@@ -44,6 +44,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | Throttling: HTTP 429 | Via faults | docs only | [Limits][qbo-limits] | Use a fault rule with status 429. Intuit documents the status and "wait 60 seconds"; the body (code 003001, `ThrottleExceeded`) is widely reported but not in the docs: check |
 | Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
 | `minorversion` parameter | Not yet | | | Accepted and ignored |
+| `requestid` on writes (idempotency) | Not yet | | [Request ID][qbo-fields] | Accepted and ignored, so a repeated requestid is applied again. Injected faults answer before the twin does anything, so a retried write is never applied twice here; a write that succeeds but loses its answer can't be simulated yet |
 | OAuth 2.0 authorization (`GET /connect/oauth2`) | Modeled | docs only | [OAuth][qbo-oauth] | Approved at once (no consent page) and redirected back with `code`, `state`, and `realmId`. A missing accounting scope redirects with `invalid_scope`, as documented |
 | OAuth 2.0 tokens (`POST /oauth2/v1/tokens/bearer`) | Modeled | docs only | [OAuth][qbo-oauth] | HTTP Basic client credentials; `authorization_code` and `refresh_token` grants; the documented response fields. Access tokens last 60 minutes of twin time; refresh tokens keep their value with a rolling 100-day expiry, as in the documented refresh sample. Codes work once |
 | Token revocation (`POST /v2/oauth2/tokens/revoke`) | Modeled | docs only | [OAuth][qbo-oauth] | Revoking any token disconnects the app |
@@ -102,6 +103,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
 [qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
+[qbo-fields]: https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions
 [qbo-invoice]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice
 [qbo-item]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/item
 [qbo-payment]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
