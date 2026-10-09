@@ -16,6 +16,9 @@ What each twin models, how closely, and whether it has been checked against the 
 | Sparse vs full update | Modeled | docs only | [Customer][qbo-customer] | Full update clears omitted writable fields |
 | Unique DisplayName | Approximate | docs only | [Error codes][qbo-errors] | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only. 6240 names the Id that has the name |
 | `GET /query` | Approximate | docs only | [REST basics][qbo-rest] | `SELECT *`, one `WHERE Field = 'value'`, `STARTPOSITION`, `MAXRESULTS`. No `POST /query`, no `COUNT(*)`, no `LIKE` |
+| `GET /item/{id}` | Modeled | docs only | [Item][qbo-item] | Seeded from the world's price list: services as `Service`, parts as `NonInventory` (parts `Taxable`). No `IncomeAccountRef`/`ExpenseAccountRef`, since the twin has no Accounts |
+| `POST /item` create and update | Not yet | | [Item][qbo-item] | Answers code 500 `Unsupported operation`. Inventory items, categories, and sub-items are not modeled |
+| `domain` and `sparse` on entities | Modeled | docs only | [Item][qbo-item] | `"domain": "QBO"`, `"sparse": false` on every entity in a response, as in the documented samples |
 | Error bodies 610, 2020, 4000, 4001, 5010, 6240 | Modeled | docs only | [Error codes][qbo-errors] | `Message` is copied from the reference, which documents it as literal. `Detail` fills in the reference's templates and may not match real responses word for word |
 | HTTP status of 610 on a read | Approximate | check | [Error codes][qbo-errors] | Twin answers 400. The docs list both 400 and 404 without saying which a missing Id gets |
 | Missing or invalid token: 401 `AuthenticationFault` 3200 | Modeled | docs only | [Error codes][qbo-errors] | |
@@ -24,7 +27,7 @@ What each twin models, how closely, and whether it has been checked against the 
 | Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
 | `minorversion` parameter | Not yet | | | Accepted and ignored |
 | OAuth 2.0 | Not yet | | | Any bearer token is accepted |
-| Webhooks, CDC, other entities | Not yet | | | Roadmap v0.1 and v0.2 |
+| Webhooks, CDC, Invoice, Payment | Not yet | | | Roadmap v0.1 and v0.2 |
 
 ## Jobber
 
@@ -53,5 +56,6 @@ What each twin models, how closely, and whether it has been checked against the 
 
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
 [qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
+[qbo-item]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/item
 [qbo-limits]: https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
 [qbo-rest]: https://developer.intuit.com/app/developer/qbo/docs/learn/rest-api-features

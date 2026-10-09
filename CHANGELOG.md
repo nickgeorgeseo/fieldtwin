@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- QuickBooks Items, seeded from the world's new trade-specific price list (`world.catalog`): `GET /item/{id}`. QuickBooks entities now carry `domain` and `sparse` like the documented samples.
 - `LICENSE` (Apache-2.0), `CONTRIBUTING.md` with the "adding an endpoint" workflow, and this changelog.
 - Biome for linting and formatting (`npm run lint`, `npm run format`), and a GitHub Actions workflow running typecheck, lint, and tests on Node 22.
 - Architecture guard tests: `test/determinism.test.ts` fails on wall-clock or unseeded-random APIs in `src/`, and `test/import-boundaries.test.ts` enforces the layer rules in ARCHITECTURE.md.

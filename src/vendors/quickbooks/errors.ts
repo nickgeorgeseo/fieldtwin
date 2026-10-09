@@ -27,6 +27,10 @@ export function qboFault(error: QboError, now: string, type: QboFaultType = "Val
 }
 
 export const qboErrors = {
+  // A real code ("Operation XXX is not supported"), used where the twin hasn't modeled an operation yet,
+  // so callers get a clear failure instead of a fake success.
+  unsupportedOperation: (detail: string, now: string) => qboFault({ code: "500", Message: "Unsupported operation", Detail: detail }, now),
+
   notFound: (now: string) =>
     qboFault({ code: "610", Message: "Object Not Found", Detail: "The object ID you're requesting doesn't exist." }, now),
 

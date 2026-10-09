@@ -1,5 +1,5 @@
 import type { TwinEvent } from "../../core/types.ts";
-import type { QboCustomer } from "./types.ts";
+import type { QboCustomer, QboItem } from "./types.ts";
 
 /**
  * Every event the QuickBooks twin records. Events carry complete records (the whole customer,
@@ -8,7 +8,8 @@ import type { QboCustomer } from "./types.ts";
 export type QboEventData =
   | { type: "CompanyCreated"; realmId: string }
   | { type: "CustomerCreated"; customer: QboCustomer }
-  | { type: "CustomerUpdated"; customer: QboCustomer };
+  | { type: "CustomerUpdated"; customer: QboCustomer }
+  | { type: "ItemCreated"; item: QboItem };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asQboEvent(event: TwinEvent): QboEventData {
@@ -24,5 +25,7 @@ export function describeQboEvent(event: TwinEvent): string {
     case "CustomerCreated":
     case "CustomerUpdated":
       return `${data.type} Id=${data.customer.Id} "${data.customer.DisplayName}" SyncToken=${data.customer.SyncToken}`;
+    case "ItemCreated":
+      return `ItemCreated Id=${data.item.Id} "${data.item.Name}" ${data.item.Type} UnitPrice=${data.item.UnitPrice}`;
   }
 }
