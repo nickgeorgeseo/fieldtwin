@@ -2,6 +2,7 @@ import { clientName, type JobberClient } from "../types.ts";
 import type { PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
 import { jobsConnection } from "./jobs.ts";
+import { quotesConnection } from "./quotes.ts";
 
 /** Client: https://developer.getjobber.com/docs (Important Objects: Client) */
 export function clientNode(client: JobberClient, context: ResolverContext) {
@@ -15,5 +16,6 @@ export function clientNode(client: JobberClient, context: ResolverContext) {
     phone: primaryPhone?.number ?? null,
     updatedAt: client.createdAt,
     jobs: (args: PageArgs) => jobsConnection(args, context, client.id),
+    quotes: (args: PageArgs) => quotesConnection(args, context, client.id),
   };
 }

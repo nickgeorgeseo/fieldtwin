@@ -3,6 +3,7 @@ import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
 import { jobNode, jobsConnection } from "./jobs.ts";
+import { quoteNode, quotesConnection } from "./quotes.ts";
 import { userNode } from "./users.ts";
 
 /**
@@ -33,6 +34,13 @@ export function createResolvers(state: () => JobberState, nowMs: () => number) {
     job: ({ id }: { id: string }) => {
       const job = state().jobs.get(id);
       return job ? jobNode(job, context) : null;
+    },
+
+    quotes: (args: PageArgs) => quotesConnection(args, context),
+
+    quote: ({ id }: { id: string }) => {
+      const quote = state().quotes.get(id);
+      return quote ? quoteNode(quote, context) : null;
     },
   };
 }

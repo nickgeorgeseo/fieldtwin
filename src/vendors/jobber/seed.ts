@@ -3,7 +3,7 @@ import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import type { WorldLineItem } from "../../world/history.ts";
 import { encodeId } from "./encoded-id.ts";
-import type { JobberClient, JobberJob, JobberLineItem, JobberUser, JobberVisit } from "./types.ts";
+import type { JobberClient, JobberJob, JobberLineItem, JobberQuote, JobberUser, JobberVisit } from "./types.ts";
 
 const SEED_TIME = "2020-01-01T00:00:00.000Z";
 
@@ -43,12 +43,28 @@ export function seedJobber(world: World): NewEvent[] {
     record("UserCreated", { user });
   });
 
+  for (const worldQuote of world.history.quotes) {
+    const quote: JobberQuote = {
+      id: ids.quote(worldQuote.key),
+      quoteNumber: String(worldQuote.number),
+      title: worldQuote.title,
+      clientId: ids.client(worldQuote.customerKey),
+      lineItems: lineItems(worldQuote.lineItems, ids, "QuoteLineItem"),
+      sentAt: worldQuote.sentAt,
+      approvedAt: worldQuote.approvedAt ?? null,
+      createdAt: worldQuote.createdAt,
+      updatedAt: worldQuote.approvedAt ?? worldQuote.sentAt,
+    };
+    record("QuoteCreated", { quote });
+  }
+
   for (const worldJob of world.history.jobs) {
     const job: JobberJob = {
       id: ids.job(worldJob.key),
       jobNumber: worldJob.number,
       title: worldJob.title,
       clientId: ids.client(worldJob.customerKey),
+      quoteId: worldJob.quoteKey ? ids.quote(worldJob.quoteKey) : null,
       instructions: null,
       lineItems: lineItems(worldJob.lineItems, ids, "JobLineItem"),
       createdAt: worldJob.createdAt,
@@ -111,6 +127,10 @@ class WorldIds {
 
   visit(key: string): string {
     return encodeId("Visit", numberIn(key));
+  }
+
+  quote(key: string): string {
+    return encodeId("Quote", numberIn(key));
   }
 
   next(type: string): string {

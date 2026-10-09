@@ -9,6 +9,7 @@ export function createJobberState(): JobberState {
     users: new Map(),
     jobs: new Map(),
     visits: new Map(),
+    quotes: new Map(),
   };
 }
 
@@ -35,6 +36,10 @@ export function applyJobberEvent(state: JobberState, event: TwinEvent): void {
 
     case "VisitCreated":
       state.visits.set(data.visit.id, data.visit);
+      return;
+
+    case "QuoteCreated":
+      state.quotes.set(data.quote.id, data.quote);
       return;
 
     default:

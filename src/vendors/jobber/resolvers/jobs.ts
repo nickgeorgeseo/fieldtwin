@@ -3,6 +3,7 @@ import type { JobberJob, JobberVisit } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
+import { quoteNode } from "./quotes.ts";
 import { jobStatus, visitStatus } from "./statuses.ts";
 import { userNode } from "./users.ts";
 
@@ -20,6 +21,7 @@ export function jobNode(job: JobberJob, context: ResolverContext) {
     endAt: visits.at(-1)?.endAt ?? null,
     completedAt: finished ? visits.at(-1)!.completedAt : null,
     total: sumMoney(job.lineItems.map((line) => line.totalPrice)), // "The total chargeable amount of the job"
+    quote: () => (job.quoteId ? quoteNode(context.state().quotes.get(job.quoteId)!, context) : null),
     lineItems: (args: PageArgs) => connection(job.lineItems, args, (line) => line),
     visits: (args: PageArgs) => connection(visits, args, (visit) => visitNode(visit, context)),
   };

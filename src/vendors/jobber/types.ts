@@ -48,8 +48,22 @@ export interface JobberJob {
   jobNumber: number;
   title: string;
   clientId: string;
+  quoteId: string | null; // the quote this job was converted from
   instructions: string | null;
   lineItems: JobberLineItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** "A cost estimate which service providers sent to their clients before any work is done." */
+export interface JobberQuote {
+  id: string;
+  quoteNumber: string; // a String in Jobber's schema
+  title: string;
+  clientId: string;
+  lineItems: JobberLineItem[];
+  sentAt: string | null;
+  approvedAt: string | null; // not an API field; with the jobs it became, it decides quoteStatus
   createdAt: string;
   updatedAt: string;
 }
@@ -74,4 +88,5 @@ export interface JobberState {
   users: Map<string, JobberUser>;
   jobs: Map<string, JobberJob>;
   visits: Map<string, JobberVisit>;
+  quotes: Map<string, JobberQuote>;
 }

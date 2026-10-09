@@ -1,0 +1,68 @@
+# Quote: "A cost estimate which service providers sent to their clients before any work is done."
+# Status values and the fields of QuoteAmounts are not in the public docs; FIDELITY.md marks them "check".
+extend type Query {
+  quotes(first: Int, after: String): QuoteConnection!
+  quote(id: EncodedId!): Quote
+}
+
+type Quote {
+  id: EncodedId!
+  quoteNumber: String!
+  quoteStatus: QuoteStatusTypeEnum!
+  title: String
+  client: Client
+  amounts: QuoteAmounts!
+  lineItems(first: Int, after: String): QuoteLineItemConnection!
+  jobs(first: Int, after: String): JobConnection
+  sentAt: ISO8601DateTime
+  transitionedAt: ISO8601DateTime!
+  createdAt: ISO8601DateTime!
+  updatedAt: ISO8601DateTime!
+}
+
+enum QuoteStatusTypeEnum {
+  draft
+  awaiting_response
+  approved
+  converted
+  changes_requested
+  archived
+}
+
+type QuoteAmounts {
+  subtotal: Float!
+  total: Float!
+}
+
+type QuoteLineItem {
+  id: EncodedId!
+  name: String!
+  description: String
+  quantity: Float!
+  unitPrice: Float
+  totalPrice: Float!
+}
+
+type QuoteConnection {
+  nodes: [Quote!]!
+  edges: [QuoteEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type QuoteEdge {
+  node: Quote!
+  cursor: String!
+}
+
+type QuoteLineItemConnection {
+  nodes: [QuoteLineItem!]!
+  edges: [QuoteLineItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type QuoteLineItemEdge {
+  node: QuoteLineItem!
+  cursor: String!
+}
