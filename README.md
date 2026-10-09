@@ -144,6 +144,16 @@ faults:
 
 Injected failures come back in the vendor's own error format and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs.
 
+A scenario can also schedule what happens as twin time passes. Advancing the clock runs each entry at its own time, recorded with source `scenario`:
+
+```yaml
+timeline:
+  - at: "08:00"                  # business time; also "+90m", "+2h", or an ISO time
+    jobber: { newClients: 12 }   # new clients call in
+  - at: "13:00"
+    jobber: { payInvoices: 4 }   # the longest-open invoices get paid
+```
+
 ## Project layout
 
 ```text

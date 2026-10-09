@@ -1,5 +1,5 @@
 import type { NewEvent } from "../../../core/types.ts";
-import { encodeId } from "../encoded-id.ts";
+import { encodeId, nextIdNumber } from "../encoded-id.ts";
 import type { JobberClient } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import type { ResolverContext } from "./context.ts";
@@ -33,7 +33,7 @@ export function createMutations(context: ResolverContext, record: (event: NewEve
 
       const state = context.state();
       const client: JobberClient = {
-        id: encodeId("Client", state.clients.size + 1),
+        id: encodeId("Client", nextIdNumber(state.clients.keys(), "Client")),
         firstName: input.firstName ?? "",
         lastName: input.lastName!,
         companyName: input.companyName ?? null,

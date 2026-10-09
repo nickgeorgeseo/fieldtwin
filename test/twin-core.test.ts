@@ -44,5 +44,6 @@ describe("the twin", () => {
     expect(new Set(twin.world.customers.map((c) => `${c.firstName} ${c.lastName}`)).size).toBe(120);
     expect(twin.clock.nowIso()).toBe("2026-07-13T11:00:00.000Z");
     expect(twin.faultRules.map((rule) => rule.name)).toEqual(["qbo-throttled-writes", "jobber-slow"]);
+    expect(twin.upcoming().map((entry) => `${entry.action} ${entry.params}`)).toEqual(["newClients 12", "newClients 15", "payInvoices 4"]);
   });
 });

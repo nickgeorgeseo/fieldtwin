@@ -4,6 +4,7 @@ import { EventLog } from "./event-log.ts";
 import { type BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
 import { type OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { SeededRandom } from "./random.ts";
+import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
 
@@ -44,6 +45,9 @@ export class Twin {
   // so they survive reset() and rewind(), the way a real app stays connected while its data changes.
   private oauthServers = new Map<VendorName, OAuthServer>();
 
+  // A loaded scenario's schedule. See schedule() and advance().
+  private timeline = new Timeline();
+
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
     this.authMode = options.auth ?? "any-token";
@@ -75,7 +79,48 @@ export class Twin {
   /** Switch to a different seed, start time, or world size, then reset. Used when loading a scenario. */
   reconfigure(changes: Partial<Omit<TwinOptions, "vendors">>): void {
     this.options = { ...this.options, ...changes };
+    this.timeline.schedule([]); // the old scenario's schedule doesn't belong in the new world
     this.reset();
+  }
+
+  /** Schedule a scenario's timeline, replacing any other, and apply the entries already due. */
+  schedule(entries: TimelineEntry[]): void {
+    for (const entry of entries) this.scenarioAction(entry).check(entry.params);
+    this.timeline.schedule(entries);
+    this.runDue(this.clock.nowMs());
+  }
+
+  /** Move twin time forward, applying scheduled entries at their own times on the way. */
+  advance(milliseconds: number): void {
+    const target = this.clock.nowMs() + milliseconds;
+    for (let due = this.timeline.nextAt(); due !== undefined && due <= target; due = this.timeline.nextAt()) {
+      this.clock.advance(Math.max(0, due - this.clock.nowMs()));
+      this.runDue(due);
+    }
+    this.clock.advance(target - this.clock.nowMs());
+  }
+
+  /** The next few scheduled entries, for status displays. */
+  upcoming(limit = 5): TimelineEntry[] {
+    return this.timeline.upcoming(limit);
+  }
+
+  private runDue(nowMs: number): void {
+    for (const { entry, position } of this.timeline.takeDue(nowMs)) {
+      const random = new SeededRandom(this.options.seed * 7919 + 1000 + position);
+      const context = { state: this.state(entry.vendor), world: this.world, random, nowIso: this.clock.nowIso() };
+      for (const event of this.scenarioAction(entry).run(entry.params, context)) this.record(event, "scenario");
+    }
+  }
+
+  private scenarioAction(entry: TimelineEntry) {
+    const actions = this.vendor(entry.vendor).scenarioActions ?? {};
+    const action = actions[entry.action];
+    if (!action) {
+      const available = Object.keys(actions).join(", ") || "none";
+      throw new Error(`${entry.vendor} has no scenario action "${entry.action}". Available: ${available}`);
+    }
+    return action;
   }
 
   /** Back to the seeded starting world. Same seed and options give a byte-identical log. */
@@ -93,6 +138,8 @@ export class Twin {
     for (const vendor of this.vendors.values()) {
       for (const event of vendor.seed(this.world)) this.record(event, "seed");
     }
+    this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
+    this.runDue(this.clock.nowMs());
   }
 
   /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
@@ -147,6 +194,7 @@ export class Twin {
     }
     this.clock = new TwinClock(checkpoint.time);
     this.rateLimits.clear();
+    this.timeline.rearmAfter(this.clock.nowMs());
 
     // Checkpoints taken after this one point at history that no longer exists.
     for (const [otherName, other] of this.checkpoints) {

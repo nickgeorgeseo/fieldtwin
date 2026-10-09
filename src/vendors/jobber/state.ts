@@ -44,6 +44,7 @@ export function applyJobberEvent(state: JobberState, event: TwinEvent): void {
       return;
 
     case "InvoiceCreated":
+    case "InvoiceUpdated":
       state.invoices.set(data.invoice.id, data.invoice);
       return;
 

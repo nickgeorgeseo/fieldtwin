@@ -18,7 +18,8 @@ export type JobberEventData =
   | { type: "JobCreated"; job: JobberJob }
   | { type: "VisitCreated"; visit: JobberVisit }
   | { type: "QuoteCreated"; quote: JobberQuote }
-  | { type: "InvoiceCreated"; invoice: JobberInvoice };
+  | { type: "InvoiceCreated"; invoice: JobberInvoice }
+  | { type: "InvoiceUpdated"; invoice: JobberInvoice };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asJobberEvent(event: TwinEvent): JobberEventData {
@@ -42,6 +43,7 @@ export function describeJobberEvent(event: TwinEvent): string {
     case "QuoteCreated":
       return `QuoteCreated #${data.quote.quoteNumber} "${data.quote.title}"`;
     case "InvoiceCreated":
-      return `InvoiceCreated #${data.invoice.invoiceNumber} "${data.invoice.subject}"${data.invoice.paidAt ? " (paid)" : ""}`;
+    case "InvoiceUpdated":
+      return `${data.type} #${data.invoice.invoiceNumber} "${data.invoice.subject}"${data.invoice.paidAt ? " (paid)" : ""}`;
   }
 }

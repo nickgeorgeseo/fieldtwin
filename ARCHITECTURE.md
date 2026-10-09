@@ -115,6 +115,25 @@ With a correct SyncToken, step 3 instead builds the full updated record, calls `
 
 **Small, boring dependencies.** Hono (HTTP), graphql-js (the reference GraphQL implementation), zod (validating scenario files), yaml, and the official MCP SDK. No ORM, no dependency injection framework, no code generation.
 
+## Scenario timelines
+
+A scenario can schedule things to happen as twin time passes:
+
+```yaml
+timeline:
+  - at: "08:00"          # business time on the start date; also "+90m", "+2h", "+1d", or an ISO time
+    jobber: { newClients: 15 }
+  - at: "+4h"
+    jobber: { payInvoices: 3 }
+```
+
+The design is deliberately small:
+
+- **Vendors own their actions.** Each vendor may export `scenarioActions` on its `VendorTwin`: named actions that check their parameters when the scenario loads and return complete events when they run. `control/` only resolves times and hands the twin a flat list of `{ atMs, vendor, action, params }`; it never learns what an action does.
+- **The clock drives the schedule.** `twin.advance(ms)` (behind `POST /_twin/clock/advance` and the MCP tool) stops at each due entry, sets the clock to the entry's time, and records its events with source `scenario`. Nothing runs on wall-clock time. Code that calls `twin.clock.advance()` directly skips the schedule; use `twin.advance()`.
+- **History stays honest.** Entries at or before the load time run at load. Rewinding to a checkpoint makes every later entry due again; the earlier ones are already in the kept history, so nothing is applied twice. Each entry draws from its own seeded random stream, so a re-armed entry creates the same new clients as before.
+- **Bad scenarios fail at load.** An unknown vendor, action, time format, or parameter is an error when the YAML is loaded, not hours of twin time later.
+
 ## Code style
 
 The goal is code a new contributor can read top to bottom without jumping around.
@@ -139,7 +158,7 @@ The goal is code a new contributor can read top to bottom without jumping around
 ## Roadmap
 
 - **v0.1.** QuickBooks Invoice, Payment, Item, and change data capture. Jobber Job, Visit, Quote, Invoice, and mutations. A twin OAuth server with expiring tokens.
-- **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Scenario timelines ("40 new requests arrive by 9 a.m.").
+- **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Timeline events are the natural trigger for them.
 - **v0.3.** Conformance suite: record short sessions against the real vendor sandboxes and replay them against the twin, so drift shows up as a failing test with a fidelity score per endpoint.
 - **v0.4.** More vendors: Housecall Pro, Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
 - **v0.5.** A benchmark for dispatch and operations agents, built on these twins.

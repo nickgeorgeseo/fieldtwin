@@ -102,6 +102,20 @@ function makeCustomers(random: SeededRandom, count: number, home: Home): WorldCu
   return customers;
 }
 
+/**
+ * Someone new to the business, for scenario timelines ("15 new clients by 9 a.m."): local to the world's
+ * city, with a name nobody in `takenNames` has ("First Last"), numbered `n` so their email is unique.
+ */
+export function newCustomer(random: SeededRandom, world: World, n: number, takenNames: Set<string>): WorldCustomer {
+  const home = CITIES.find((city) => city.city === world.company.city)!;
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const firstName = random.pick(FIRST_NAMES);
+    const lastName = random.pick(LAST_NAMES);
+    if (!takenNames.has(`${firstName} ${lastName}`)) return makeCustomer(random, n, firstName, lastName, home);
+  }
+  throw new Error("The word lists have no unused names left for a new customer");
+}
+
 function makeCustomer(random: SeededRandom, n: number, firstName: string, lastName: string, home: Home): WorldCustomer {
   return {
     key: `cust-${pad(n)}`,

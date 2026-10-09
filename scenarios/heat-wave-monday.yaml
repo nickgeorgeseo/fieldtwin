@@ -17,3 +17,12 @@ faults:
     vendor: jobber
     rate: 1
     effect: { latencyMs: 300 }
+timeline:
+  # The phones start ringing when the office opens, and don't stop.
+  - at: "08:00"
+    jobber: { newClients: 12 }
+  - at: "10:00"
+    jobber: { newClients: 15 }
+  # Customers whose cooling came back on pay up after lunch.
+  - at: "13:00"
+    jobber: { payInvoices: 4 }

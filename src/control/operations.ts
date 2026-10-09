@@ -1,6 +1,6 @@
 import type { Twin } from "../core/twin.ts";
-import type { AuthMode, TwinEvent } from "../core/types.ts";
-import { parseFaultRules, parseScenario } from "./scenario.ts";
+import type { AuthMode, TwinEvent, VendorName } from "../core/types.ts";
+import { parseFaultRules, parseScenario, resolveAt } from "./scenario.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -17,6 +17,7 @@ export function describeTwin(twin: Twin) {
     vendors: twin.vendorNames(),
     authMode: twin.authMode,
     activeFaults: twin.faultRules.map((rule) => rule.name),
+    upcoming: twin.upcoming().map(({ atMs, vendor, action, params }) => ({ at: new Date(atMs).toISOString(), vendor, action, params })),
   };
 }
 
@@ -25,9 +26,12 @@ export function resetTwin(twin: Twin) {
   return describeTwin(twin);
 }
 
+/** Move twin time forward. Scheduled scenario events happen on the way, each at its own time. */
 export function advanceClock(twin: Twin, minutes: number) {
-  twin.clock.advance(minutes * 60_000);
-  return { twinTime: twin.clock.nowIso() };
+  if (typeof minutes !== "number" || !(minutes >= 0)) throw new Error("minutes must be a number, 0 or more");
+  const before = twin.log.length;
+  twin.advance(minutes * 60_000);
+  return { twinTime: twin.clock.nowIso(), scenarioEvents: twin.log.length - before };
 }
 
 export function createCheckpoint(twin: Twin, name: string) {
@@ -71,6 +75,15 @@ export function loadScenario(twin: Twin, yamlText: string) {
   twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize: scenario.world });
   twin.faultRules = scenario.faults;
   if (scenario.auth) twin.authMode = scenario.auth;
+
+  const startMs = twin.clock.nowMs();
+  const timeline = scenario.timeline.flatMap(({ at, ...byVendor }) => {
+    const atMs = resolveAt(at, startMs, twin.world.company.utcOffsetHours);
+    return Object.entries(byVendor).flatMap(([vendor, actions]) =>
+      Object.entries(actions ?? {}).map(([action, params]) => ({ atMs, vendor: vendor as VendorName, action, params })),
+    );
+  });
+  twin.schedule(timeline);
   return { scenario: scenario.name, ...describeTwin(twin) };
 }
 

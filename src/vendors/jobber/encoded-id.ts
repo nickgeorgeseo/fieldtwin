@@ -29,3 +29,13 @@ export function isEncodedId(value: unknown): value is string {
 export function invalidEncodedIdMessage(value: unknown): string {
   return `'${String(value)}' is not a valid EncodedId`;
 }
+
+/** The next free number for a record type, given the ids already used: one more than the highest. */
+export function nextIdNumber(ids: Iterable<string>, type: string): number {
+  let highest = 0;
+  for (const id of ids) {
+    const decoded = decodeId(id);
+    if (decoded?.type === type) highest = Math.max(highest, decoded.n);
+  }
+  return highest + 1;
+}
