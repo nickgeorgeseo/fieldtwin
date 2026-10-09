@@ -1,0 +1,138 @@
+# Architecture
+
+This document explains how fieldtwin is put together and, more importantly, the few rules that keep it easy to maintain. If a change would break one of these rules, open an issue to discuss it first.
+
+## Goals
+
+- **Believable.** Code that works against the twin should work against the real API, and code that breaks on the real API should break on the twin.
+- **Reproducible.** Same seed and same requests give a byte-identical event log.
+- **Inspectable.** At any moment you can see exactly what changed and why.
+- **Easy to extend.** Adding a vendor or an endpoint should mean copying an existing pattern, not learning a framework.
+
+## Non-goals
+
+- Full parity with any vendor. We model the behavior integrations actually depend on and say clearly what we skip (FIDELITY.md).
+- Cloning vendor UIs.
+- Syncing vendors with each other. That is the job of the code under test.
+- Production use. This is a test environment.
+
+## The picture
+
+```mermaid
+flowchart LR
+  subgraph Callers
+    A[Your integration or AI agent]
+    B[Developer, test, or coding agent]
+  end
+
+  subgraph fieldtwin
+    F[Fault middleware]
+    Q[vendors/quickbooks]
+    J[vendors/jobber]
+    C[control: HTTP + MCP]
+    O[operations.ts]
+    T[Twin runtime]
+    L[(Event log)]
+    W[World generator]
+  end
+
+  A -->|vendor-shaped HTTP| F
+  F --> Q
+  F --> J
+  B -->|/_twin or MCP tools| C
+  C --> O
+  O --> T
+  Q -->|twin.record| T
+  J -->|twin.record| T
+  T --> L
+  W -->|seed| T
+```
+
+## The three rules
+
+**1. All state changes go through `twin.record()`.** A route never edits state directly. It works out the new record, then records an event (`CustomerCreated`, `CustomerUpdated`) and the vendor's `apply()` function updates state. This single write path is what makes "what did my agent change?" and "rewind" possible, and it means there is exactly one place to look when state is wrong.
+
+**2. Time comes from `twin.clock`; randomness comes from `SeededRandom`.** `Date.now()` and `Math.random()` do not appear in this codebase. This is what makes runs reproducible and lets tests skip ahead in time instantly. Faults use their own random stream so turning a fault on never changes the generated world.
+
+**3. Vendor state can always be rebuilt from the event log.** `apply()` must be deterministic: the same events in always produce the same state out. Events carry complete records (the whole customer, not "change field X") so `apply()` stays trivially simple.
+
+## Layers and who may import whom
+
+```text
+world/        imports nothing from the project except core/random
+core/         imports world/ only
+vendors/x/    imports core/ and world/ only. Never another vendor.
+faults/       imports core/ only. Never a specific vendor.
+control/      imports core/ only; HTTP and MCP adapters both go through operations.ts
+app.ts        the only file that knows every piece exists
+```
+
+If two vendors need the same helper, it moves to `core/`. If you find yourself importing a vendor from `faults/` or `control/`, the vendor contract is missing something; add it to `VendorTwin` instead.
+
+## Anatomy of a vendor folder
+
+Every vendor has the same files, so once you have read one you can read them all.
+
+| File | Holds |
+|---|---|
+| `types.ts` | Record shapes, named exactly as the vendor's docs name them, plus the event payloads |
+| `state.ts` | `createState()` and `apply()`, the only code that changes this vendor's state |
+| `seed.ts` | Turns the shared world into this vendor's starting events |
+| `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()` |
+| `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
+| `index.ts` | Exports one `VendorTwin` object. Nothing else |
+
+GraphQL vendors also have `schema.graphql` (a hand-written subset of the public schema), `resolvers.ts` (plain functions of state), and anything vendor-specific like Jobber's `cost.ts`.
+
+## What happens on a request
+
+Take `POST /v3/company/{realm}/customer` with a stale SyncToken.
+
+1. `app.ts` routed `/v3/*` through the QuickBooks fault middleware. No fault rule matches, so it passes the request on.
+2. `quickbooks/routes.ts` checks the bearer token and realm, sees an `Id` in the body, and calls `updateCustomer()`.
+3. `updateCustomer()` compares SyncTokens, finds a mismatch, and returns `qboErrors.staleObject()`. Nothing is recorded, so state and the log are untouched.
+
+With a correct SyncToken, step 3 instead builds the full updated record, calls `twin.record({ type: "CustomerUpdated", ... }, "api")`, and returns it. The event's `source: "api"` is how `/_twin/.../changes?source=api` later separates your code's changes from seed data and scenario events.
+
+## Key decisions
+
+**An event log instead of a database.** Tradeoff: rebuilding state means replaying events, which is slower than a database for huge worlds. In return we get rewind, change lists, reproducible bug reports (attach `log.jsonl`), and state that is plain objects anyone can read. Twin worlds are small, so replay is fast. If that ever stops being true, add periodic snapshots inside `Twin`; no vendor code changes.
+
+**Hand-written schema subsets instead of importing vendor specs.** A generated client of a 500-type schema is unreadable and mostly unused. We add fields as tests need them, each one traceable to the public docs.
+
+**Vendors don't sync with each other.** Both are seeded from one world, so they start out consistent, but after that they drift exactly like real systems. A scenario can even seed deliberate mismatches (the same customer spelled two ways) to test sync logic.
+
+**Faults are data.** Fault rules are plain objects in YAML. The middleware asks the vendor for an error body in its own format, so vendors never contain fault logic and every vendor gets every fault type for free.
+
+**One operations module.** HTTP control routes, MCP tools, and tests all call `control/operations.ts`, so each operation has one implementation and the adapters stay a few lines long.
+
+**Small, boring dependencies.** Hono (HTTP), graphql-js (the reference GraphQL implementation), zod (validating scenario files), yaml, and the official MCP SDK. No ORM, no dependency injection framework, no code generation.
+
+## Code style
+
+The goal is code a new contributor can read top to bottom without jumping around.
+
+- Plain functions and plain objects. A class only when it owns changing state (`Twin`, `TwinClock`, `CostBucket`).
+- Name things the way the vendor's docs name them (`SyncToken`, `DisplayName`, `clients`, `pageInfo`), so code can be checked against the docs line by line.
+- A file does one job and stays under about 200 lines. When it grows, split it by job, not by type.
+- Every vendor behavior gets a comment saying what the real API does and why it matters, with a docs link when there is one. Comments explain *why*; the code already says *what*.
+- No clever tricks: no metaprogramming, no decorators, no inheritance between vendors.
+- Error messages say what was wrong and what to do about it.
+- Every behavior has a test, named as a sentence about the behavior.
+
+## Adding a vendor
+
+1. Add the name to `VendorName` in `core/types.ts`.
+2. Copy `vendors/quickbooks/` (REST) or `vendors/jobber/` (GraphQL) to `vendors/<name>/` and empty it out.
+3. Write `types.ts` from the vendor's public docs, then `state.ts`, `seed.ts`, `routes.ts`, `index.ts`, in that order.
+4. Pick a `pathPrefix` no other vendor uses.
+5. Add it to `ALL_VENDORS` in `app.ts`.
+6. Add `test/<name>.test.ts` and a section in FIDELITY.md.
+
+## Roadmap
+
+- **v0.1.** QuickBooks Invoice, Payment, Item, and change data capture. Jobber Job, Visit, Quote, Invoice, and mutations. A twin OAuth server with expiring tokens.
+- **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Scenario timelines ("40 new requests arrive by 9 a.m.").
+- **v0.3.** Conformance suite: record short sessions against the real vendor sandboxes and replay them against the twin, so drift shows up as a failing test with a fidelity score per endpoint.
+- **v0.4.** More vendors: Housecall Pro, Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
+- **v0.5.** A benchmark for dispatch and operations agents, built on these twins.

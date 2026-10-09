@@ -1,0 +1,49 @@
+# A small, hand-written subset of Jobber's public GraphQL schema.
+# Field names match https://developer.getjobber.com so client code works unchanged.
+# Add fields here first, then a resolver in resolvers.ts, then a test.
+
+scalar EncodedId
+scalar ISO8601DateTime
+
+type Query {
+  account: Account!
+  clients(first: Int, after: String): ClientConnection!
+  client(id: EncodedId!): Client
+}
+
+type Account {
+  id: EncodedId!
+  name: String!
+}
+
+type ClientConnection {
+  nodes: [Client!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type Client {
+  id: EncodedId!
+  firstName: String
+  lastName: String
+  companyName: String
+  name: String!
+  emails: [Email!]!
+  phones: [ClientPhoneNumber!]!
+  createdAt: ISO8601DateTime!
+}
+
+type Email {
+  address: String!
+  primary: Boolean!
+}
+
+type ClientPhoneNumber {
+  number: String!
+  primary: Boolean!
+}

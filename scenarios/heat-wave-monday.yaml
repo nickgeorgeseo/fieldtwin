@@ -1,0 +1,19 @@
+# The Monday after a heat wave: a bigger customer list, and QuickBooks is struggling.
+# Use it to check that your sync code retries politely instead of giving up or hammering the API.
+name: Heat wave Monday
+description: Busy HVAC Monday. One in five QuickBooks writes is throttled, and Jobber is slow.
+seed: 7
+startTime: "2026-07-13T11:00:00Z" # 7:00 a.m. Eastern
+world:
+  customers: 120
+  technicians: 6
+faults:
+  - name: qbo-throttled-writes
+    vendor: quickbooks
+    method: POST
+    rate: 0.2
+    effect: { status: 429, message: "ThrottleExceeded" }
+  - name: jobber-slow
+    vendor: jobber
+    rate: 1
+    effect: { latencyMs: 300 }
