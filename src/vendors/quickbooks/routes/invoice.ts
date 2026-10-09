@@ -1,9 +1,10 @@
 import type { Hono } from "hono";
+import { formatMoney, fromCents, toCents } from "../../../core/money.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, pickWritable, type UpdateBody } from "./entity.ts";
+import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
 
 /** Invoice: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice */
 export function invoiceRoutes(app: Hono, twin: Twin): void {
@@ -23,7 +24,7 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
       return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Invoice by the twin yet.`, now()), 400);
     }
     const body = (await c.req.json()) as UpdateBody<QboInvoice>;
-    const result = body.Id ? updateNotYet(now()) : createInvoice(twin, body);
+    const result = body.Id ? updateInvoice(twin, body) : createInvoice(twin, body);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Invoice: asResponse(result), time: now() });
   });
@@ -49,6 +50,35 @@ function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | Q
   return invoice;
 }
 
-function updateNotYet(now: string): QboFault {
-  return qboErrors.unsupportedOperation("Operation Update is not supported for Invoice by the twin yet.", now);
+function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | QboFault {
+  const state = twin.state<QboState>("quickbooks");
+  const now = twin.clock.nowIso();
+  const existing = state.invoices.get(String(body.Id));
+  if (!existing) return qboErrors.notFound(now);
+
+  const conflict = checkSyncToken(existing, body, now);
+  if (conflict) return conflict;
+
+  const fields: InvoiceFields = mergeUpdate(existing, body, WRITABLE_INVOICE_FIELDS);
+  const draft = draftInvoice(state, fields, { today: now.slice(0, 10), now, existingLines: existing.Line, isCreate: false });
+  if ("Fault" in draft) return draft;
+
+  // Payments already applied stay applied, so the new balance is the new total minus what has been paid.
+  const paidCents = toCents(existing.TotalAmt) - toCents(existing.Balance);
+  const balanceCents = toCents(draft.TotalAmt) - paidCents;
+  if (balanceCents < 0) {
+    return qboErrors.businessValidation(
+      `This invoice has ${formatMoney(fromCents(paidCents))} in payments applied, so its total can't go below that.`,
+      now,
+    );
+  }
+
+  const invoice: QboInvoice = {
+    ...draft,
+    ...nextVersion(existing, now),
+    Balance: fromCents(balanceCents),
+    LinkedTxn: existing.LinkedTxn, // read only: payment links survive updates
+  };
+  twin.record({ vendor: "quickbooks", type: "InvoiceUpdated", data: { invoice } }, "api");
+  return invoice;
 }

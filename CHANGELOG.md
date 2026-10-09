@@ -6,7 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
-- QuickBooks invoices: create and read, with Item lines, computed `TotalAmt` and `Balance`, the subtotal line QuickBooks appends, automatic `DocNumber`s, and the documented line validation errors (2020, 2050, 2290, 2500, 6070).
+- QuickBooks invoices: create, read, and sparse and full update (SyncToken rules, line Ids kept, totals recomputed), with Item lines, computed `TotalAmt` and `Balance`, the subtotal line QuickBooks appends, automatic `DocNumber`s, and the documented line validation errors (2020, 2050, 2290, 2500, 6070).
 - QuickBooks Items, seeded from the world's new trade-specific price list (`world.catalog`): `GET /item/{id}`. QuickBooks entities now carry `domain` and `sparse` like the documented samples.
 - `LICENSE` (Apache-2.0), `CONTRIBUTING.md` with the "adding an endpoint" workflow, and this changelog.
 - Biome for linting and formatting (`npm run lint`, `npm run format`), and a GitHub Actions workflow running typecheck, lint, and tests on Node 22.
