@@ -1,0 +1,71 @@
+# Invoice: "A receipt detailing the work done as well as the cost of the service provided."
+# The root invoices/invoice queries, the status values other than "voided", and the fields of InvoiceAmounts
+# are not in the public docs; FIDELITY.md marks them "check".
+extend type Query {
+  invoices(first: Int, after: String): InvoiceConnection!
+  invoice(id: EncodedId!): Invoice
+}
+
+type Invoice {
+  id: EncodedId!
+  invoiceNumber: String!
+  invoiceStatus: InvoiceStatusTypeEnum!
+  subject: String!
+  client: Client
+  amounts: InvoiceAmounts
+  issuedDate: ISO8601DateTime
+  dueDate: ISO8601DateTime
+  lineItems(first: Int, after: String): InvoiceLineItemConnection!
+  jobs(first: Int, after: String): JobConnection!
+  createdAt: ISO8601DateTime!
+  updatedAt: ISO8601DateTime!
+}
+
+enum InvoiceStatusTypeEnum {
+  draft
+  awaiting_payment
+  past_due
+  paid
+  bad_debt
+  voided
+}
+
+type InvoiceAmounts {
+  subtotal: Float!
+  total: Float!
+  paymentsTotal: Float!
+  invoiceBalance: Float!
+}
+
+type InvoiceLineItem {
+  id: EncodedId!
+  name: String!
+  description: String
+  quantity: Float!
+  unitPrice: Float
+  totalPrice: Float!
+}
+
+type InvoiceConnection {
+  nodes: [Invoice!]!
+  edges: [InvoiceEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InvoiceEdge {
+  node: Invoice!
+  cursor: String!
+}
+
+type InvoiceLineItemConnection {
+  nodes: [InvoiceLineItem!]!
+  edges: [InvoiceLineItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InvoiceLineItemEdge {
+  node: InvoiceLineItem!
+  cursor: String!
+}

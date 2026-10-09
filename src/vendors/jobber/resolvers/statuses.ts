@@ -1,4 +1,4 @@
-import type { JobberVisit } from "../types.ts";
+import type { JobberInvoice, JobberVisit } from "../types.ts";
 
 /**
  * Statuses are derived, not stored: Jobber's visitStatus and jobStatus change as time passes even when
@@ -9,6 +9,7 @@ import type { JobberVisit } from "../types.ts";
 
 export type VisitStatus = "completed" | "late" | "today" | "upcoming" | "unscheduled";
 export type JobStatus = "active" | "archived" | "late" | "requires_invoicing" | "today" | "upcoming" | "unscheduled";
+export type InvoiceStatus = "awaiting_payment" | "past_due" | "paid";
 
 const HOUR = 3_600_000;
 
@@ -37,4 +38,11 @@ export function jobStatus(visits: JobberVisit[], invoiced: boolean, nowMs: numbe
   if (statuses.includes("late")) return "late";
   if (statuses.includes("today")) return "today";
   return statuses.includes("completed") ? "active" : "upcoming";
+}
+
+/** An open invoice is past due once its due date has gone by at the business. ("voided" is documented too.) */
+export function invoiceStatus(invoice: JobberInvoice, nowMs: number, utcOffsetHours: number): InvoiceStatus {
+  if (invoice.paidAt) return "paid";
+  const dueDay = localDate(Date.parse(invoice.dueDate), utcOffsetHours);
+  return dueDay < localDate(nowMs, utcOffsetHours) ? "past_due" : "awaiting_payment";
 }

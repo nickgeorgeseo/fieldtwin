@@ -16,6 +16,9 @@ type Job {
   endAt: ISO8601DateTime
   completedAt: ISO8601DateTime
   total: Float!
+  invoicedTotal: Float!
+  uninvoicedTotal: Float!
+  invoices(first: Int, after: String): InvoiceConnection!
   quote: Quote
   lineItems(first: Int, after: String): JobLineItemConnection!
   visits(first: Int, after: String): VisitConnection!

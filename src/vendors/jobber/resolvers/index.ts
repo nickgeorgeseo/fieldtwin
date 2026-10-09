@@ -2,6 +2,7 @@ import type { JobberState } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
+import { invoiceNode, invoicesConnection } from "./invoices.ts";
 import { jobNode, jobsConnection } from "./jobs.ts";
 import { quoteNode, quotesConnection } from "./quotes.ts";
 import { userNode } from "./users.ts";
@@ -37,6 +38,13 @@ export function createResolvers(state: () => JobberState, nowMs: () => number) {
     },
 
     quotes: (args: PageArgs) => quotesConnection(args, context),
+
+    invoices: (args: PageArgs) => invoicesConnection(args, context),
+
+    invoice: ({ id }: { id: string }) => {
+      const invoice = state().invoices.get(id);
+      return invoice ? invoiceNode(invoice, context) : null;
+    },
 
     quote: ({ id }: { id: string }) => {
       const quote = state().quotes.get(id);

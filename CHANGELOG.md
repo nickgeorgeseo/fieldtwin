@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Jobber invoices (`invoices`, `invoice`, `Client.invoices`, `Job.invoices`), paid, open, or past due, with `amounts`, `Client.balance`, and `Job.invoicedTotal`. An invoice turns `past_due` on its own as twin time passes its due date.
 - Jobber quotes (`quotes`, `quote`, `Client.quotes`, `Job.quote`), converted or awaiting a response.
 - Jobber jobs, visits, and users from the world's history: `jobs`, `job`, `Client.jobs`, `Job.visits`, `Visit.assignedUsers`, `users`. `jobStatus` and `visitStatus` are derived from the twin clock, so a visit moves from upcoming to today to late as time passes. Every list is a full Relay connection with `edges`.
 - World history, deterministic from the seed: about three months of completed jobs and visits across the technicians, quotes for bigger work, invoices (most paid, some open, a few past due), today's schedule, and the next two weeks. Vendor-neutral facts that each vendor turns into its own records.

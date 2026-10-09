@@ -3,7 +3,7 @@ import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import type { WorldLineItem } from "../../world/history.ts";
 import { encodeId } from "./encoded-id.ts";
-import type { JobberClient, JobberJob, JobberLineItem, JobberQuote, JobberUser, JobberVisit } from "./types.ts";
+import type { JobberClient, JobberInvoice, JobberJob, JobberLineItem, JobberQuote, JobberUser, JobberVisit } from "./types.ts";
 
 const SEED_TIME = "2020-01-01T00:00:00.000Z";
 
@@ -88,6 +88,23 @@ export function seedJobber(world: World): NewEvent[] {
     }
   }
 
+  for (const worldInvoice of world.history.invoices) {
+    const invoice: JobberInvoice = {
+      id: ids.invoice(worldInvoice.key),
+      invoiceNumber: String(worldInvoice.number),
+      subject: world.history.jobs.find((job) => job.key === worldInvoice.jobKey)!.title,
+      clientId: ids.client(worldInvoice.customerKey),
+      jobIds: [ids.job(worldInvoice.jobKey)],
+      lineItems: lineItems(worldInvoice.lineItems, ids, "InvoiceLineItem"),
+      issuedDate: worldInvoice.issuedAt,
+      dueDate: worldInvoice.dueAt,
+      paidAt: worldInvoice.paidAt ?? null,
+      createdAt: worldInvoice.createdAt,
+      updatedAt: worldInvoice.paidAt ?? worldInvoice.issuedAt,
+    };
+    record("InvoiceCreated", { invoice });
+  }
+
   return events;
 }
 
@@ -131,6 +148,10 @@ class WorldIds {
 
   quote(key: string): string {
     return encodeId("Quote", numberIn(key));
+  }
+
+  invoice(key: string): string {
+    return encodeId("Invoice", numberIn(key));
   }
 
   next(type: string): string {

@@ -3,6 +3,7 @@ import {
   clientName,
   type JobberAccount,
   type JobberClient,
+  type JobberInvoice,
   type JobberJob,
   type JobberQuote,
   type JobberUser,
@@ -16,7 +17,8 @@ export type JobberEventData =
   | { type: "UserCreated"; user: JobberUser }
   | { type: "JobCreated"; job: JobberJob }
   | { type: "VisitCreated"; visit: JobberVisit }
-  | { type: "QuoteCreated"; quote: JobberQuote };
+  | { type: "QuoteCreated"; quote: JobberQuote }
+  | { type: "InvoiceCreated"; invoice: JobberInvoice };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asJobberEvent(event: TwinEvent): JobberEventData {
@@ -39,5 +41,7 @@ export function describeJobberEvent(event: TwinEvent): string {
       return `VisitCreated "${data.visit.title}" ${data.visit.startAt}${data.visit.completedAt ? " (completed)" : ""}`;
     case "QuoteCreated":
       return `QuoteCreated #${data.quote.quoteNumber} "${data.quote.title}"`;
+    case "InvoiceCreated":
+      return `InvoiceCreated #${data.invoice.invoiceNumber} "${data.invoice.subject}"${data.invoice.paidAt ? " (paid)" : ""}`;
   }
 }

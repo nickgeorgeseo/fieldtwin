@@ -1,6 +1,8 @@
+import { sumMoney } from "../../../core/money.ts";
 import { clientName, type JobberClient } from "../types.ts";
 import type { PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
+import { invoiceAmounts, invoicesConnection, invoicesFor } from "./invoices.ts";
 import { jobsConnection } from "./jobs.ts";
 import { quotesConnection } from "./quotes.ts";
 
@@ -17,5 +19,8 @@ export function clientNode(client: JobberClient, context: ResolverContext) {
     updatedAt: client.createdAt,
     jobs: (args: PageArgs) => jobsConnection(args, context, client.id),
     quotes: (args: PageArgs) => quotesConnection(args, context, client.id),
+    invoices: (args: PageArgs) => invoicesConnection(args, context, { clientId: client.id }),
+    // "The client's current balance": what they still owe across their invoices.
+    balance: () => sumMoney(invoicesFor(context, { clientId: client.id }).map((invoice) => invoiceAmounts(invoice).invoiceBalance)),
   };
 }

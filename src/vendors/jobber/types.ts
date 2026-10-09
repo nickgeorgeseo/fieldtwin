@@ -81,6 +81,21 @@ export interface JobberVisit {
   createdAt: string;
 }
 
+/** "A receipt detailing the work done as well as the cost of the service provided." */
+export interface JobberInvoice {
+  id: string;
+  invoiceNumber: string; // a String in Jobber's schema
+  subject: string;
+  clientId: string;
+  jobIds: string[];
+  lineItems: JobberLineItem[];
+  issuedDate: string;
+  dueDate: string;
+  paidAt: string | null; // not an API field; decides invoiceStatus and the amounts paid
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface JobberState {
   account: JobberAccount;
   // Maps keep insertion order, which is the order lists are served in, so pagination is stable.
@@ -89,4 +104,5 @@ export interface JobberState {
   jobs: Map<string, JobberJob>;
   visits: Map<string, JobberVisit>;
   quotes: Map<string, JobberQuote>;
+  invoices: Map<string, JobberInvoice>;
 }

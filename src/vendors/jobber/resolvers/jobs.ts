@@ -3,6 +3,7 @@ import type { JobberJob, JobberVisit } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
+import { invoiceAmounts, invoicesConnection, invoicesFor } from "./invoices.ts";
 import { quoteNode } from "./quotes.ts";
 import { jobStatus, visitStatus } from "./statuses.ts";
 import { userNode } from "./users.ts";
@@ -13,14 +14,20 @@ export function jobNode(job: JobberJob, context: ResolverContext) {
   const visits = visitsOf(job, context);
   const { utcOffsetHours } = context.state().account;
   const finished = visits.length > 0 && visits.every((visit) => visit.completedAt);
+  const invoices = invoicesFor(context, { jobId: job.id });
+  const total = sumMoney(job.lineItems.map((line) => line.totalPrice));
+  const invoicedTotal = sumMoney(invoices.map((invoice) => invoiceAmounts(invoice).total));
   return {
     ...job,
-    jobStatus: () => jobStatus(visits, false, context.nowMs(), utcOffsetHours),
+    jobStatus: () => jobStatus(visits, invoices.length > 0, context.nowMs(), utcOffsetHours),
     client: () => clientNode(context.state().clients.get(job.clientId)!, context),
     startAt: visits[0]?.startAt ?? null,
     endAt: visits.at(-1)?.endAt ?? null,
     completedAt: finished ? visits.at(-1)!.completedAt : null,
-    total: sumMoney(job.lineItems.map((line) => line.totalPrice)), // "The total chargeable amount of the job"
+    total, // "The total chargeable amount of the job"
+    invoicedTotal,
+    uninvoicedTotal: Math.max(0, sumMoney([total, -invoicedTotal])),
+    invoices: (args: PageArgs) => invoicesConnection(args, context, { jobId: job.id }),
     quote: () => (job.quoteId ? quoteNode(context.state().quotes.get(job.quoteId)!, context) : null),
     lineItems: (args: PageArgs) => connection(job.lineItems, args, (line) => line),
     visits: (args: PageArgs) => connection(visits, args, (visit) => visitNode(visit, context)),

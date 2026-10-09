@@ -118,6 +118,12 @@ describe("the world's history", () => {
     }
   });
 
+  it("always leaves the most recently finished job waiting to be invoiced", () => {
+    const finished = history.jobs.filter((job) => job.visits.every((visit) => visit.completedAt));
+    const latest = finished.reduce((a, b) => (a.visits.at(-1)!.completedAt! > b.visits.at(-1)!.completedAt! ? a : b));
+    expect(history.invoices.some((invoice) => invoice.jobKey === latest.key)).toBe(false);
+  });
+
   it("invoices completed jobs only, and pays invoices after issuing them and before today", () => {
     for (const invoice of history.invoices) {
       const job = history.jobs.find((candidate) => candidate.key === invoice.jobKey)!;

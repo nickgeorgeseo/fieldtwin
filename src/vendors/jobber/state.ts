@@ -10,6 +10,7 @@ export function createJobberState(): JobberState {
     jobs: new Map(),
     visits: new Map(),
     quotes: new Map(),
+    invoices: new Map(),
   };
 }
 
@@ -40,6 +41,10 @@ export function applyJobberEvent(state: JobberState, event: TwinEvent): void {
 
     case "QuoteCreated":
       state.quotes.set(data.quote.id, data.quote);
+      return;
+
+    case "InvoiceCreated":
+      state.invoices.set(data.invoice.id, data.invoice);
       return;
 
     default:
