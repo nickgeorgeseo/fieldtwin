@@ -75,7 +75,7 @@ export class Twin {
     const { seed, startTime, worldSize } = this.options;
     this.clock = new TwinClock(startTime);
     this.log = new EventLog();
-    this.world = generateWorld(new SeededRandom(seed), worldSize);
+    this.world = generateWorld(new SeededRandom(seed), { startTime, size: worldSize });
     this.faultRandom = new SeededRandom(seed + 1);
     this.faultRules = [];
     this.checkpoints.clear();

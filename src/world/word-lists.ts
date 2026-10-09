@@ -57,11 +57,12 @@ export const STREET_NAMES = [
   "Mill Creek Dr",
 ] as const;
 
+/** utcOffsetHours is the summer offset (EDT or CDT). The twin doesn't model daylight saving changes. */
 export const CITIES = [
-  { city: "Riverton", state: "NC", zipPrefix: "282" },
-  { city: "Fairview", state: "SC", zipPrefix: "296" },
-  { city: "Oak Hollow", state: "TX", zipPrefix: "773" },
-  { city: "Millbrook", state: "GA", zipPrefix: "300" },
+  { city: "Riverton", state: "NC", zipPrefix: "282", utcOffsetHours: -4 },
+  { city: "Fairview", state: "SC", zipPrefix: "296", utcOffsetHours: -4 },
+  { city: "Oak Hollow", state: "TX", zipPrefix: "773", utcOffsetHours: -5 },
+  { city: "Millbrook", state: "GA", zipPrefix: "300", utcOffsetHours: -4 },
 ] as const;
 
 export const TRADES = [

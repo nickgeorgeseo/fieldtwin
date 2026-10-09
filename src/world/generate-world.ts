@@ -1,5 +1,6 @@
 import type { SeededRandom } from "../core/random.ts";
 import { type CatalogEntry, makeCatalog } from "./catalog.ts";
+import { makeHistory, type WorldHistory } from "./history.ts";
 import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-lists.ts";
 
 /**
@@ -10,10 +11,11 @@ import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-li
  * after that: keeping Jobber and QuickBooks in sync is the job of the code under test.
  */
 export interface World {
-  company: { name: string; trade: string; city: string; state: string };
+  company: { name: string; trade: string; city: string; state: string; utcOffsetHours: number };
   customers: WorldCustomer[];
   technicians: WorldTechnician[];
   catalog: CatalogEntry[];
+  history: WorldHistory;
 }
 
 export interface WorldCustomer {
@@ -41,15 +43,26 @@ export interface WorldSize {
 
 const DEFAULT_SIZE: WorldSize = { customers: 25, technicians: 4 };
 
-export function generateWorld(random: SeededRandom, size: Partial<WorldSize> = {}): World {
-  const { customers, technicians } = { ...DEFAULT_SIZE, ...size };
+export interface WorldOptions {
+  startTime: string; // history is laid out around this moment: the past behind it, the schedule ahead
+  size?: Partial<WorldSize>;
+}
+
+export function generateWorld(random: SeededRandom, options: WorldOptions): World {
+  const { customers, technicians } = { ...DEFAULT_SIZE, ...options.size };
   const home = random.pick(CITIES);
   const trade = random.pick(TRADES);
   const ownerLastName = random.pick(LAST_NAMES);
 
   // Order matters: each part draws from the same random stream, so new parts of the world go last.
   // That way an existing seed keeps the same company, customers, and technicians when the world grows.
-  const company = { name: `${ownerLastName} ${trade.businessSuffix}`, trade: trade.name, city: home.city, state: home.state };
+  const company = {
+    name: `${ownerLastName} ${trade.businessSuffix}`,
+    trade: trade.name,
+    city: home.city,
+    state: home.state,
+    utcOffsetHours: home.utcOffsetHours,
+  };
   const customerList = makeCustomers(random, customers, home);
   const technicianList = Array.from({ length: technicians }, (_, i) => ({
     key: `tech-${pad(i + 1)}`,
@@ -57,8 +70,16 @@ export function generateWorld(random: SeededRandom, size: Partial<WorldSize> = {
     lastName: random.pick(LAST_NAMES),
   }));
   const catalog = makeCatalog(random, trade.name);
+  const history = makeHistory({
+    random,
+    customers: customerList,
+    technicians: technicianList,
+    catalog,
+    startMs: Date.parse(options.startTime),
+    utcOffsetHours: home.utcOffsetHours,
+  });
 
-  return { company, customers: customerList, technicians: technicianList, catalog };
+  return { company, customers: customerList, technicians: technicianList, catalog, history };
 }
 
 type Home = { city: string; state: string; zipPrefix: string };
