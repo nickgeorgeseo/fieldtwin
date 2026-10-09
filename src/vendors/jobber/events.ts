@@ -1,10 +1,13 @@
 import type { TwinEvent } from "../../core/types.ts";
-import { clientName, type JobberClient } from "./types.ts";
+import { clientName, type JobberAccount, type JobberClient, type JobberJob, type JobberUser, type JobberVisit } from "./types.ts";
 
 /** Every event the Jobber twin records. Events carry complete records, so apply() stays simple. */
 export type JobberEventData =
-  | { type: "AccountCreated"; account: { id: string; name: string } }
-  | { type: "ClientCreated"; client: JobberClient };
+  | { type: "AccountCreated"; account: JobberAccount }
+  | { type: "ClientCreated"; client: JobberClient }
+  | { type: "UserCreated"; user: JobberUser }
+  | { type: "JobCreated"; job: JobberJob }
+  | { type: "VisitCreated"; visit: JobberVisit };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asJobberEvent(event: TwinEvent): JobberEventData {
@@ -19,5 +22,11 @@ export function describeJobberEvent(event: TwinEvent): string {
       return `AccountCreated "${data.account.name}"`;
     case "ClientCreated":
       return `ClientCreated "${clientName(data.client)}"`;
+    case "UserCreated":
+      return `UserCreated "${data.user.name.full}"`;
+    case "JobCreated":
+      return `JobCreated #${data.job.jobNumber} "${data.job.title}"`;
+    case "VisitCreated":
+      return `VisitCreated "${data.visit.title}" ${data.visit.startAt}${data.visit.completedAt ? " (completed)" : ""}`;
   }
 }

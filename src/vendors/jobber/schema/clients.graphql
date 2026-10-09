@@ -1,0 +1,42 @@
+extend type Query {
+  clients(first: Int, after: String): ClientConnection!
+  client(id: EncodedId!): Client
+}
+
+type Client {
+  id: EncodedId!
+  firstName: String!
+  lastName: String!
+  companyName: String
+  name: String!
+  isCompany: Boolean!
+  email: String
+  emails: [Email!]!
+  phone: String
+  phones: [ClientPhoneNumber!]!
+  jobs(first: Int, after: String): JobConnection!
+  createdAt: ISO8601DateTime!
+  updatedAt: ISO8601DateTime!
+}
+
+type Email {
+  address: String!
+  primary: Boolean!
+}
+
+type ClientPhoneNumber {
+  number: String!
+  primary: Boolean!
+}
+
+type ClientConnection {
+  nodes: [Client!]!
+  edges: [ClientEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ClientEdge {
+  node: Client!
+  cursor: String!
+}

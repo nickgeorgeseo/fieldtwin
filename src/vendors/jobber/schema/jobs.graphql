@@ -1,0 +1,102 @@
+# Job: "A scheduled event where work will take place." Visit: "each time a Service Provider goes to a
+# client property to complete work." Status values are not in the public docs; FIDELITY.md marks them "check".
+extend type Query {
+  jobs(first: Int, after: String): JobConnection!
+  job(id: EncodedId!): Job
+}
+
+type Job {
+  id: EncodedId!
+  jobNumber: Int!
+  title: String
+  jobStatus: JobStatusTypeEnum!
+  client: Client!
+  instructions: String
+  startAt: ISO8601DateTime
+  endAt: ISO8601DateTime
+  completedAt: ISO8601DateTime
+  total: Float!
+  lineItems(first: Int, after: String): JobLineItemConnection!
+  visits(first: Int, after: String): VisitConnection!
+  createdAt: ISO8601DateTime!
+  updatedAt: ISO8601DateTime!
+}
+
+enum JobStatusTypeEnum {
+  active
+  archived
+  late
+  requires_invoicing
+  today
+  upcoming
+  unscheduled
+}
+
+type JobLineItem {
+  id: EncodedId!
+  name: String!
+  description: String
+  quantity: Float!
+  unitPrice: Float
+  totalPrice: Float!
+}
+
+type Visit {
+  id: EncodedId!
+  title: String
+  visitStatus: VisitStatusTypeEnum!
+  startAt: ISO8601DateTime
+  endAt: ISO8601DateTime
+  completedAt: ISO8601DateTime
+  isComplete: Boolean!
+  allDay: Boolean!
+  duration: Int
+  client: Client!
+  job: Job!
+  assignedUsers(first: Int, after: String): UserConnection
+  createdAt: ISO8601DateTime!
+}
+
+enum VisitStatusTypeEnum {
+  completed
+  late
+  today
+  upcoming
+  unscheduled
+}
+
+type JobConnection {
+  nodes: [Job!]!
+  edges: [JobEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type JobEdge {
+  node: Job!
+  cursor: String!
+}
+
+type JobLineItemConnection {
+  nodes: [JobLineItem!]!
+  edges: [JobLineItemEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type JobLineItemEdge {
+  node: JobLineItem!
+  cursor: String!
+}
+
+type VisitConnection {
+  nodes: [Visit!]!
+  edges: [VisitEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type VisitEdge {
+  node: Visit!
+  cursor: String!
+}

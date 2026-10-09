@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   buildSchema,
   type DocumentNode,
@@ -20,12 +20,20 @@ import { invalidEncodedIdMessage, isEncodedId } from "./encoded-id.ts";
  * https://developer.getjobber.com/docs/using_jobbers_api/api_queries_and_mutations/ (Response structure)
  */
 
-export const schema = buildSchema(readFileSync(new URL("./schema.graphql", import.meta.url), "utf8"));
+/** The schema, from every file in schema/ (base.graphql defines Query; the others extend it). */
+const SCHEMA_DIR = new URL("./schema/", import.meta.url);
+export const schema = buildSchema(
+  readdirSync(SCHEMA_DIR)
+    .filter((file) => file.endsWith(".graphql"))
+    .sort()
+    .map((file) => readFileSync(new URL(file, SCHEMA_DIR), "utf8"))
+    .join("\n"),
+);
 
-// Teach the EncodedId scalar from schema.graphql to reject values that are not EncodedIds,
+// Teach the EncodedId scalar from schema/base.graphql to reject values that are not EncodedIds,
 // so ids written inline in a query fail validation too.
 const encodedIdScalar = schema.getType("EncodedId");
-if (!(encodedIdScalar instanceof GraphQLScalarType)) throw new Error("schema.graphql must declare scalar EncodedId");
+if (!(encodedIdScalar instanceof GraphQLScalarType)) throw new Error("schema/base.graphql must declare scalar EncodedId");
 encodedIdScalar.parseValue = (value) => {
   if (!isEncodedId(value)) throw new TypeError(invalidEncodedIdMessage(value));
   return value;

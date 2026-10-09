@@ -1,14 +1,23 @@
+import { multiplyMoney } from "../../core/money.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
+import type { WorldLineItem } from "../../world/history.ts";
 import { encodeId } from "./encoded-id.ts";
-import type { JobberClient } from "./types.ts";
+import type { JobberClient, JobberJob, JobberLineItem, JobberUser, JobberVisit } from "./types.ts";
 
 const SEED_TIME = "2020-01-01T00:00:00.000Z";
 
+/** Turns the shared world into Jobber's starting records: the account, clients, users, and work history. */
 export function seedJobber(world: World): NewEvent[] {
+  const ids = new WorldIds(world);
   const events: NewEvent[] = [
-    { vendor: "jobber", type: "AccountCreated", data: { account: { id: encodeId("Account", 1), name: world.company.name } } },
+    {
+      vendor: "jobber",
+      type: "AccountCreated",
+      data: { account: { id: encodeId("Account", 1), name: world.company.name, utcOffsetHours: world.company.utcOffsetHours } },
+    },
   ];
+  const record = (type: string, data: object) => events.push({ vendor: "jobber", type, data });
 
   world.customers.forEach((person, index) => {
     const client: JobberClient = {
@@ -20,8 +29,98 @@ export function seedJobber(world: World): NewEvent[] {
       phones: [{ number: person.phone, primary: true }],
       createdAt: SEED_TIME,
     };
-    events.push({ vendor: "jobber", type: "ClientCreated", data: { client } });
+    record("ClientCreated", { client });
   });
 
+  world.technicians.forEach((tech, index) => {
+    const user: JobberUser = {
+      id: ids.user(tech.key),
+      name: { first: tech.firstName, last: tech.lastName, full: `${tech.firstName} ${tech.lastName}` },
+      email: { raw: `${tech.firstName}.${tech.lastName}.${index + 1}@example.com`.toLowerCase() },
+      isAccountOwner: false,
+      createdAt: SEED_TIME,
+    };
+    record("UserCreated", { user });
+  });
+
+  for (const worldJob of world.history.jobs) {
+    const job: JobberJob = {
+      id: ids.job(worldJob.key),
+      jobNumber: worldJob.number,
+      title: worldJob.title,
+      clientId: ids.client(worldJob.customerKey),
+      instructions: null,
+      lineItems: lineItems(worldJob.lineItems, ids, "JobLineItem"),
+      createdAt: worldJob.createdAt,
+      updatedAt: worldJob.visits.at(-1)?.completedAt ?? worldJob.createdAt,
+    };
+    record("JobCreated", { job });
+
+    for (const worldVisit of worldJob.visits) {
+      const visit: JobberVisit = {
+        id: ids.visit(worldVisit.key),
+        jobId: job.id,
+        clientId: job.clientId,
+        title: job.title,
+        startAt: worldVisit.startAt,
+        endAt: worldVisit.endAt,
+        completedAt: worldVisit.completedAt ?? null,
+        assignedUserIds: worldVisit.technicianKeys.map((key) => ids.user(key)),
+        createdAt: worldJob.createdAt,
+      };
+      record("VisitCreated", { visit });
+    }
+  }
+
   return events;
+}
+
+function lineItems(lines: WorldLineItem[], ids: WorldIds, type: string): JobberLineItem[] {
+  return lines.map((line) => ({
+    id: ids.next(type),
+    name: line.name,
+    description: line.description,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    totalPrice: multiplyMoney(line.quantity, line.unitPrice),
+  }));
+}
+
+/** Jobber ids for world records: the world's keys ("cust-007", "job-0012") map to encoded ids. */
+class WorldIds {
+  private counters = new Map<string, number>();
+  private customerIndex: Map<string, number>;
+  private technicianIndex: Map<string, number>;
+
+  constructor(world: World) {
+    this.customerIndex = new Map(world.customers.map((customer, index) => [customer.key, index + 1]));
+    this.technicianIndex = new Map(world.technicians.map((tech, index) => [tech.key, index + 1]));
+  }
+
+  client(key: string): string {
+    return encodeId("Client", this.customerIndex.get(key)!);
+  }
+
+  user(key: string): string {
+    return encodeId("User", this.technicianIndex.get(key)!);
+  }
+
+  job(key: string): string {
+    return encodeId("Job", numberIn(key));
+  }
+
+  visit(key: string): string {
+    return encodeId("Visit", numberIn(key));
+  }
+
+  next(type: string): string {
+    const n = (this.counters.get(type) ?? 0) + 1;
+    this.counters.set(type, n);
+    return encodeId(type, n);
+  }
+}
+
+/** "job-0012" -> 12 */
+function numberIn(key: string): number {
+  return Number(key.slice(key.lastIndexOf("-") + 1));
 }

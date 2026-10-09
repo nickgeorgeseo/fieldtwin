@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Jobber jobs, visits, and users from the world's history: `jobs`, `job`, `Client.jobs`, `Job.visits`, `Visit.assignedUsers`, `users`. `jobStatus` and `visitStatus` are derived from the twin clock, so a visit moves from upcoming to today to late as time passes. Every list is a full Relay connection with `edges`.
 - World history, deterministic from the seed: about three months of completed jobs and visits across the technicians, quotes for bigger work, invoices (most paid, some open, a few past due), today's schedule, and the next two weeks. Vendor-neutral facts that each vendor turns into its own records.
 - QuickBooks change data capture (`GET /cdc`) and a much fuller query language: `SELECT COUNT(*)`, `WHERE Id IN (...)`, filters on references like `CustomerRef`, queries over Item, Invoice, and Payment, and `POST /query`.
 - QuickBooks payments: create and read. Lines apply amounts to invoices; paid invoices read `Balance: 0` and link the payment; the rest is `UnappliedAmt`.

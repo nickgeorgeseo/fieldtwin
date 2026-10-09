@@ -89,7 +89,7 @@ Every vendor has the same files, so once you have read one you can read them all
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
 | `index.ts` | Exports one `VendorTwin` object. Nothing else |
 
-GraphQL vendors also have `schema.graphql` (a hand-written subset of the public schema), `resolvers.ts` (plain functions of state), and anything vendor-specific like Jobber's `cost.ts`.
+GraphQL vendors also have `schema.graphql` (a hand-written subset of the public schema), `resolvers.ts` (plain functions of state), and anything vendor-specific like Jobber's `cost.ts`. Jobber has grown both into folders: `schema/` holds one `.graphql` file per area (each `extend type Query` with its own lists), and `resolvers/` one file per object, plus `statuses.ts`, which derives time-dependent statuses from facts and the twin clock instead of storing them.
 
 ## What happens on a request
 

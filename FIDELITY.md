@@ -69,6 +69,11 @@ What each twin models, how closely, and whether it has been checked against the 
 | Cost of `pageInfo`, `totalCount`, plain lists, `__typename` | Approximate | | The docs don't say. Connection-level fields are charged once, plain lists like one object, `__typename` free |
 | The docs' own sample response | Approximate | check | Jobber's "Response structure" sample prices `{ account { id name } }` at 1 point; the documented formula gives 3. The twin follows the formula |
 | 2,500 requests per 5 minutes DDoS guard | Via faults | | Use a fault rule with status 429 |
+| `jobs`, `job`, `Client.jobs` | Modeled | docs only | Seeded from the world's history. Documented Job fields: `jobNumber`, `title`, `client`, `startAt`/`endAt`/`completedAt` (from its visits), `total`, `lineItems`, `visits`, timestamps |
+| Visits | Modeled | docs only | Reached through `Job.visits`. Documented fields: times, `isComplete`, `allDay`, `duration` (minutes), `client`, `job`, `assignedUsers`. No root `visits` query: the public docs don't show one |
+| `jobStatus`, `visitStatus` values | Approximate | check | Not in the public docs; lowercase like the documented `voided`. Derived on every read from the visits and the twin clock, in the business's time zone: a visit is `today` on its day and `late` once its day passes uncompleted; a job is `requires_invoicing` when all visits are done, `active` part way through |
+| Job, quote, and invoice line items | Approximate | check | `name` and `quantity` are documented; `unitPrice` and `totalPrice` are not in the public docs |
+| `users` | Approximate | check | The business's technicians. `User` is documented, but a root `users` query and the fields of `Name` (`first`, `last`, `full`) and `UserEmail` (`raw`) are not |
 | Mutations | Not yet | | Roadmap v0.1 |
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
 | OAuth 2.0 | Not yet | | Any bearer token is accepted |

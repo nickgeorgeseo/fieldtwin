@@ -1,0 +1,23 @@
+# A small, hand-written subset of Jobber's public GraphQL schema, one file per area.
+# Field names match https://developer.getjobber.com/docs (Important Objects) so client code works unchanged.
+# Add fields here first, then a resolver in resolvers/, then a test. Each file extends Query with its own lists.
+
+scalar EncodedId
+scalar ISO8601DateTime
+
+type Query {
+  account: Account!
+}
+
+type Account {
+  id: EncodedId!
+  name: String!
+}
+
+# Every list is a Relay connection: nodes, or edges { node cursor }, plus pageInfo and totalCount.
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}

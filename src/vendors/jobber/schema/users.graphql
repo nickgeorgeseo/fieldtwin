@@ -1,0 +1,35 @@
+# User: "A user belongs to an account and generally completes work for clients."
+# The fields of Name and UserEmail are not in Jobber's public docs; FIDELITY.md marks them "check".
+extend type Query {
+  users(first: Int, after: String): UserConnection!
+}
+
+type User {
+  id: EncodedId!
+  name: Name!
+  email: UserEmail!
+  isAccountOwner: Boolean!
+  createdAt: ISO8601DateTime!
+}
+
+type Name {
+  first: String!
+  last: String!
+  full: String!
+}
+
+type UserEmail {
+  raw: String!
+}
+
+type UserConnection {
+  nodes: [User!]!
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserEdge {
+  node: User!
+  cursor: String!
+}

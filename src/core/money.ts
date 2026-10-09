@@ -16,6 +16,11 @@ export function sumMoney(amounts: readonly number[]): number {
   return fromCents(amounts.reduce((total, amount) => total + toCents(amount), 0));
 }
 
+/** quantity × unit price, rounded to the cent (1.5 hours at 110.00 is 165.00, never 164.99999). */
+export function multiplyMoney(quantity: number, unitPrice: number): number {
+  return fromCents(Math.round(quantity * toCents(unitPrice)));
+}
+
 /** Whether two amounts are equal to the cent. */
 export function sameMoney(a: number, b: number): boolean {
   return toCents(a) === toCents(b);

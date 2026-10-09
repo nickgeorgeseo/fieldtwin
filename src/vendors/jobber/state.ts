@@ -3,7 +3,13 @@ import { asJobberEvent } from "./events.ts";
 import type { JobberState } from "./types.ts";
 
 export function createJobberState(): JobberState {
-  return { account: { id: "", name: "" }, clients: new Map(), clientOrder: [] };
+  return {
+    account: { id: "", name: "", utcOffsetHours: 0 },
+    clients: new Map(),
+    users: new Map(),
+    jobs: new Map(),
+    visits: new Map(),
+  };
 }
 
 /** The only place Jobber state changes. */
@@ -17,7 +23,18 @@ export function applyJobberEvent(state: JobberState, event: TwinEvent): void {
 
     case "ClientCreated":
       state.clients.set(data.client.id, data.client);
-      state.clientOrder.push(data.client.id);
+      return;
+
+    case "UserCreated":
+      state.users.set(data.user.id, data.user);
+      return;
+
+    case "JobCreated":
+      state.jobs.set(data.job.id, data.job);
+      return;
+
+    case "VisitCreated":
+      state.visits.set(data.visit.id, data.visit);
       return;
 
     default:
