@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { controlRoutes } from "./control/http.ts";
 import { Twin } from "./core/twin.ts";
+import type { AuthMode } from "./core/types.ts";
 import type { VendorTwin } from "./core/vendor-twin.ts";
 import { faultMiddleware } from "./faults/fault-middleware.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
@@ -15,6 +16,7 @@ if (new Set(prefixes).size !== prefixes.length) throw new Error(`Two vendors sha
 export interface AppOptions {
   seed?: number;
   startTime?: string;
+  auth?: AuthMode; // "any-token" (default) or "oauth"
 }
 
 /** Builds the twin and the HTTP app around it. Tests use this directly, no network needed. */
@@ -22,6 +24,7 @@ export function createApp(options: AppOptions = {}) {
   const twin = new Twin({
     seed: options.seed ?? 42,
     startTime: options.startTime ?? "2026-07-13T11:00:00.000Z",
+    auth: options.auth,
     vendors: ALL_VENDORS,
   });
 

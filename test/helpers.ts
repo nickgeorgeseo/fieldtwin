@@ -1,9 +1,9 @@
-import { createApp } from "../src/app.ts";
+import { type AppOptions, createApp } from "../src/app.ts";
 import { TWIN_REALM_ID } from "../src/vendors/quickbooks/seed.ts";
 
 /** A fresh twin plus small helpers that read like the requests a real client would make. */
-export function setup(seed = 42) {
-  const { app, twin } = createApp({ seed });
+export function setup(seed = 42, options: Omit<AppOptions, "seed"> = {}) {
+  const { app, twin } = createApp({ seed, ...options });
   const auth = { Authorization: "Bearer test-token" };
   const qbo = `/v3/company/${TWIN_REALM_ID}`;
 

@@ -29,6 +29,13 @@ export interface TwinEvent {
 /** What vendor code hands to twin.record(). The twin fills in seq, at, and source. */
 export type NewEvent = Pick<TwinEvent, "vendor" | "type" | "data">;
 
+/**
+ * How the vendor APIs treat bearer tokens.
+ *   any-token – any "Authorization: Bearer ..." works. Quick local use; the default for `npm start`.
+ *   oauth     – only access tokens the twin's OAuth server issued, and only until they expire or are revoked.
+ */
+export type AuthMode = "any-token" | "oauth";
+
 /** A named point in history you can list changes from or rewind to. */
 export interface Checkpoint {
   name: string;

@@ -42,7 +42,11 @@ What each twin models, how closely, and whether it has been checked against the 
 | Throttling: HTTP 429 | Via faults | docs only | [Limits][qbo-limits] | Use a fault rule with status 429. Intuit documents the status and "wait 60 seconds"; the body (code 003001, `ThrottleExceeded`) is widely reported but not in the docs: check |
 | Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
 | `minorversion` parameter | Not yet | | | Accepted and ignored |
-| OAuth 2.0 | Not yet | | | Any bearer token is accepted |
+| OAuth 2.0 authorization (`GET /connect/oauth2`) | Modeled | docs only | [OAuth][qbo-oauth] | Approved at once (no consent page) and redirected back with `code`, `state`, and `realmId`. A missing accounting scope redirects with `invalid_scope`, as documented |
+| OAuth 2.0 tokens (`POST /oauth2/v1/tokens/bearer`) | Modeled | docs only | [OAuth][qbo-oauth] | HTTP Basic client credentials; `authorization_code` and `refresh_token` grants; the documented response fields. Access tokens last 60 minutes of twin time; refresh tokens keep their value with a rolling 100-day expiry, as in the documented refresh sample. Codes work once |
+| Token revocation (`POST /v2/oauth2/tokens/revoke`) | Modeled | docs only | [OAuth][qbo-oauth] | Revoking any token disconnects the app |
+| OAuth details the docs don't give | Approximate | check | [OAuth][qbo-oauth] | Authorization codes last 10 minutes. Any `client_id` and `client_secret` are accepted (there is no app registry). Error bodies use the standard OAuth `error`/`error_description` |
+| Expired or unknown token on the API | Approximate | check | [Error codes][qbo-errors] | In `auth: oauth` mode, 401 `AuthenticationFault` 3200 with a Detail saying what to do. Real 401 bodies reportedly differ in casing; unconfirmed |
 | `GET /cdc` change data capture | Modeled | docs only | [CDC][qbo-cdc] | Customer, Item, Invoice, Payment changed since `changedSince` (date, date-time, or UTC offset), grouped by entity and ordered by `LastUpdatedTime`, latest version only, at most 1,000 objects. Reads `MetaData.LastUpdatedTime` |
 | CDC look-back over 30 days | Approximate | check | [CDC][qbo-cdc] | The docs limit look-back to 30 days but don't show the error. Twin answers 2190 `Invalid Date Range` |
 | CDC group with no changes | Approximate | check | [CDC][qbo-cdc] | Answered as `{}`; the docs only show groups with changes |
@@ -97,4 +101,5 @@ What each twin models, how closely, and whether it has been checked against the 
 [qbo-payment]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
 [qbo-query]: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
 [qbo-limits]: https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
+[qbo-oauth]: https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0
 [qbo-rest]: https://developer.intuit.com/app/developer/qbo/docs/learn/rest-api-features

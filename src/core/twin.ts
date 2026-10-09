@@ -2,14 +2,16 @@ import { generateWorld, type World, type WorldSize } from "../world/generate-wor
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
 import { type BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
+import { type OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { SeededRandom } from "./random.ts";
-import type { Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
+import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
 
 export interface TwinOptions {
   seed: number;
   startTime: string;
   worldSize?: Partial<WorldSize>;
+  auth?: AuthMode;
   vendors: VendorTwin[];
 }
 
@@ -26,6 +28,7 @@ export class Twin {
   log!: EventLog;
   world!: World;
   faultRules: FaultRule[] = [];
+  authMode: AuthMode;
   faultRandom!: SeededRandom; // separate stream, so faults never change the generated world
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
@@ -37,8 +40,13 @@ export class Twin {
   // it remembers belongs to a history that no longer exists.
   private rateLimits = new Map<string, LeakyBucket>();
 
+  // OAuth connections are bookkeeping too, but they belong to your app rather than to the business data,
+  // so they survive reset() and rewind(), the way a real app stays connected while its data changes.
+  private oauthServers = new Map<VendorName, OAuthServer>();
+
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
+    this.authMode = options.auth ?? "any-token";
     this.reset();
   }
 
@@ -85,6 +93,18 @@ export class Twin {
     for (const vendor of this.vendors.values()) {
       for (const event of vendor.seed(this.world)) this.record(event, "seed");
     }
+  }
+
+  /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
+  oauthServer(vendor: VendorName, policy: OAuthPolicy): OAuthServer {
+    let server = this.oauthServers.get(vendor);
+    if (!server) {
+      // Its own random stream, so issuing tokens never changes the world or the faults.
+      const stream = this.options.seed + 2 + [...this.vendors.keys()].indexOf(vendor);
+      server = new OAuthServer(policy, new SeededRandom(stream));
+      this.oauthServers.set(vendor, server);
+    }
+    return server;
   }
 
   /** The rate-limit budget for a key (e.g. one vendor app), created full on first use. */
