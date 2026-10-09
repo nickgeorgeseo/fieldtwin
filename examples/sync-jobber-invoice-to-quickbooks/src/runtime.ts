@@ -6,6 +6,9 @@
  */
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** Every request gives up after this long, so a hung connection becomes a retryable timeout instead of a stuck sync. */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
 export interface Runtime {
   fetch: Fetch;
   sleep: (milliseconds: number) => Promise<void>;
