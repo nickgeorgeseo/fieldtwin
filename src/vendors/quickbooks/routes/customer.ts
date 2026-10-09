@@ -3,7 +3,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
-import { COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
 
 /** Customer: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer */
 export function customerRoutes(app: Hono, twin: Twin): void {
@@ -13,7 +13,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
   app.get(`${COMPANY}/customer/:id`, (c) => {
     const customer = state().customers.get(c.req.param("id"));
     if (!customer) return c.json(qboErrors.notFound(now()), 400);
-    return c.json({ Customer: customer, time: now() });
+    return c.json({ Customer: asResponse(customer), time: now() });
   });
 
   // QuickBooks uses one POST endpoint for both create and update. An Id in the body means update.
@@ -21,7 +21,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
     const body = (await c.req.json()) as UpdateBody<QboCustomer>;
     const result = body.Id ? updateCustomer(twin, body) : createCustomer(twin, body);
     if ("Fault" in result) return c.json(result, 400);
-    return c.json({ Customer: result, time: now() });
+    return c.json({ Customer: asResponse(result), time: now() });
   });
 }
 

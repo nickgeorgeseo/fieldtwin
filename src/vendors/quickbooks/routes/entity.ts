@@ -55,3 +55,11 @@ export function nextVersion(existing: Versioned, now: string): Versioned {
     MetaData: { CreateTime: existing.MetaData.CreateTime, LastUpdatedTime: now },
   };
 }
+
+/**
+ * How an entity looks in a response. Every documented sample carries `"domain": "QBO"` and `"sparse": false`;
+ * they describe the response, not the business, so they are added here and never stored in the event log.
+ */
+export function asResponse<T extends object>(entity: T): T & { domain: "QBO"; sparse: false } {
+  return { ...entity, domain: "QBO", sparse: false };
+}

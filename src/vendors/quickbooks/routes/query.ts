@@ -3,7 +3,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { parseQboQuery } from "../query.ts";
 import type { QboCustomer, QboState } from "../types.ts";
-import { COMPANY } from "./entity.ts";
+import { asResponse, COMPANY } from "./entity.ts";
 
 /** The query endpoint: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries */
 export function queryRoutes(app: Hono, twin: Twin): void {
@@ -25,7 +25,7 @@ export function queryRoutes(app: Hono, twin: Twin): void {
     const page = customers.slice(query.startPosition - 1, query.startPosition - 1 + query.maxResults);
 
     return c.json({
-      QueryResponse: page.length ? { Customer: page, startPosition: query.startPosition, maxResults: page.length } : {},
+      QueryResponse: page.length ? { Customer: page.map(asResponse), startPosition: query.startPosition, maxResults: page.length } : {},
       time: now(),
     });
   });

@@ -46,3 +46,25 @@ describe("QuickBooks twin: customers", () => {
     expect((await jobber("{ account { name } }")).status).toBe(200);
   });
 });
+
+describe("QuickBooks twin: response envelope", () => {
+  it("marks entities with domain QBO and sparse false, as every documented response does", async () => {
+    const { qboGet, qboPost } = setup();
+    const { Customer: read } = await (await qboGet("/customer/1")).json();
+    expect(read).toMatchObject({ domain: "QBO", sparse: false });
+
+    const { Customer: created } = await (await qboPost("/customer", { DisplayName: "Envelope Check" })).json();
+    expect(created).toMatchObject({ domain: "QBO", sparse: false });
+
+    const query = encodeURIComponent("select * from Customer maxresults 1");
+    const { QueryResponse } = await (await qboGet(`/query?query=${query}`)).json();
+    expect(QueryResponse.Customer[0]).toMatchObject({ domain: "QBO", sparse: false });
+  });
+
+  it("keeps those markers out of the event log, which records the business data only", async () => {
+    const { twin, qboPost } = setup();
+    await qboPost("/customer", { DisplayName: "Log Check" });
+    const last = twin.log.all().at(-1)!;
+    expect(JSON.stringify(last.data)).not.toContain("domain");
+  });
+});
