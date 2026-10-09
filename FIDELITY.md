@@ -15,7 +15,10 @@ What each twin models, how closely, and whether it has been checked against the 
 | `POST /customer` update with SyncToken | Modeled | docs only | [Customer][qbo-customer] | A stale SyncToken answers 5010 `Stale Object` |
 | Sparse vs full update | Modeled | docs only | [Customer][qbo-customer] | Full update clears omitted writable fields |
 | Unique DisplayName | Approximate | docs only | [Error codes][qbo-errors] | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only. 6240 names the Id that has the name |
-| `GET /query` | Approximate | docs only | [REST basics][qbo-rest] | `SELECT *`, one `WHERE Field = 'value'`, `STARTPOSITION`, `MAXRESULTS`. No `POST /query`, no `COUNT(*)`, no `LIKE` |
+| `GET /query` | Approximate | docs only | [Queries][qbo-query] | `SELECT * FROM Customer`, one `WHERE Property = value`, `STARTPOSITION`, `MAXRESULTS` (default 100, at most 1,000) |
+| Query case and escaping | Modeled | docs only | [Queries][qbo-query] | Keywords, entity and property names, and values match without regard to case; `\'` escapes an apostrophe |
+| Query features not modeled yet | Not yet | | [Queries][qbo-query] | `AND`, `LIKE`, `<`, `>`, `ORDERBY`, `POST /query`, and `COUNT(*)` answer 500 `Unsupported operation` naming the feature; syntax errors answer 4000; unknown entities and properties answer 4001 |
+| Which properties can be filtered | Approximate | | [Queries][qbo-query] | Each entity lists the modeled properties its reference marks filterable. QuickBooks may accept more |
 | `GET /item/{id}` | Modeled | docs only | [Item][qbo-item] | Seeded from the world's price list: services as `Service`, parts as `NonInventory` (parts `Taxable`). No `IncomeAccountRef`/`ExpenseAccountRef`, since the twin has no Accounts |
 | `POST /item` create and update | Not yet | | [Item][qbo-item] | Answers code 500 `Unsupported operation`. Inventory items, categories, and sub-items are not modeled |
 | `domain` and `sparse` on entities | Modeled | docs only | [Item][qbo-item] | `"domain": "QBO"`, `"sparse": false` on every entity in a response, as in the documented samples |
@@ -71,5 +74,6 @@ What each twin models, how closely, and whether it has been checked against the 
 [qbo-invoice]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice
 [qbo-item]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/item
 [qbo-payment]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
+[qbo-query]: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
 [qbo-limits]: https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
 [qbo-rest]: https://developer.intuit.com/app/developer/qbo/docs/learn/rest-api-features

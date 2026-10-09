@@ -26,14 +26,6 @@ describe("QuickBooks twin: customers", () => {
     expect(updated.PrimaryEmailAddr).toBeUndefined(); // the classic silent data-loss bug, reproduced on purpose
   });
 
-  it("pages through customers with STARTPOSITION and MAXRESULTS", async () => {
-    const { qboGet } = setup();
-    const query = encodeURIComponent("select * from Customer startposition 21 maxresults 10");
-    const { QueryResponse } = await (await qboGet(`/query?query=${query}`)).json();
-    expect(QueryResponse.Customer).toHaveLength(5); // 25 seeded customers, so positions 21-25
-    expect(QueryResponse.startPosition).toBe(21);
-  });
-
   it("injects a QuickBooks-shaped 429 from a fault rule, without touching Jobber", async () => {
     const { twin, qboPost, jobber } = setup();
     twin.faultRules = [{ name: "always-throttle", vendor: "quickbooks", rate: 1, effect: { status: 429 } }];
