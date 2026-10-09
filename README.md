@@ -150,6 +150,7 @@ Ready-made scenarios in `scenarios/`:
 |---|---|
 | `heat-wave-monday.yaml` | A busy HVAC Monday: 120 customers, throttled QuickBooks writes, a slow Jobber, and new clients calling in all morning |
 | `mismatched-books.yaml` | Jobber and QuickBooks disagree: customers spelled differently (same email), customers only in Jobber with unsynced work, customers only in QuickBooks |
+| `flaky-apis.yaml` | Retry testing: real OAuth checks plus layered faults (QuickBooks 429s and 503s, Jobber 429s and 502s) while customers keep paying |
 
 A scenario can also schedule what happens as twin time passes. Advancing the clock runs each entry at its own time, recorded with source `scenario`:
 

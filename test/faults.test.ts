@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { loadScenario } from "../src/control/operations.ts";
 import { setup } from "./helpers.ts";
 
 const putFaults = (app: ReturnType<typeof setup>["app"], body: unknown) =>
@@ -64,5 +66,23 @@ describe("layered fault rules", () => {
     const response = await qboGet("/customer/1");
     expect(performance.now() - started).toBeGreaterThanOrEqual(15);
     expect(response.headers.get("X-Twin-Fault")).toBe("down");
+  });
+});
+
+describe("the flaky-apis scenario", () => {
+  it("turns on real OAuth checks and fails a good share of requests to each vendor", async () => {
+    const { twin, qboGet, jobber } = setup();
+    loadScenario(twin, readFileSync("scenarios/flaky-apis.yaml", "utf8"));
+    expect(twin.authMode).toBe("oauth");
+
+    // Count only injected failures: in oauth mode the test token is rejected anyway when no fault fires.
+    let qboFaults = 0;
+    let jobberFaults = 0;
+    for (let i = 0; i < 100; i++) {
+      if ((await qboGet("/customer/1")).headers.get("X-Twin-Fault")) qboFaults++;
+      if ((await jobber("{ account { name } }")).headers.get("X-Twin-Fault")) jobberFaults++;
+    }
+    expect(qboFaults).toBeGreaterThan(25);
+    expect(jobberFaults).toBeGreaterThan(10);
   });
 });

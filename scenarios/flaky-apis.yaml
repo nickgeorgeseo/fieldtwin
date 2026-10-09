@@ -1,0 +1,37 @@
+# Everything that can go wrong, often. Use it to prove your retry logic before production does it for you.
+# Faults roll independently per request, so a run of retries can fail several times in a row.
+name: Flaky APIs
+description: >
+  Heavy fault rates on both vendors, with real OAuth checks. QuickBooks throttles nearly a third of requests
+  (429) and is sometimes unavailable (503). Jobber's DDoS guard throttles one request in five (429) and its
+  gateway sometimes fails (502). Every response is a little slow.
+seed: 42
+startTime: "2026-07-13T11:00:00Z"
+auth: oauth
+faults:
+  - name: qbo-throttled
+    vendor: quickbooks
+    rate: 0.3
+    effect: { status: 429, message: "ThrottleExceeded" }
+  - name: qbo-unavailable
+    vendor: quickbooks
+    rate: 0.1
+    effect: { status: 503, message: "Service temporarily unavailable" }
+  - name: jobber-ddos-guard
+    vendor: jobber
+    pathIncludes: /api/graphql # the OAuth endpoints stay up, so token refresh still works
+    rate: 0.2
+    effect: { status: 429 }
+  - name: jobber-bad-gateway
+    vendor: jobber
+    pathIncludes: /api/graphql
+    rate: 0.05
+    effect: { status: 502, message: "Bad gateway" }
+  - name: everything-a-little-slow
+    vendor: quickbooks
+    rate: 1
+    effect: { latencyMs: 5 }
+timeline:
+  # Customers keep paying while your sync struggles.
+  - at: "+30m"
+    jobber: { payInvoices: 2 }

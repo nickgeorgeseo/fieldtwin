@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- The `flaky-apis` scenario for retry testing: real OAuth checks and layered faults on both vendors.
 - World drift and the `mismatched-books` scenario: customers spelled differently in QuickBooks (same email), customers only in Jobber with work QuickBooks has never seen, and customers only in QuickBooks.
 - Scenario timelines: schedule vendor actions (`jobber: { newClients: 15 }`, `jobber: { payInvoices: 3 }`) at business times, offsets, or exact times. Advancing the clock runs them in order, recorded with source `scenario`; rewinding re-arms them. `GET /_twin` shows what's coming next.
 - Twin OAuth 2.0 servers for QuickBooks and Jobber at the vendors' own paths: authorization, token exchange, refresh (Jobber rotates, QuickBooks rolls), PKCE, revocation, and expiry on twin time. An auth mode (`FIELDTWIN_AUTH=oauth`, `auth: oauth` in a scenario, or `PUT /_twin/auth`) makes the APIs reject unknown and expired tokens; the default still accepts any token, and the README says so up front.
@@ -30,6 +31,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- Every fault rule that matches a request gets its own chance to fire (it used to be only the first), so rules can be layered.
 - QuickBooks query values match without regard to case and accept `\'` escapes, as documented. Features the twin doesn't model answer 500 `Unsupported operation` instead of a parse error.
 - QuickBooks error bodies now use the documented messages (610, 2020, 4000, 4001, 5010, 6240) and carry the `element` field. A request for another company answers 403 `AuthorizationFault` 3100 instead of 3200.
 - Jobber query cost follows the documented formula exactly (every field 1 point; `edges`, `nodes`, `node`, and connections free; per-node fields multiplied by `first`, `last`, or 100).
