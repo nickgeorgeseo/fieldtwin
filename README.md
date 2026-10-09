@@ -88,7 +88,7 @@ curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 Claude Code:
 
 ```bash
-claude mcp add fieldtwin -- npx tsx /path/to/fieldtwin/src/control/mcp.ts
+claude mcp add fieldtwin -- npx tsx /path/to/fieldtwin/src/mcp.ts
 ```
 
 The MCP tools only control the test world. Your agent still calls the vendor APIs over HTTP, the same way production code will.
@@ -122,10 +122,12 @@ src/
     quickbooks/  one folder per vendor, all with the same shape
     jobber/
   faults/      makes vendor APIs misbehave on purpose
-  control/     /_twin HTTP routes, MCP server, scenarios (one shared operations.ts)
+  control/     /_twin HTTP routes, MCP tools, scenarios (one shared operations.ts)
   app.ts       wires it together
+  server.ts    entry point for `npm start`
+  mcp.ts       entry point for `npm run mcp`
 scenarios/     ready-made situations
-test/          one test file per vendor, plus core
+test/          one test file per vendor, plus core and the architecture guards
 ```
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing anything in `core/`.

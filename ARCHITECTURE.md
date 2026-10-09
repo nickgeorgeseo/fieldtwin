@@ -65,9 +65,13 @@ vendors/x/    imports core/ and world/ only. Never another vendor.
 faults/       imports core/ only. Never a specific vendor.
 control/      imports core/ only; HTTP and MCP adapters both go through operations.ts
 app.ts        the only file that knows every piece exists
+server.ts     entry points: start the HTTP server (server.ts) or the HTTP server plus
+mcp.ts          MCP over stdio (mcp.ts). They import app.ts and control/, nothing else needs them
 ```
 
 If two vendors need the same helper, it moves to `core/`. If you find yourself importing a vendor from `faults/` or `control/`, the vendor contract is missing something; add it to `VendorTwin` instead.
+
+These rules are enforced, not just written down: `test/import-boundaries.test.ts` parses every import in `src/` and fails with the offending `file imports file`, and `test/determinism.test.ts` does the same for rule 2.
 
 ## Anatomy of a vendor folder
 

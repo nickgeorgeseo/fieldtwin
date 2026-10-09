@@ -10,7 +10,7 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "mcp": "tsx src/control/mcp.ts",
+    "mcp": "tsx src/mcp.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
