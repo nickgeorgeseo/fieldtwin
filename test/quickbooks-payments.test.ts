@@ -23,7 +23,7 @@ describe("QuickBooks twin: payments", () => {
     expect(response.status).toBe(200);
     const { Payment } = await response.json();
     expect(Payment).toMatchObject({
-      Id: "1",
+      Id: expect.stringMatching(/^\d+$/),
       SyncToken: "0",
       TotalAmt: 235,
       UnappliedAmt: 0,
@@ -42,14 +42,20 @@ describe("QuickBooks twin: payments", () => {
   it("applies a partial payment, leaving the rest of the balance open", async () => {
     const harness = setup();
     const invoice = await invoiceFor(harness, "3", 500);
-    await harness.qboPost("/payment", { CustomerRef: { value: "3" }, TotalAmt: 200, Line: [applyTo(invoice.Id, 200)] });
-    await harness.qboPost("/payment", { CustomerRef: { value: "3" }, TotalAmt: 120.5, Line: [applyTo(invoice.Id, 120.5)] });
+    const pay = async (amount: number) =>
+      (
+        await (
+          await harness.qboPost("/payment", { CustomerRef: { value: "3" }, TotalAmt: amount, Line: [applyTo(invoice.Id, amount)] })
+        ).json()
+      ).Payment.Id;
+    const first = await pay(200);
+    const second = await pay(120.5);
 
     const { Invoice } = await (await harness.qboGet(`/invoice/${invoice.Id}`)).json();
     expect(Invoice.Balance).toBe(179.5);
     expect(Invoice.LinkedTxn).toEqual([
-      { TxnId: "1", TxnType: "Payment" },
-      { TxnId: "2", TxnType: "Payment" },
+      { TxnId: first, TxnType: "Payment" },
+      { TxnId: second, TxnType: "Payment" },
     ]);
   });
 
@@ -117,8 +123,10 @@ describe("QuickBooks twin: payments", () => {
 
     const summaries = listChanges(harness.twin, "before-payment").map((change) => change.summary);
     expect(summaries).toHaveLength(2);
-    expect(summaries[0]).toMatch(/PaymentCreated Id=1 ".+" TotalAmt=80\.00 UnappliedAmt=0\.00/);
-    expect(summaries[1]).toMatch(/InvoiceUpdated Id=1 DocNumber=1001 ".+" TotalAmt=80\.00 Balance=0\.00 SyncToken=1/);
+    expect(summaries[0]).toMatch(/PaymentCreated Id=\d+ ".+" TotalAmt=80\.00 UnappliedAmt=0\.00/);
+    expect(summaries[1]).toMatch(
+      new RegExp(`InvoiceUpdated Id=${invoice.Id} DocNumber=1001 ".+" TotalAmt=80\\.00 Balance=0\\.00 SyncToken=1`),
+    );
   });
 
   it("changes the invoice's SyncToken, so code holding the old one gets a Stale Object error", async () => {

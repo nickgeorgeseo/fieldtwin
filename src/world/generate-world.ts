@@ -11,6 +11,7 @@ import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-li
  * after that: keeping Jobber and QuickBooks in sync is the job of the code under test.
  */
 export interface World {
+  asOf: string; // the moment the world describes: history is before it, the schedule after it
   company: { name: string; trade: string; city: string; state: string; utcOffsetHours: number };
   customers: WorldCustomer[];
   technicians: WorldTechnician[];
@@ -79,7 +80,7 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
     utcOffsetHours: home.utcOffsetHours,
   });
 
-  return { company, customers: customerList, technicians: technicianList, catalog, history };
+  return { asOf: options.startTime, company, customers: customerList, technicians: technicianList, catalog, history };
 }
 
 type Home = { city: string; state: string; zipPrefix: string };

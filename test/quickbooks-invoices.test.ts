@@ -26,7 +26,7 @@ describe("QuickBooks twin: creating and reading invoices", () => {
     const { Invoice } = await response.json();
 
     expect(Invoice).toMatchObject({
-      Id: "1",
+      Id: expect.stringMatching(/^\d+$/),
       SyncToken: "0",
       DocNumber: "1001",
       TxnDate: "2026-07-13",
@@ -151,7 +151,7 @@ describe("QuickBooks twin: creating and reading invoices", () => {
     const event = twin.log.all().at(-1)!;
     expect(event.type).toBe("InvoiceCreated");
     expect(twin.vendor("quickbooks").describeEvent(event)).toMatch(
-      /^InvoiceCreated Id=1 DocNumber=1001 ".+" TotalAmt=50\.00 Balance=50\.00$/,
+      /^InvoiceCreated Id=\d+ DocNumber=1001 ".+" TotalAmt=50\.00 Balance=50\.00$/,
     );
   });
 });

@@ -186,7 +186,9 @@ describe("QuickBooks query clause: COUNT(*)", () => {
     expect((await query(harness, "select count(*) from Customer where Id in ('1', '2', '3')")).body.QueryResponse).toEqual({
       totalCount: 3,
     });
-    expect((await query(harness, "select count(*) from Invoice")).body.QueryResponse).toEqual({ totalCount: 0 });
+    expect((await query(harness, "select count(*) from Invoice where DocNumber = 'no-such-number'")).body.QueryResponse).toEqual({
+      totalCount: 0,
+    });
   });
 });
 
