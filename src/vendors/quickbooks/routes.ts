@@ -19,17 +19,17 @@ export function quickbooksRoutes(twin: Twin): Hono {
   // and every QuickBooks URL names a company ("realm"). The twin serves exactly one.
   app.use("/v3/company/:realmId/*", async (c, next) => {
     if (!c.req.header("Authorization")?.startsWith("Bearer ")) {
-      return c.json(qboErrors.notAuthenticated(now()), 401);
+      return c.json(qboErrors.notAuthenticated("Send an Authorization: Bearer <access token> header.", now()), 401);
     }
     if (c.req.param("realmId") !== state().realmId) {
-      return c.json(qboErrors.wrongRealm(state().realmId, now()), 403);
+      return c.json(qboErrors.wrongRealm(c.req.param("realmId"), state().realmId, now()), 403);
     }
     await next();
   });
 
   app.get("/v3/company/:realmId/customer/:id", (c) => {
     const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return c.json(qboErrors.notFound("Customer", c.req.param("id"), now()), 400);
+    if (!customer) return c.json(qboErrors.notFound(now()), 400);
     return c.json({ Customer: customer, time: now() });
   });
 
@@ -45,7 +45,7 @@ export function quickbooksRoutes(twin: Twin): Hono {
     const query = parseQboQuery(c.req.query("query") ?? "");
     if ("error" in query) return c.json(qboErrors.badQuery(query.error, now()), 400);
     if (query.entity.toLowerCase() !== "customer") {
-      return c.json(qboErrors.badQuery(`The twin does not support querying ${query.entity} yet`, now()), 400);
+      return c.json(qboErrors.invalidQuery(`The twin does not support querying ${query.entity}. Supported: Customer`, now()), 400);
     }
 
     let customers = [...state().customers.values()];
@@ -72,7 +72,8 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>) {
   // QuickBooks builds a DisplayName from the person's name when none is given.
   fields.DisplayName ??= [fields.GivenName, fields.FamilyName].filter(Boolean).join(" ") || undefined;
   if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
-  if (isDisplayNameTaken(state, fields.DisplayName)) return qboErrors.duplicateName(fields.DisplayName, now);
+  const taken = customerNamed(state, fields.DisplayName);
+  if (taken) return qboErrors.duplicateName(taken.Id, now);
 
   const customer = newCustomerRecord(state, { ...fields, DisplayName: fields.DisplayName }, now);
   twin.record({ vendor: "quickbooks", type: "CustomerCreated", data: { customer } }, "api");
@@ -84,21 +85,20 @@ function updateCustomer(twin: Twin, body: Partial<QboCustomer> & { sparse?: bool
   const now = twin.clock.nowIso();
   const existing = state.customers.get(body.Id!);
 
-  if (!existing) return qboErrors.notFound("Customer", body.Id!, now);
+  if (!existing) return qboErrors.notFound(now);
   if (body.SyncToken === undefined) return qboErrors.missingField("SyncToken", now);
 
   // The quirk that breaks real integrations: you must send the SyncToken you last read.
   // If anyone changed the record since then, QuickBooks rejects your update.
-  if (body.SyncToken !== existing.SyncToken) return qboErrors.staleObject(existing.Id, now);
+  if (body.SyncToken !== existing.SyncToken) return qboErrors.staleObject(now);
 
   // A sparse update changes only the fields you send. A full update replaces every writable field,
   // so anything you leave out is cleared. Getting this wrong silently wipes data in production.
   const base = body.sparse ? pickWritable(existing) : {};
   const fields = { ...base, ...pickWritable(body) };
   if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
-  if (fields.DisplayName !== existing.DisplayName && isDisplayNameTaken(state, fields.DisplayName)) {
-    return qboErrors.duplicateName(fields.DisplayName, now);
-  }
+  const taken = customerNamed(state, fields.DisplayName);
+  if (taken && taken.Id !== existing.Id) return qboErrors.duplicateName(taken.Id, now);
 
   const customer: QboCustomer = {
     Active: true,
@@ -120,6 +120,6 @@ function pickWritable(source: Partial<QboCustomer>): Partial<QboCustomer> {
   return picked;
 }
 
-function isDisplayNameTaken(state: QboState, name: string): boolean {
-  return [...state.customers.values()].some((customer) => customer.DisplayName === name);
+function customerNamed(state: QboState, name: string): QboCustomer | undefined {
+  return [...state.customers.values()].find((customer) => customer.DisplayName === name);
 }

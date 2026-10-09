@@ -8,20 +8,23 @@ What each twin models, how closely, and whether it has been checked against the 
 
 ## QuickBooks Online
 
-| Behavior | Status | Verified | Notes |
-|---|---|---|---|
-| `GET /customer/{id}` | Modeled | docs only | |
-| `POST /customer` create | Modeled | docs only | DisplayName derived from GivenName + FamilyName when missing |
-| `POST /customer` update with SyncToken | Modeled | docs only | Stale token returns error 5010 |
-| Sparse vs full update | Modeled | docs only | Full update clears omitted writable fields |
-| Unique DisplayName | Approximate | docs only | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only |
-| `GET /query` | Approximate | docs only | `SELECT *`, one `WHERE Field = 'value'`, `STARTPOSITION`, `MAXRESULTS`. No `POST /query`, no `COUNT(*)`, no `LIKE` |
-| Error codes 610, 2020, 4000, 6240 | Modeled | check | Message wording is approximate |
-| Auth failure code 3200, throttle code 003001 | Approximate | check | Real wrong-realm responses may differ |
-| `minorversion` parameter | Not yet | | Accepted and ignored |
-| OAuth 2.0 | Not yet | | Any bearer token is accepted |
-| Rate limits | Via faults | | Use a fault rule with status 429 |
-| Webhooks, CDC, other entities | Not yet | | Roadmap v0.1 and v0.2 |
+| Behavior | Status | Verified | Docs | Notes |
+|---|---|---|---|---|
+| `GET /customer/{id}` | Modeled | docs only | [Customer][qbo-customer] | |
+| `POST /customer` create | Modeled | docs only | [Customer][qbo-customer] | DisplayName derived from GivenName + FamilyName when missing |
+| `POST /customer` update with SyncToken | Modeled | docs only | [Customer][qbo-customer] | A stale SyncToken answers 5010 `Stale Object` |
+| Sparse vs full update | Modeled | docs only | [Customer][qbo-customer] | Full update clears omitted writable fields |
+| Unique DisplayName | Approximate | docs only | [Error codes][qbo-errors] | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only. 6240 names the Id that has the name |
+| `GET /query` | Approximate | docs only | [REST basics][qbo-rest] | `SELECT *`, one `WHERE Field = 'value'`, `STARTPOSITION`, `MAXRESULTS`. No `POST /query`, no `COUNT(*)`, no `LIKE` |
+| Error bodies 610, 2020, 4000, 4001, 5010, 6240 | Modeled | docs only | [Error codes][qbo-errors] | `Message` is copied from the reference, which documents it as literal. `Detail` fills in the reference's templates and may not match real responses word for word |
+| HTTP status of 610 on a read | Approximate | check | [Error codes][qbo-errors] | Twin answers 400. The docs list both 400 and 404 without saying which a missing Id gets |
+| Missing or invalid token: 401 `AuthenticationFault` 3200 | Modeled | docs only | [Error codes][qbo-errors] | |
+| Wrong realm: 403 `AuthorizationFault` 3100 | Approximate | check | [Error codes][qbo-errors] | 3100 is the only documented 403 code. The real `Message` for a token used on another company is unconfirmed |
+| Throttling: HTTP 429 | Via faults | docs only | [Limits][qbo-limits] | Use a fault rule with status 429. Intuit documents the status and "wait 60 seconds"; the body (code 003001, `ThrottleExceeded`) is widely reported but not in the docs: check |
+| Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
+| `minorversion` parameter | Not yet | | | Accepted and ignored |
+| OAuth 2.0 | Not yet | | | Any bearer token is accepted |
+| Webhooks, CDC, other entities | Not yet | | | Roadmap v0.1 and v0.2 |
 
 ## Jobber
 
@@ -39,3 +42,8 @@ What each twin models, how closely, and whether it has been checked against the 
 | Mutations | Not yet | | Roadmap v0.1 |
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
 | OAuth 2.0 | Not yet | | Any bearer token is accepted |
+
+[qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
+[qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
+[qbo-limits]: https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
+[qbo-rest]: https://developer.intuit.com/app/developer/qbo/docs/learn/rest-api-features

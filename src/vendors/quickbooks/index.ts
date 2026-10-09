@@ -1,5 +1,5 @@
 import type { VendorTwin } from "../../core/vendor-twin.ts";
-import { qboFault } from "./errors.ts";
+import { qboErrorForStatus } from "./errors.ts";
 import { describeQboEvent } from "./events.ts";
 import { quickbooksRoutes } from "./routes.ts";
 import { seedQuickBooks } from "./seed.ts";
@@ -14,8 +14,5 @@ export const quickbooksTwin: VendorTwin<QboState> = {
   describeEvent: describeQboEvent,
   seed: seedQuickBooks,
   routes: quickbooksRoutes,
-  errorBody: (status, message, twin) =>
-    status === 429
-      ? qboFault("003001", "ThrottleExceeded", message, twin.clock.nowIso(), "SERVICE")
-      : qboFault(String(status), "Injected fault", message, twin.clock.nowIso(), "SystemFault"),
+  errorBody: (status, message, twin) => qboErrorForStatus(status, message, twin.clock.nowIso()),
 };
