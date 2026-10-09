@@ -170,3 +170,22 @@ describe("QuickBooks query clause: WHERE on a reference", () => {
     expect(byId.body.QueryResponse.Payment).toHaveLength(1);
   });
 });
+
+describe("QuickBooks query clause: COUNT(*)", () => {
+  it("parses the documented statement, missing space and all", () => {
+    expect(parseQboQuery("SELECT COUNT(*)FROM Customer")).toMatchObject({ select: "count", entity: "Customer" });
+  });
+
+  it("answers totalCount and no records, ignoring pagination", async () => {
+    const { body } = await query(setup(), "SELECT COUNT(*) FROM Customer MAXRESULTS 5");
+    expect(body.QueryResponse).toEqual({ totalCount: 25 });
+  });
+
+  it("counts only what the WHERE clause matches, including nothing", async () => {
+    const harness = setup();
+    expect((await query(harness, "select count(*) from Customer where Id in ('1', '2', '3')")).body.QueryResponse).toEqual({
+      totalCount: 3,
+    });
+    expect((await query(harness, "select count(*) from Invoice")).body.QueryResponse).toEqual({ totalCount: 0 });
+  });
+});

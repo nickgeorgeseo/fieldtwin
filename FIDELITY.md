@@ -15,9 +15,9 @@ What each twin models, how closely, and whether it has been checked against the 
 | `POST /customer` update with SyncToken | Modeled | docs only | [Customer][qbo-customer] | A stale SyncToken answers 5010 `Stale Object` |
 | Sparse vs full update | Modeled | docs only | [Customer][qbo-customer] | Full update clears omitted writable fields |
 | Unique DisplayName | Approximate | docs only | [Error codes][qbo-errors] | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only. 6240 names the Id that has the name |
-| `GET /query` | Approximate | docs only | [Queries][qbo-query] | `SELECT *` from Customer, Item, Invoice, or Payment, one `WHERE Property = value` or `WHERE Property IN (value, ...)`, `STARTPOSITION`, `MAXRESULTS` (default 100, at most 1,000) |
+| `GET /query` | Approximate | docs only | [Queries][qbo-query] | `SELECT *` or `SELECT COUNT(*)` from Customer, Item, Invoice, or Payment, one `WHERE Property = value` or `WHERE Property IN (value, ...)`, `STARTPOSITION`, `MAXRESULTS` (default 100, at most 1,000) |
 | Query case and escaping | Modeled | docs only | [Queries][qbo-query] | Keywords, entity and property names, and values match without regard to case; `\'` escapes an apostrophe |
-| Query features not modeled yet | Not yet | | [Queries][qbo-query] | `AND`, `LIKE`, `<`, `>`, `ORDERBY`, `POST /query`, and `COUNT(*)` answer 500 `Unsupported operation` naming the feature; syntax errors answer 4000; unknown entities and properties answer 4001 |
+| Query features not modeled yet | Not yet | | [Queries][qbo-query] | `AND`, `LIKE`, `<`, `>`, `ORDERBY`, and `POST /query` answer 500 `Unsupported operation` naming the feature; syntax errors answer 4000; unknown entities and properties answer 4001 |
 | Which properties can be filtered | Approximate | | [Queries][qbo-query] | Each entity lists the modeled properties its reference marks filterable. QuickBooks may accept more |
 | `GET /item/{id}` | Modeled | docs only | [Item][qbo-item] | Seeded from the world's price list: services as `Service`, parts as `NonInventory` (parts `Taxable`). No `IncomeAccountRef`/`ExpenseAccountRef`, since the twin has no Accounts |
 | `POST /item` create and update | Not yet | | [Item][qbo-item] | Answers code 500 `Unsupported operation`. Inventory items, categories, and sub-items are not modeled |

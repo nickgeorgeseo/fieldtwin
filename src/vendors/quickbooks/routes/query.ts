@@ -61,6 +61,9 @@ function runQuery(state: QboState, query: QboQuery): { response: object } | { in
     matching = matching.filter((record) => where.values.some((value) => matches(valueAt(record, property), value)));
   }
 
+  // "The number of entities is returned as the value of the totalCount field ... data objects ... aren't in the response."
+  if (query.select === "count") return { response: { totalCount: matching.length } };
+
   const page = matching.slice(query.startPosition - 1, query.startPosition - 1 + query.maxResults);
   // QuickBooks answers an empty QueryResponse, with no entity key, when nothing matches.
   if (!page.length) return { response: {} };

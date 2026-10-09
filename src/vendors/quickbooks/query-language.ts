@@ -119,8 +119,12 @@ class Parser {
 
   private selectList(): QboQuery["select"] {
     if (this.acceptSymbol("*")) return "*";
+    // "count(*): The number of records that satisfy the query criteria."
     if (this.acceptWord("COUNT")) {
-      throw new ParseFailure("unsupported", "The twin does not support COUNT(*) yet");
+      this.expectSymbol("(");
+      this.expectSymbol("*");
+      this.expectSymbol(")");
+      return "count";
     }
     throw new ParseFailure("syntax", "Expected * after SELECT. Projections (SELECT Field, ...) are not part of the query language");
   }
