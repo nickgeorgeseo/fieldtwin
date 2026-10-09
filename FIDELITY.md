@@ -42,7 +42,11 @@ What each twin models, how closely, and whether it has been checked against the 
 | Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
 | `minorversion` parameter | Not yet | | | Accepted and ignored |
 | OAuth 2.0 | Not yet | | | Any bearer token is accepted |
-| Webhooks, CDC | Not yet | | | Roadmap v0.1 and v0.2 |
+| `GET /cdc` change data capture | Modeled | docs only | [CDC][qbo-cdc] | Customer, Item, Invoice, Payment changed since `changedSince` (date, date-time, or UTC offset), grouped by entity and ordered by `LastUpdatedTime`, latest version only, at most 1,000 objects. Reads `MetaData.LastUpdatedTime` |
+| CDC look-back over 30 days | Approximate | check | [CDC][qbo-cdc] | The docs limit look-back to 30 days but don't show the error. Twin answers 2190 `Invalid Date Range` |
+| CDC group with no changes | Approximate | check | [CDC][qbo-cdc] | Answered as `{}`; the docs only show groups with changes |
+| Deleted objects in CDC | Not yet | | [CDC][qbo-cdc] | The twin models no deletes, so `status: "Deleted"` entries never appear |
+| Webhooks | Not yet | | | Roadmap v0.2 |
 
 ## Jobber
 
@@ -69,6 +73,7 @@ What each twin models, how closely, and whether it has been checked against the 
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
 | OAuth 2.0 | Not yet | | Any bearer token is accepted |
 
+[qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
 [qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
 [qbo-invoice]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice

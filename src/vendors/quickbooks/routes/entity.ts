@@ -1,5 +1,6 @@
 import type { QboFault } from "../errors.ts";
 import { qboErrors } from "../errors.ts";
+import type { QboEntityName, QboState } from "../types.ts";
 
 /**
  * What every QuickBooks entity route shares: the company path, the SyncToken rule, and sparse vs full updates.
@@ -62,4 +63,17 @@ export function nextVersion(existing: Versioned, now: string): Versioned {
  */
 export function asResponse<T extends object>(entity: T): T & { domain: "QBO"; sparse: false } {
   return { ...entity, domain: "QBO", sparse: false };
+}
+
+/** Every entity the twin serves, by its QuickBooks name, with where its records live. */
+export const ENTITY_RECORDS: Record<QboEntityName, (state: QboState) => Map<string, Versioned>> = {
+  Customer: (state) => state.customers,
+  Item: (state) => state.items,
+  Invoice: (state) => state.invoices,
+  Payment: (state) => state.payments,
+};
+
+/** The canonical entity name for one written in any case ("invoice" -> "Invoice"), or undefined. */
+export function entityNamed(name: string): QboEntityName | undefined {
+  return (Object.keys(ENTITY_RECORDS) as QboEntityName[]).find((entity) => entity.toLowerCase() === name.trim().toLowerCase());
 }

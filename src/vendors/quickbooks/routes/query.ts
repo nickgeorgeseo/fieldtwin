@@ -2,33 +2,21 @@ import type { Context, Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { parseQboQuery, type QboQuery, type QueryValue } from "../query-language.ts";
-import type { QboState } from "../types.ts";
-import { asResponse, COMPANY } from "./entity.ts";
+import type { QboEntityName, QboState } from "../types.ts";
+import { asResponse, COMPANY, ENTITY_RECORDS, entityNamed } from "./entity.ts";
 
 const METADATA = ["MetaData.CreateTime", "MetaData.LastUpdatedTime"];
 
 /**
  * The query endpoint: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
- * Each queryable entity lists the properties a WHERE clause may filter on (the ones the twin models that
+ * Each entity lists the properties a WHERE clause may filter on (the ones the twin models that
  * the entity reference marks "filterable"). Property names match without regard to case, like QuickBooks.
  */
-const QUERYABLE: Record<string, { records: (state: QboState) => Iterable<object>; properties: string[] }> = {
-  Customer: {
-    records: (state) => state.customers.values(),
-    properties: ["Id", "DisplayName", "GivenName", "FamilyName", "PrimaryEmailAddr", "Active", ...METADATA],
-  },
-  Item: {
-    records: (state) => state.items.values(),
-    properties: ["Id", "Name", "FullyQualifiedName", "Type", "Active", ...METADATA],
-  },
-  Invoice: {
-    records: (state) => state.invoices.values(),
-    properties: ["Id", "DocNumber", "TxnDate", "DueDate", "CustomerRef", "TotalAmt", "Balance", ...METADATA],
-  },
-  Payment: {
-    records: (state) => state.payments.values(),
-    properties: ["Id", "TxnDate", "CustomerRef", "TotalAmt", "PaymentRefNum", ...METADATA],
-  },
+const FILTERABLE: Record<QboEntityName, string[]> = {
+  Customer: ["Id", "DisplayName", "GivenName", "FamilyName", "PrimaryEmailAddr", "Active", ...METADATA],
+  Item: ["Id", "Name", "FullyQualifiedName", "Type", "Active", ...METADATA],
+  Invoice: ["Id", "DocNumber", "TxnDate", "DueDate", "CustomerRef", "TotalAmt", "Balance", ...METADATA],
+  Payment: ["Id", "TxnDate", "CustomerRef", "TotalAmt", "PaymentRefNum", ...METADATA],
 };
 
 export function queryRoutes(app: Hono, twin: Twin): void {
@@ -51,11 +39,11 @@ export function queryRoutes(app: Hono, twin: Twin): void {
 }
 
 function runQuery(state: QboState, query: QboQuery): { response: object } | { invalid: string } {
-  const entity = Object.keys(QUERYABLE).find((name) => name.toLowerCase() === query.entity.toLowerCase());
-  if (!entity) return { invalid: `The twin can't query ${query.entity}. Queryable entities: ${Object.keys(QUERYABLE).join(", ")}` };
-  const { records, properties } = QUERYABLE[entity]!;
+  const entity = entityNamed(query.entity);
+  if (!entity) return { invalid: `The twin can't query ${query.entity}. Queryable entities: ${Object.keys(FILTERABLE).join(", ")}` };
+  const properties = FILTERABLE[entity];
 
-  let matching = [...records(state)];
+  let matching: object[] = [...ENTITY_RECORDS[entity](state).values()];
   if (query.where) {
     const { where } = query;
     const property = properties.find((name) => name.toLowerCase() === where.property.toLowerCase());

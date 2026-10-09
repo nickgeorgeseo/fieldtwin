@@ -51,6 +51,9 @@ export const qboErrors = {
   invalidDate: (element: string, supplied: string, now: string) =>
     qboFault({ code: "2070", Message: "Invalid Date", Detail: `Supplied value: ${supplied}`, element }, now),
 
+  invalidDateRange: (element: string, detail: string, now: string) =>
+    qboFault({ code: "2190", Message: "Invalid Date Range", Detail: detail, element }, now),
+
   negativeAmount: (element: string, now: string) =>
     qboFault({ code: "2290", Message: "NegativeAmount", Detail: "Negative amounts aren't supported on transaction lines.", element }, now),
 

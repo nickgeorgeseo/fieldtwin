@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- QuickBooks change data capture (`GET /cdc`) and a much fuller query language: `SELECT COUNT(*)`, `WHERE Id IN (...)`, filters on references like `CustomerRef`, queries over Item, Invoice, and Payment, and `POST /query`.
 - QuickBooks payments: create and read. Lines apply amounts to invoices; paid invoices read `Balance: 0` and link the payment; the rest is `UnappliedAmt`.
 - QuickBooks invoices: create, read, and sparse and full update (SyncToken rules, line Ids kept, totals recomputed), with Item lines, computed `TotalAmt` and `Balance`, the subtotal line QuickBooks appends, automatic `DocNumber`s, and the documented line validation errors (2020, 2050, 2290, 2500, 6070).
 - QuickBooks Items, seeded from the world's new trade-specific price list (`world.catalog`): `GET /item/{id}`. QuickBooks entities now carry `domain` and `sparse` like the documented samples.
@@ -20,6 +21,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- QuickBooks query values match without regard to case and accept `\'` escapes, as documented. Features the twin doesn't model answer 500 `Unsupported operation` instead of a parse error.
 - QuickBooks error bodies now use the documented messages (610, 2020, 4000, 4001, 5010, 6240) and carry the `element` field. A request for another company answers 403 `AuthorizationFault` 3100 instead of 3200.
 - Jobber query cost follows the documented formula exactly (every field 1 point; `edges`, `nodes`, `node`, and connections free; per-node fields multiplied by `first`, `last`, or 100).
 - Jobber answers syntax and validation errors with HTTP 200 and an `errors` list, as documented, instead of 400.

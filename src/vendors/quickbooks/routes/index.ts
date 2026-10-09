@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboState } from "../types.ts";
+import { cdcRoutes } from "./cdc.ts";
 import { customerRoutes } from "./customer.ts";
 import { COMPANY } from "./entity.ts";
 import { invoiceRoutes } from "./invoice.ts";
@@ -37,5 +38,6 @@ export function quickbooksRoutes(twin: Twin): Hono {
   invoiceRoutes(app, twin);
   paymentRoutes(app, twin);
   queryRoutes(app, twin);
+  cdcRoutes(app, twin);
   return app;
 }
