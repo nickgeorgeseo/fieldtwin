@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { buildSchema, execute, parse, validate, type GraphQLError } from "graphql";
+import { buildSchema, type DocumentNode, execute, type GraphQLError, parse, validate } from "graphql";
 import { Hono } from "hono";
 import type { Twin } from "../../core/twin.ts";
 import { CostBucket, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND, estimateQueryCost } from "./cost.ts";
@@ -32,7 +32,7 @@ export function jobberRoutes(twin: Twin): Hono {
 
     const { query, variables = {} } = (await c.req.json()) as { query: string; variables?: Record<string, unknown> };
 
-    let document;
+    let document: DocumentNode;
     try {
       document = parse(query);
     } catch (error) {

@@ -9,7 +9,7 @@ import type { Twin } from "./twin.ts";
  *
  * Vendor folders never import from each other. Anything two vendors share belongs in core/ or world/.
  */
-export interface VendorTwin<State = any> {
+export interface VendorTwin<State = unknown> {
   name: VendorName;
 
   /** URL prefix this vendor's real API lives under, e.g. "/v3". Two vendors may not share one. */

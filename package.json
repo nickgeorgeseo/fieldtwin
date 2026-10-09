@@ -12,7 +12,9 @@
     "dev": "tsx watch src/server.ts",
     "mcp": "tsx src/control/mcp.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome check --write ."
   },
   "dependencies": {
     "@hono/node-server": "^1.19.17",
@@ -23,6 +25,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^22.20.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
