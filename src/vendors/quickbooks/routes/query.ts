@@ -5,6 +5,8 @@ import { parseQboQuery, type QboQuery, type QueryValue } from "../query-language
 import type { QboState } from "../types.ts";
 import { asResponse, COMPANY } from "./entity.ts";
 
+const METADATA = ["MetaData.CreateTime", "MetaData.LastUpdatedTime"];
+
 /**
  * The query endpoint: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
  * Each queryable entity lists the properties a WHERE clause may filter on (the ones the twin models that
@@ -13,16 +15,19 @@ import { asResponse, COMPANY } from "./entity.ts";
 const QUERYABLE: Record<string, { records: (state: QboState) => Iterable<object>; properties: string[] }> = {
   Customer: {
     records: (state) => state.customers.values(),
-    properties: [
-      "Id",
-      "DisplayName",
-      "GivenName",
-      "FamilyName",
-      "PrimaryEmailAddr",
-      "Active",
-      "MetaData.CreateTime",
-      "MetaData.LastUpdatedTime",
-    ],
+    properties: ["Id", "DisplayName", "GivenName", "FamilyName", "PrimaryEmailAddr", "Active", ...METADATA],
+  },
+  Item: {
+    records: (state) => state.items.values(),
+    properties: ["Id", "Name", "FullyQualifiedName", "Type", "Active", ...METADATA],
+  },
+  Invoice: {
+    records: (state) => state.invoices.values(),
+    properties: ["Id", "DocNumber", "TxnDate", "DueDate", "CustomerRef", "TotalAmt", "Balance", ...METADATA],
+  },
+  Payment: {
+    records: (state) => state.payments.values(),
+    properties: ["Id", "TxnDate", "CustomerRef", "TotalAmt", "PaymentRefNum", ...METADATA],
   },
 };
 

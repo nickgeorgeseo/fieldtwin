@@ -90,3 +90,30 @@ describe("QuickBooks twin: GET /query", () => {
     expect(body.Fault.Error[0].Detail).toContain("LIKE");
   });
 });
+
+describe("QuickBooks twin: querying each entity", () => {
+  const sale = (Amount: number) => ({ DetailType: "SalesItemLineDetail", Amount, SalesItemLineDetail: { ItemRef: { value: "1" } } });
+
+  it("queries Item, as in the Item reference's sample query", async () => {
+    const { body } = await query(setup(), "select * from Item maxresults 2");
+    expect(body.QueryResponse).toMatchObject({ startPosition: 1, maxResults: 2 });
+    expect(body.QueryResponse.Item.map((item: { Id: string }) => item.Id)).toEqual(["1", "2"]);
+  });
+
+  it("queries Invoice, filtering on DocNumber", async () => {
+    const harness = setup();
+    await harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(50)], DocNumber: "JB-7" });
+    await harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(75)], DocNumber: "JB-8" });
+    const { body } = await query(harness, "select * from Invoice where DocNumber = 'jb-8'");
+    expect(body.QueryResponse.Invoice).toHaveLength(1);
+    expect(body.QueryResponse.Invoice[0]).toMatchObject({ DocNumber: "JB-8", TotalAmt: 75, domain: "QBO" });
+  });
+
+  it("queries Payment, filtering on a number", async () => {
+    const harness = setup();
+    await harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 40 });
+    await harness.qboPost("/payment", { CustomerRef: { value: "2" }, TotalAmt: 60 });
+    const { body } = await query(harness, "select * from Payment where TotalAmt = '60'");
+    expect(body.QueryResponse.Payment.map((payment: { TotalAmt: number }) => payment.TotalAmt)).toEqual([60]);
+  });
+});
