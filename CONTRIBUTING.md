@@ -10,7 +10,7 @@ Requires Node 22 or newer.
 
 ```bash
 npm ci
-npm test            # vitest, about a second
+npm test            # vitest, a few seconds
 npm run typecheck   # tsc, no emit
 npm run lint        # Biome: lint, formatting, and import order
 npm run format      # let Biome fix formatting and import order for you

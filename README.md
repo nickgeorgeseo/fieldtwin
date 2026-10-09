@@ -6,7 +6,7 @@ Point your integration, script, or AI agent at `http://localhost:4010` instead o
 
 Nothing touches a real customer's account. Every run starts from the same seed, so a bug you hit once you can hit again.
 
-> Status: early sketch (v0.0.1). QuickBooks customers and Jobber clients work end to end. See [FIDELITY.md](FIDELITY.md) for exactly what is modeled.
+> Status: v0.1. QuickBooks Online customers, items, invoices, payments, queries, and change data capture; Jobber clients, jobs, visits, quotes, invoices, users, and `clientCreate`; both vendors' OAuth 2.0 flows; scenarios with timelines and drifted books; and a [reference integration](#a-worked-example-jobber-to-quickbooks) that syncs one into the other. [FIDELITY.md](FIDELITY.md) says exactly what is modeled, and how closely.
 
 ## Why this exists
 
@@ -190,8 +190,8 @@ timeline:
 
 ```text
 src/
-  core/        the twin runtime: event log, clock, seeded randomness, vendor contract
-  world/       generates the vendor-neutral fake business
+  core/        the twin runtime: event log, clock, seeded randomness, OAuth server, vendor contract
+  world/       the vendor-neutral fake business: customers, price list, months of work history, drift
   vendors/
     quickbooks/  one folder per vendor, all with the same shape
     jobber/
@@ -200,8 +200,10 @@ src/
   app.ts       wires it together
   server.ts    entry point for `npm start`
   mcp.ts       entry point for `npm run mcp`
-scenarios/     ready-made situations
-test/          one test file per vendor, plus core and the architecture guards
+scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-apis)
+examples/      code that uses the twins the way yours will: over HTTP, never importing src/
+  sync-jobber-invoice-to-quickbooks/   the reference integration, its demo, and its tests
+test/          tests by vendor and area, plus core and the architecture guards
 ```
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing anything in `core/`.
