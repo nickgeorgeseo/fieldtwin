@@ -1,4 +1,5 @@
 import type { SeededRandom } from "../core/random.ts";
+import { type CatalogEntry, makeCatalog } from "./catalog.ts";
 import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-lists.ts";
 
 /**
@@ -12,6 +13,7 @@ export interface World {
   company: { name: string; trade: string; city: string; state: string };
   customers: WorldCustomer[];
   technicians: WorldTechnician[];
+  catalog: CatalogEntry[];
 }
 
 export interface WorldCustomer {
@@ -45,15 +47,18 @@ export function generateWorld(random: SeededRandom, size: Partial<WorldSize> = {
   const trade = random.pick(TRADES);
   const ownerLastName = random.pick(LAST_NAMES);
 
-  return {
-    company: { name: `${ownerLastName} ${trade.businessSuffix}`, trade: trade.name, city: home.city, state: home.state },
-    customers: makeCustomers(random, customers, home),
-    technicians: Array.from({ length: technicians }, (_, i) => ({
-      key: `tech-${pad(i + 1)}`,
-      firstName: random.pick(FIRST_NAMES),
-      lastName: random.pick(LAST_NAMES),
-    })),
-  };
+  // Order matters: each part draws from the same random stream, so new parts of the world go last.
+  // That way an existing seed keeps the same company, customers, and technicians when the world grows.
+  const company = { name: `${ownerLastName} ${trade.businessSuffix}`, trade: trade.name, city: home.city, state: home.state };
+  const customerList = makeCustomers(random, customers, home);
+  const technicianList = Array.from({ length: technicians }, (_, i) => ({
+    key: `tech-${pad(i + 1)}`,
+    firstName: random.pick(FIRST_NAMES),
+    lastName: random.pick(LAST_NAMES),
+  }));
+  const catalog = makeCatalog(random, trade.name);
+
+  return { company, customers: customerList, technicians: technicianList, catalog };
 }
 
 type Home = { city: string; state: string; zipPrefix: string };
