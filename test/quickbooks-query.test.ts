@@ -143,3 +143,30 @@ describe("QuickBooks query clause: WHERE Id = and IN", () => {
     expect(parseQboQuery("select * from Customer where Id > '3'")).toMatchObject({ kind: "unsupported" });
   });
 });
+
+describe("QuickBooks query clause: WHERE on a reference", () => {
+  const sale = (Amount: number) => ({ DetailType: "SalesItemLineDetail", Amount, SalesItemLineDetail: { ItemRef: { value: "1" } } });
+
+  it("finds all invoices for a customer, as in the documented WHERE CustomerRef = '123'", async () => {
+    const harness = setup();
+    for (const [customer, amount] of [
+      ["3", 10],
+      ["4", 20],
+      ["3", 30],
+    ] as const) {
+      await harness.qboPost("/invoice", { CustomerRef: { value: customer }, Line: [sale(amount)] });
+    }
+    const { body } = await query(harness, "SELECT * FROM Invoice WHERE CustomerRef = '3'");
+    expect(body.QueryResponse.Invoice.map((invoice: { TotalAmt: number }) => invoice.TotalAmt)).toEqual([10, 30]);
+  });
+
+  it("compares a reference by Id, not by name", async () => {
+    const harness = setup();
+    await harness.qboPost("/payment", { CustomerRef: { value: "3" }, TotalAmt: 15 });
+    const { Customer } = await (await harness.qboGet("/customer/3")).json();
+    const byName = await query(harness, `select * from Payment where CustomerRef = '${Customer.DisplayName}'`);
+    expect(byName.body.QueryResponse).toEqual({});
+    const byId = await query(harness, "select * from Payment where CustomerRef IN ('3', '4')");
+    expect(byId.body.QueryResponse.Payment).toHaveLength(1);
+  });
+});
