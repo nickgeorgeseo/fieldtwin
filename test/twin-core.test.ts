@@ -47,3 +47,28 @@ describe("the twin", () => {
     expect(twin.upcoming().map((entry) => `${entry.action} ${entry.params}`)).toEqual(["newClients 12", "newClients 15", "payInvoices 4"]);
   });
 });
+
+describe("the control plane over HTTP", () => {
+  it("lists ready-made scenarios and loads one by name", async () => {
+    const { app, twin } = setup();
+    const scenarios = await (await app.request("/_twin/scenarios")).json();
+    expect(scenarios.map((scenario: { name: string }) => scenario.name)).toContain("mismatched-books");
+
+    const loaded = await (await app.request("/_twin/scenarios/mismatched-books", { method: "POST" })).json();
+    expect(loaded.scenario).toBe("Mismatched books");
+    expect(twin.world.customers).toHaveLength(30);
+
+    const missing = await app.request("/_twin/scenarios/no-such-thing", { method: "POST" });
+    expect(missing.status).toBe(400);
+    expect((await missing.json()).error).toContain("Available:");
+  });
+
+  it("exports the log since a checkpoint", async () => {
+    const { app, qboPost } = setup();
+    await app.request("/_twin/checkpoints/mark", { method: "POST" });
+    await qboPost("/customer", { DisplayName: "Exported Customer" });
+    const lines = (await (await app.request("/_twin/log.jsonl?since=mark")).text()).split("\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Exported Customer");
+  });
+});

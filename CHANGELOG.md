@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- MCP tools `twin_list_scenarios`, `twin_load_scenario`, `twin_set_faults`, `twin_set_auth`, and `twin_export_log`, with matching control-plane routes (`GET /_twin/scenarios`, `POST /_twin/scenarios/:name`, `GET /_twin/log.jsonl?since=`).
 - The `flaky-apis` scenario for retry testing: real OAuth checks and layered faults on both vendors.
 - World drift and the `mismatched-books` scenario: customers spelled differently in QuickBooks (same email), customers only in Jobber with work QuickBooks has never seen, and customers only in QuickBooks.
 - Scenario timelines: schedule vendor actions (`jobber: { newClients: 15 }`, `jobber: { payInvoices: 3 }`) at business times, offsets, or exact times. Advancing the clock runs them in order, recorded with source `scenario`; rewinding re-arms them. `GET /_twin` shows what's coming next.

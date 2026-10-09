@@ -1,6 +1,6 @@
 import type { Twin } from "../core/twin.ts";
 import type { AuthMode, TwinEvent, VendorName } from "../core/types.ts";
-import { parseFaultRules, parseScenario, resolveAt } from "./scenario.ts";
+import { listScenarioFiles, parseFaultRules, parseScenario, readScenarioFile, resolveAt } from "./scenario.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -88,8 +88,20 @@ export function loadScenario(twin: Twin, yamlText: string) {
   return { scenario: scenario.name, ...describeTwin(twin) };
 }
 
-export function exportLog(twin: Twin): string {
-  return twin.log.toJsonl();
+/** The ready-made scenarios, with what each one is for. */
+export function listScenarios() {
+  return listScenarioFiles();
+}
+
+/** Load a ready-made scenario by name ("flaky-apis"). */
+export function loadScenarioByName(twin: Twin, name: string) {
+  return loadScenario(twin, readScenarioFile(name));
+}
+
+/** The event log as JSON Lines: everything, or only what happened since a checkpoint. */
+export function exportLog(twin: Twin, options: { sinceCheckpoint?: string } = {}): string {
+  const events = options.sinceCheckpoint ? twin.changesSince(options.sinceCheckpoint) : twin.log.all();
+  return events.map((event) => JSON.stringify(event)).join("\n");
 }
 
 function summarize(twin: Twin, event: TwinEvent): string {

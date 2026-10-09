@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
 import { type FaultRule, isFaultStatus } from "../core/types.ts";
@@ -94,4 +95,28 @@ export function resolveAt(at: string, startMs: number, utcOffsetHours: number): 
   const exact = /^\d{4}-\d{2}-\d{2}T/.test(at) ? Date.parse(at) : Number.NaN;
   if (!Number.isNaN(exact)) return exact;
   throw new Error(`Timeline time "${at}" isn't one the twin understands. Use "+2h", "09:00" (business time), or an ISO time.`);
+}
+
+/**
+ * The ready-made scenarios in the project's scenarios/ folder. Found relative to this file, not the working
+ * directory, because the MCP server can be started from anywhere.
+ */
+const SCENARIOS_DIR = new URL("../../scenarios/", import.meta.url);
+
+export function listScenarioFiles(): { name: string; title: string; description: string }[] {
+  return readdirSync(SCENARIOS_DIR)
+    .filter((file) => file.endsWith(".yaml"))
+    .sort()
+    .map((file) => {
+      const scenario = parseScenario(readFileSync(new URL(file, SCENARIOS_DIR), "utf8"));
+      return { name: file.replace(/\.yaml$/, ""), title: scenario.name, description: (scenario.description ?? "").trim() };
+    });
+}
+
+/** The YAML of a ready-made scenario, by name ("heat-wave-monday"). Names can't reach outside the folder. */
+export function readScenarioFile(name: string): string {
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error(`"${name}" isn't a scenario name. Names are lowercase words joined by dashes.`);
+  const available = listScenarioFiles().map((scenario) => scenario.name);
+  if (!available.includes(name)) throw new Error(`No scenario named "${name}". Available: ${available.join(", ")}`);
+  return readFileSync(new URL(`${name}.yaml`, SCENARIOS_DIR), "utf8");
 }

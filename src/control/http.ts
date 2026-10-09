@@ -20,7 +20,9 @@ export function controlRoutes(twin: Twin): Hono {
   app.put("/_twin/faults", async (c) => c.json(ops.setFaults(twin, await c.req.json())));
   app.put("/_twin/auth", async (c) => c.json(ops.setAuthMode(twin, ((await c.req.json()) as { mode?: unknown }).mode)));
   app.post("/_twin/scenario", async (c) => c.json(ops.loadScenario(twin, await c.req.text())));
-  app.get("/_twin/log.jsonl", (c) => c.text(ops.exportLog(twin)));
+  app.get("/_twin/scenarios", (c) => c.json(ops.listScenarios()));
+  app.post("/_twin/scenarios/:name", (c) => c.json(ops.loadScenarioByName(twin, c.req.param("name"))));
+  app.get("/_twin/log.jsonl", (c) => c.text(ops.exportLog(twin, { sinceCheckpoint: c.req.query("since") })));
 
   // Control-plane mistakes (unknown checkpoint, bad scenario) come back as readable 400s.
   app.onError((error, c) => c.json({ error: error.message }, 400));

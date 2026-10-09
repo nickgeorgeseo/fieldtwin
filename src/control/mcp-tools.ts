@@ -47,6 +47,55 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     ({ checkpoint }) => asText(ops.rewindTo(twin, checkpoint)),
   );
 
+  server.registerTool("twin_list_scenarios", { description: "The ready-made scenarios, and what each one tests." }, () =>
+    asText(ops.listScenarios()),
+  );
+
+  server.registerTool(
+    "twin_load_scenario",
+    {
+      description:
+        "Rebuild the world from a scenario: a ready-made one by name (see twin_list_scenarios), or your own YAML " +
+        "(seed, startTime, world, faults, auth, timeline).",
+      inputSchema: { name: z.string().optional(), yaml: z.string().optional() },
+    },
+    ({ name, yaml }) => {
+      if (name) return asText(ops.loadScenarioByName(twin, name));
+      if (yaml) return asText(ops.loadScenario(twin, yaml));
+      throw new Error("Give either the name of a ready-made scenario or scenario YAML.");
+    },
+  );
+
+  server.registerTool(
+    "twin_set_faults",
+    {
+      description:
+        "Replace the active fault rules. Each rule: { name, vendor: quickbooks|jobber, method?, pathIncludes?, rate: 0-1, " +
+        "effect: { status?: HTTP error status, latencyMs?, message? } }. An empty list turns faults off.",
+      inputSchema: { rules: z.array(z.unknown()) },
+    },
+    ({ rules }) => asText(ops.setFaults(twin, rules)),
+  );
+
+  server.registerTool(
+    "twin_set_auth",
+    {
+      description:
+        'How the vendor APIs treat bearer tokens: "any-token" accepts anything; "oauth" accepts only unexpired tokens from the twin\'s OAuth endpoints.',
+      inputSchema: { mode: z.enum(["any-token", "oauth"]) },
+    },
+    ({ mode }) => asText(ops.setAuthMode(twin, mode)),
+  );
+
+  server.registerTool(
+    "twin_export_log",
+    {
+      description: "The event log as JSON Lines, one event per line: everything, or only what happened since a checkpoint.",
+      inputSchema: { checkpoint: z.string().optional() },
+    },
+    ({ checkpoint }) => ({ content: [{ type: "text" as const, text: ops.exportLog(twin, { sinceCheckpoint: checkpoint }) }] }),
+  );
+
   return server;
 }
 

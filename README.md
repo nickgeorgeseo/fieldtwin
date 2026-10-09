@@ -101,8 +101,10 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint |
 | `PUT /_twin/faults` | Replace the active fault rules |
 | `PUT /_twin/auth` `{"mode": "oauth"}` | Check bearer tokens for real (`oauth`) or accept any (`any-token`) |
-| `POST /_twin/scenario` (YAML body) | Load a scenario |
-| `GET /_twin/log.jsonl` | The full event log, one event per line |
+| `GET /_twin/scenarios` | The ready-made scenarios and what each one tests |
+| `POST /_twin/scenarios/:name` | Load a ready-made scenario |
+| `POST /_twin/scenario` (YAML body) | Load your own scenario |
+| `GET /_twin/log.jsonl?since=:checkpoint` | The event log, one event per line (all of it without `since`) |
 
 A typical agent test:
 
@@ -115,7 +117,18 @@ curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 
 ## Using it from a coding agent (MCP)
 
-`npm run mcp` starts the twin and an MCP server over stdio with six tools: `twin_status`, `twin_reset`, `twin_advance_clock`, `twin_checkpoint`, `twin_changes`, `twin_rewind`.
+`npm run mcp` starts the twin and an MCP server over stdio. Its tools mirror the control plane:
+
+| Tool | What it does |
+|---|---|
+| `twin_status` | Company, twin time, auth mode, active faults, what's scheduled next |
+| `twin_reset` | Back to the seeded starting world |
+| `twin_advance_clock` | Move time forward; scheduled scenario events happen on the way |
+| `twin_checkpoint`, `twin_changes`, `twin_rewind` | Mark a moment, list what changed since (optionally only your API calls), undo it |
+| `twin_list_scenarios`, `twin_load_scenario` | Pick a ready-made scenario by name, or load your own YAML |
+| `twin_set_faults` | Make the APIs misbehave on purpose |
+| `twin_set_auth` | Accept any token, or check OAuth tokens for real |
+| `twin_export_log` | The event log as JSON Lines, all of it or since a checkpoint |
 
 Claude Code:
 
