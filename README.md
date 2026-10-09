@@ -26,9 +26,10 @@ npm start
 
 ```text
 fieldtwin: Rowntree Electric is open for business at http://localhost:4010
+fieldtwin: auth is any-token: ANY Bearer token is accepted. Set FIELDTWIN_AUTH=oauth for real OAuth checks.
 ```
 
-Read a customer from the QuickBooks twin (any bearer token works for now):
+Read a customer from the QuickBooks twin (by default any bearer token works; see [Authentication](#authentication)):
 
 ```bash
 curl -H "Authorization: Bearer dev" \
@@ -56,19 +57,50 @@ Change only the base URL. Paths, headers, and body shapes match the real APIs.
 
 The QuickBooks twin serves one company, realm `9341000000000001`.
 
+## Authentication
+
+> **By default the twin accepts any bearer token.** That keeps the quick start to one command, and it is the
+> wrong setting for testing your OAuth code. To make the twin check tokens the way the real APIs do, start it
+> with `FIELDTWIN_AUTH=oauth npm start`, put `auth: oauth` in a scenario, or switch a running twin:
+> `curl -X PUT localhost:4010/_twin/auth -H "Content-Type: application/json" -d '{"mode":"oauth"}'`.
+
+Each vendor has a twin OAuth 2.0 server at the vendor's own paths, so your OAuth client only needs new URLs:
+
+| Endpoint | Real URL | Twin URL |
+|---|---|---|
+| QuickBooks authorize | `https://appcenter.intuit.com/connect/oauth2` | `http://localhost:4010/connect/oauth2` |
+| QuickBooks tokens | `https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer` | `http://localhost:4010/oauth2/v1/tokens/bearer` |
+| QuickBooks revoke | `https://developer.api.intuit.com/v2/oauth2/tokens/revoke` | `http://localhost:4010/v2/oauth2/tokens/revoke` |
+| Jobber authorize | `https://api.getjobber.com/api/oauth/authorize` | `http://localhost:4010/api/oauth/authorize` |
+| Jobber tokens | `https://api.getjobber.com/api/oauth/token` | `http://localhost:4010/api/oauth/token` |
+
+The twin approves every authorization request at once (there is no consent page) and accepts any `client_id` and `client_secret`. Everything after that follows the vendors' docs: codes work once, access tokens last 60 minutes, Jobber rotates refresh tokens and rejects the old one, QuickBooks keeps the refresh token on a rolling 100 days. Tokens expire on twin time, so `POST /_twin/clock/advance {"minutes": 60}` tests your refresh path in a second.
+
+Getting a Jobber token from the command line:
+
+```bash
+CODE=$(curl -s -o /dev/null -w '%{redirect_url}' \
+  "http://localhost:4010/api/oauth/authorize?response_type=code&client_id=my-app&redirect_uri=http://localhost:3000/callback" \
+  | sed -E 's/.*code=([^&]+).*/\1/')
+curl -s -X POST http://localhost:4010/api/oauth/token \
+  -d client_id=my-app -d client_secret=dev -d grant_type=authorization_code \
+  -d code=$CODE -d redirect_uri=http://localhost:3000/callback
+```
+
 ## The control plane
 
 Everything under `/_twin` controls the fake world rather than imitating a vendor.
 
 | Request | What it does |
 |---|---|
-| `GET /_twin` | Company, twin time, event count, active faults |
+| `GET /_twin` | Company, twin time, event count, auth mode, active faults |
 | `POST /_twin/reset` | Back to the seeded starting world |
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move) |
 | `POST /_twin/checkpoints/:name` | Name this moment |
 | `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then |
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint |
 | `PUT /_twin/faults` | Replace the active fault rules |
+| `PUT /_twin/auth` `{"mode": "oauth"}` | Check bearer tokens for real (`oauth`) or accept any (`any-token`) |
 | `POST /_twin/scenario` (YAML body) | Load a scenario |
 | `GET /_twin/log.jsonl` | The full event log, one event per line |
 

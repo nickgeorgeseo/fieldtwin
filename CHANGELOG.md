@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Twin OAuth 2.0 servers for QuickBooks and Jobber at the vendors' own paths: authorization, token exchange, refresh (Jobber rotates, QuickBooks rolls), PKCE, revocation, and expiry on twin time. An auth mode (`FIELDTWIN_AUTH=oauth`, `auth: oauth` in a scenario, or `PUT /_twin/auth`) makes the APIs reject unknown and expired tokens; the default still accepts any token, and the README says so up front.
 - Jobber `clientCreate`, matching the docs' sample mutation and its `userErrors` contract.
 - QuickBooks starts with the books a bookkeeper two weeks behind would have: older invoices (numbered as in Jobber) and the payments against them. The last two weeks are deliberately missing, so there is real sync work to do from the first request.
 - Jobber invoices (`invoices`, `invoice`, `Client.invoices`, `Job.invoices`), paid, open, or past due, with `amounts`, `Client.balance`, and `Job.invoicedTotal`. An invoice turns `past_due` on its own as twin time passes its due date.

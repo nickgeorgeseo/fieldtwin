@@ -1,5 +1,5 @@
 import type { Twin } from "../core/twin.ts";
-import type { TwinEvent } from "../core/types.ts";
+import type { AuthMode, TwinEvent } from "../core/types.ts";
 import { parseFaultRules, parseScenario } from "./scenario.ts";
 
 /**
@@ -15,6 +15,7 @@ export function describeTwin(twin: Twin) {
     twinTime: twin.clock.nowIso(),
     eventCount: twin.log.length,
     vendors: twin.vendorNames(),
+    authMode: twin.authMode,
     activeFaults: twin.faultRules.map((rule) => rule.name),
   };
 }
@@ -50,11 +51,26 @@ export function setFaults(twin: Twin, rules: unknown) {
   return { activeFaults: twin.faultRules.map((rule) => rule.name) };
 }
 
+/**
+ * Choose how the vendor APIs treat bearer tokens: "any-token" accepts anything (quick local use), "oauth"
+ * accepts only unexpired tokens from the twin's OAuth servers. Connections made earlier keep working.
+ */
+export function setAuthMode(twin: Twin, mode: unknown) {
+  twin.authMode = parseAuthMode(mode);
+  return { authMode: twin.authMode };
+}
+
+export function parseAuthMode(mode: unknown): AuthMode {
+  if (mode === "any-token" || mode === "oauth") return mode;
+  throw new Error(`Unknown auth mode "${String(mode)}". Use "any-token" or "oauth".`);
+}
+
 /** Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults. */
 export function loadScenario(twin: Twin, yamlText: string) {
   const scenario = parseScenario(yamlText);
   twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize: scenario.world });
   twin.faultRules = scenario.faults;
+  if (scenario.auth) twin.authMode = scenario.auth;
   return { scenario: scenario.name, ...describeTwin(twin) };
 }
 

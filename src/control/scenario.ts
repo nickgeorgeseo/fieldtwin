@@ -26,6 +26,7 @@ const ScenarioSchema = z.object({
   seed: z.number().int(),
   startTime: z.string(),
   world: z.object({ customers: z.number().int().positive(), technicians: z.number().int().positive() }).partial().optional(),
+  auth: z.enum(["any-token", "oauth"]).optional(),
   faults: z.array(FaultRuleSchema).default([]),
 });
 

@@ -18,6 +18,7 @@ export function controlRoutes(twin: Twin): Hono {
   );
   app.post("/_twin/checkpoints/:name/rewind", (c) => c.json(ops.rewindTo(twin, c.req.param("name"))));
   app.put("/_twin/faults", async (c) => c.json(ops.setFaults(twin, await c.req.json())));
+  app.put("/_twin/auth", async (c) => c.json(ops.setAuthMode(twin, ((await c.req.json()) as { mode?: unknown }).mode)));
   app.post("/_twin/scenario", async (c) => c.json(ops.loadScenario(twin, await c.req.text())));
   app.get("/_twin/log.jsonl", (c) => c.text(ops.exportLog(twin)));
 
