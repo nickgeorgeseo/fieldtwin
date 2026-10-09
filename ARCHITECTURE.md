@@ -85,7 +85,7 @@ Every vendor has the same files, so once you have read one you can read them all
 | `events.ts` | The event payloads this vendor records, and `describeEvent()`: one plain-language line per event |
 | `state.ts` | `createState()` and `apply()`, the only code that changes this vendor's state |
 | `seed.ts` | Turns the shared world into this vendor's starting events |
-| `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()` |
+| `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks has grown this into `routes/`, one file per entity |
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
 | `index.ts` | Exports one `VendorTwin` object. Nothing else |
 
@@ -96,8 +96,8 @@ GraphQL vendors also have `schema.graphql` (a hand-written subset of the public 
 Take `POST /v3/company/{realm}/customer` with a stale SyncToken.
 
 1. `app.ts` routed `/v3/*` through the QuickBooks fault middleware. No fault rule matches, so it passes the request on.
-2. `quickbooks/routes.ts` checks the bearer token and realm, sees an `Id` in the body, and calls `updateCustomer()`.
-3. `updateCustomer()` compares SyncTokens, finds a mismatch, and returns `qboErrors.staleObject()`. Nothing is recorded, so state and the log are untouched.
+2. `quickbooks/routes/index.ts` checks the bearer token and realm. `quickbooks/routes/customer.ts` sees an `Id` in the body and calls `updateCustomer()`.
+3. `updateCustomer()` asks `checkSyncToken()` (shared by every QuickBooks entity, in `routes/entity.ts`), finds a mismatch, and returns `qboErrors.staleObject()`. Nothing is recorded, so state and the log are untouched.
 
 With a correct SyncToken, step 3 instead builds the full updated record, calls `twin.record({ type: "CustomerUpdated", ... }, "api")`, and returns it. The event's `source: "api"` is how `/_twin/.../changes?source=api` later separates your code's changes from seed data and scenario events.
 
@@ -121,7 +121,7 @@ The goal is code a new contributor can read top to bottom without jumping around
 
 - Plain functions and plain objects. A class only when it owns changing state (`Twin`, `TwinClock`, `CostBucket`).
 - Name things the way the vendor's docs name them (`SyncToken`, `DisplayName`, `clients`, `pageInfo`), so code can be checked against the docs line by line.
-- A file does one job and stays under about 200 lines. When it grows, split it by job, not by type.
+- A file does one job and stays under about 200 lines. When it grows, split it by job, not by type. When a file from the vendor anatomy outgrows that, it becomes a folder with the same name (`routes.ts` becomes `routes/index.ts` plus one file per entity), so every vendor's top level still reads the same.
 - Every vendor behavior gets a comment saying what the real API does and why it matters, with a docs link when there is one. Comments explain *why*; the code already says *what*.
 - No clever tricks: no metaprogramming, no decorators, no inheritance between vendors.
 - Error messages say what was wrong and what to do about it.

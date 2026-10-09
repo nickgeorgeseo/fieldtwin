@@ -1,7 +1,7 @@
 import type { VendorTwin } from "../../core/vendor-twin.ts";
 import { qboErrorForStatus } from "./errors.ts";
 import { describeQboEvent } from "./events.ts";
-import { quickbooksRoutes } from "./routes.ts";
+import { quickbooksRoutes } from "./routes/index.ts";
 import { seedQuickBooks } from "./seed.ts";
 import { applyQboEvent, createQboState } from "./state.ts";
 import type { QboState } from "./types.ts";
