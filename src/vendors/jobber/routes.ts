@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
-import { buildSchema, type DocumentNode, execute, type GraphQLError, parse, validate } from "graphql";
+import { execute } from "graphql";
 import { Hono } from "hono";
 import type { Twin } from "../../core/twin.ts";
 import { CostBucket, estimateQueryCost, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND } from "./cost.ts";
+import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
 import { createResolvers } from "./resolvers.ts";
 import type { JobberState } from "./types.ts";
 import { resolveVersion } from "./versions.ts";
@@ -13,8 +13,6 @@ import { resolveVersion } from "./versions.ts";
  * Every request needs `Authorization: Bearer ...` and an `X-JOBBER-GRAPHQL-VERSION` header.
  * https://developer.getjobber.com/docs/using_jobbers_api/api_queries_and_mutations/
  */
-
-const schema = buildSchema(readFileSync(new URL("./schema.graphql", import.meta.url), "utf8"));
 
 export function jobberRoutes(twin: Twin): Hono {
   const app = new Hono();
@@ -32,19 +30,14 @@ export function jobberRoutes(twin: Twin): Hono {
     if ("error" in resolved) return c.json(graphQLError(resolved.error, "UNSUPPORTED_VERSION"), 400);
     const { version } = resolved;
 
-    const { query, variables = {} } = (await c.req.json()) as { query: string; variables?: Record<string, unknown> };
-
-    let document: DocumentNode;
-    try {
-      document = parse(query);
-    } catch (error) {
-      return c.json({ errors: [{ message: (error as GraphQLError).message }] }, 400);
-    }
-    const validationErrors = validate(schema, document);
-    if (validationErrors.length) return c.json({ errors: validationErrors.map((e) => ({ message: e.message })) }, 400);
+    const body = (await c.req.json()) as Partial<GraphQLRequest>;
+    const request: GraphQLRequest = { query: body.query ?? "", variables: body.variables ?? {}, operationName: body.operationName };
+    const prepared = prepare(request);
+    if ("errors" in prepared) return c.json({ errors: prepared.errors });
+    const { document } = prepared;
 
     // Rate limiting happens before execution, the same order Jobber documents.
-    const requestedQueryCost = estimateQueryCost(document, variables);
+    const requestedQueryCost = estimateQueryCost(document, request.variables);
     const spend = bucket.trySpend(requestedQueryCost, twin.clock.nowMs());
     const throttleStatus = {
       maximumAvailable: MAXIMUM_AVAILABLE,
@@ -59,7 +52,13 @@ export function jobberRoutes(twin: Twin): Hono {
       });
     }
 
-    const result = await execute({ schema, document, rootValue: resolvers, variableValues: variables });
+    const result = await execute({
+      schema,
+      document,
+      rootValue: resolvers,
+      variableValues: request.variables,
+      operationName: request.operationName,
+    });
     return c.json({
       ...result,
       extensions: { cost: { requestedQueryCost, actualQueryCost: requestedQueryCost, throttleStatus }, versioning: { version } },

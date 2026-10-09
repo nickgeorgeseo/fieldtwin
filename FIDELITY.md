@@ -35,7 +35,11 @@ What each twin models, how closely, and whether it has been checked against the 
 | Missing or unknown version header | Approximate | check | The docs require the header but don't show the failure. The twin answers 400 with a GraphQL error naming the active versions. Deprecation `warning`s are not sent (end-of-support dates aren't published) |
 | `account`, `client`, `clients` queries | Modeled | docs only | Small field subset (see `schema.graphql`) |
 | Relay-style cursor pagination | Modeled | docs only | Cursors are opaque, as in the real API |
-| Encoded ids | Approximate | check | Base64 of `gid://Jobber/Type/n`. Treat ids as opaque |
+| Encoded ids | Modeled | docs only | Base64 of `gid://Jobber/Type/n`, as the docs show. Treat ids as opaque |
+| Base64 padding on ids | Approximate | check | The twin pads (`=`). Jobber's own examples disagree: one padded, one not |
+| Invalid `EncodedId` variable | Modeled | docs only | The documented `Variable $id of type EncodedId! was provided invalid value` error with `extensions.problems` |
+| Unknown id | Modeled | docs only | Resolves to `null`, not an error |
+| Syntax and validation errors | Approximate | docs only | HTTP 200 with an `errors` list, as documented. Messages come from graphql-js, so wording differs from Jobber's (which runs graphql-ruby) |
 | Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | |
 | `extensions.cost` and `THROTTLED` errors | Modeled | docs only | |
 | Query cost formula | Approximate | | Right shape (page size and nesting raise cost; a missing `first` assumes 100 nodes). Numbers will not match Jobber exactly |

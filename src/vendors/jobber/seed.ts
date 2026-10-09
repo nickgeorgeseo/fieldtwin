@@ -1,6 +1,7 @@
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
-import { encodeId, type JobberClient } from "./types.ts";
+import { encodeId } from "./encoded-id.ts";
+import type { JobberClient } from "./types.ts";
 
 const SEED_TIME = "2020-01-01T00:00:00.000Z";
 

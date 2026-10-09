@@ -1,7 +1,7 @@
 /** Jobber records as the twin stores them. Shapes follow the public GraphQL schema (camelCase). */
 
 export interface JobberClient {
-  id: string; // an EncodedId, see encodeId()
+  id: string; // an EncodedId, see encoded-id.ts
   firstName: string;
   lastName: string;
   companyName: string | null;
@@ -19,12 +19,4 @@ export interface JobberState {
   account: { id: string; name: string };
   clients: Map<string, JobberClient>;
   clientOrder: string[]; // insertion order, so pagination is stable
-}
-
-/**
- * Jobber ids are opaque strings. The twin makes them the same way Jobber appears to:
- * base64 of a global id like "gid://Jobber/Client/42". Clients must treat them as opaque either way.
- */
-export function encodeId(type: string, n: number): string {
-  return Buffer.from(`gid://Jobber/${type}/${n}`).toString("base64");
 }

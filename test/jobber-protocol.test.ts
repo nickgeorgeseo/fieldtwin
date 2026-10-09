@@ -41,3 +41,52 @@ describe("Jobber twin: API versions", () => {
     }
   });
 });
+
+describe("Jobber twin: errors and ids", () => {
+  it("answers GraphQL syntax and validation errors with HTTP 200 and an errors list, as Jobber documents", async () => {
+    const { jobber } = setup();
+    for (const query of ["{ account { name }", "{ acount { name } }"]) {
+      const response = await jobber(query);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data).toBeUndefined();
+      expect(body.errors[0].message).toBeTruthy();
+    }
+  });
+
+  it("rejects a variable that is not an EncodedId, in Jobber's documented error shape", async () => {
+    const { jobber } = setup();
+    const body = await (await jobber("query SampleQuery($id: EncodedId!) { client(id: $id) { id } }", { id: "1" })).json();
+    expect(body.errors).toEqual([
+      {
+        message: "Variable $id of type EncodedId! was provided invalid value",
+        locations: [{ line: 1, column: 19 }],
+        extensions: {
+          value: "1",
+          problems: [{ path: [], explanation: "'1' is not a valid EncodedId", message: "'1' is not a valid EncodedId" }],
+        },
+      },
+    ]);
+  });
+
+  it("rejects an id written inline in the query that is not an EncodedId", async () => {
+    const { jobber } = setup();
+    const body = await (await jobber('{ client(id: "1") { id } }')).json();
+    expect(body.errors[0].message).toContain("'1' is not a valid EncodedId");
+  });
+
+  it("makes ids the documented way: base64 of a gid://Jobber global id", async () => {
+    const { jobber } = setup();
+    const body = await (await jobber("{ clients(first: 1) { nodes { id } } }")).json();
+    const id: string = body.data.clients.nodes[0].id;
+    expect(Buffer.from(id, "base64").toString()).toBe("gid://Jobber/Client/1");
+  });
+
+  it("returns null, not an error, for a well-formed id that matches nothing", async () => {
+    const { jobber } = setup();
+    const missing = Buffer.from("gid://Jobber/Client/99999").toString("base64");
+    const body = await (await jobber("query ($id: EncodedId!) { client(id: $id) { id } }", { id: missing })).json();
+    expect(body).toMatchObject({ data: { client: null } });
+    expect(body.errors).toBeUndefined();
+  });
+});
