@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Twin } from "../../core/twin.ts";
 import { actualQueryCost, COST_LIMITS, requestedQueryCost } from "./cost.ts";
 import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
-import { createResolvers } from "./resolvers.ts";
+import { createResolvers } from "./resolvers/index.ts";
 import type { JobberState } from "./types.ts";
 import { resolveVersion } from "./versions.ts";
 
@@ -16,7 +16,10 @@ import { resolveVersion } from "./versions.ts";
 
 export function jobberRoutes(twin: Twin): Hono {
   const app = new Hono();
-  const resolvers = createResolvers(() => twin.state<JobberState>("jobber"));
+  const resolvers = createResolvers(
+    () => twin.state<JobberState>("jobber"),
+    () => twin.clock.nowMs(),
+  );
 
   app.post("/api/graphql", async (c) => {
     const token = bearerToken(c.req.header("Authorization"));

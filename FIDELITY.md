@@ -55,8 +55,8 @@ What each twin models, how closely, and whether it has been checked against the 
 | Single endpoint `POST /api/graphql` | Modeled | docs only | |
 | `X-JOBBER-GRAPHQL-VERSION` versions | Modeled | docs only | Every version the changelog lists as active is accepted and echoed in `extensions.versioning.version`. Historic versions resolve to the oldest active one. The twin serves the same schema subset for every version |
 | Missing or unknown version header | Approximate | check | The docs require the header but don't show the failure. The twin answers 400 with a GraphQL error naming the active versions. Deprecation `warning`s are not sent (end-of-support dates aren't published) |
-| `account`, `client`, `clients` queries | Modeled | docs only | Small field subset (see `schema.graphql`) |
-| Relay-style cursor pagination | Modeled | docs only | Cursors are opaque, as in the real API |
+| `account`, `client`, `clients` queries | Modeled | docs only | Documented Client fields: names, `isCompany`, primary `email` and `phone`, `emails`, `phones`, timestamps. `firstName` and `lastName` are non-null, as documented |
+| Relay-style cursor pagination | Modeled | docs only | `nodes` or `edges { node cursor }`, `pageInfo` (`hasNextPage`, `endCursor`, plus Relay's `hasPreviousPage` and `startCursor`), `totalCount`. `first` defaults to 100. Cursors are opaque; a cursor the twin never issued is an error. `last` and `before` are not modeled |
 | Encoded ids | Modeled | docs only | Base64 of `gid://Jobber/Type/n`, as the docs show. Treat ids as opaque |
 | Base64 padding on ids | Approximate | check | The twin pads (`=`). Jobber's own examples disagree: one padded, one not |
 | Invalid `EncodedId` variable | Modeled | docs only | The documented `Variable $id of type EncodedId! was provided invalid value` error with `extensions.problems` |

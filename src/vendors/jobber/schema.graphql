@@ -1,6 +1,6 @@
 # A small, hand-written subset of Jobber's public GraphQL schema.
 # Field names match https://developer.getjobber.com so client code works unchanged.
-# Add fields here first, then a resolver in resolvers.ts, then a test.
+# Add fields here first, then a resolver in resolvers/, then a test.
 
 scalar EncodedId
 scalar ISO8601DateTime
@@ -16,26 +16,39 @@ type Account {
   name: String!
 }
 
+# Every list is a Relay connection: nodes, or edges { node cursor }, plus pageInfo and totalCount.
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
 type ClientConnection {
   nodes: [Client!]!
+  edges: [ClientEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
 }
 
-type PageInfo {
-  hasNextPage: Boolean!
-  endCursor: String
+type ClientEdge {
+  node: Client!
+  cursor: String!
 }
 
 type Client {
   id: EncodedId!
-  firstName: String
-  lastName: String
+  firstName: String!
+  lastName: String!
   companyName: String
   name: String!
+  isCompany: Boolean!
+  email: String
   emails: [Email!]!
+  phone: String
   phones: [ClientPhoneNumber!]!
   createdAt: ISO8601DateTime!
+  updatedAt: ISO8601DateTime!
 }
 
 type Email {
