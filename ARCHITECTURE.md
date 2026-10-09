@@ -52,6 +52,8 @@ flowchart LR
 
 **1. All state changes go through `twin.record()`.** A route never edits state directly. It works out the new record, then records an event (`CustomerCreated`, `CustomerUpdated`) and the vendor's `apply()` function updates state. This single write path is what makes "what did my agent change?" and "rewind" possible, and it means there is exactly one place to look when state is wrong.
 
+The rule covers *business state*: anything the fake company would see in its own books or schedule. Request bookkeeping is different. Spending a rate-limit budget changes nothing about the business, so it lives outside the log, in the `Twin` itself (`twin.rateLimitBucket()`), and `reset()` and `rewind()` clear it rather than replay it. Keep that exception small: if a client could ever read it back as data, it belongs in the log.
+
 **2. Time comes from `twin.clock`; randomness comes from `SeededRandom`.** `Date.now()` and `Math.random()` do not appear in this codebase. This is what makes runs reproducible and lets tests skip ahead in time instantly. Faults use their own random stream so turning a fault on never changes the generated world.
 
 **3. Vendor state can always be rebuilt from the event log.** `apply()` must be deterministic: the same events in always produce the same state out. Events carry complete records (the whole customer, not "change field X") so `apply()` stays trivially simple.

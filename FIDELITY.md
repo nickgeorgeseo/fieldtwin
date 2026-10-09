@@ -40,7 +40,7 @@ What each twin models, how closely, and whether it has been checked against the 
 | Invalid `EncodedId` variable | Modeled | docs only | The documented `Variable $id of type EncodedId! was provided invalid value` error with `extensions.problems` |
 | Unknown id | Modeled | docs only | Resolves to `null`, not an error |
 | Syntax and validation errors | Approximate | docs only | HTTP 200 with an `errors` list, as documented. Messages come from graphql-js, so wording differs from Jobber's (which runs graphql-ruby) |
-| Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | |
+| Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | One budget per app, as documented (per app and account; the twin has one account). Until OAuth, each access token counts as one app. Reset and rewind start every budget full |
 | `extensions.cost` and `THROTTLED` errors | Modeled | docs only | |
 | Query cost formula | Modeled | docs only | One point per field; `edges`, `nodes`, `node`, and connection fields free; per-node fields multiplied by `first`/`last` or 100. Reproduces the docs' 7, 50, and 500 point examples |
 | `actualQueryCost` | Modeled | docs only | Counted over the data that came back, and that is what the bucket is charged |

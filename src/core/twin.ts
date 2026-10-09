@@ -1,6 +1,7 @@
 import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
+import { type BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
 import { SeededRandom } from "./random.ts";
 import type { Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
@@ -30,6 +31,11 @@ export class Twin {
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
   private checkpoints = new Map<string, Checkpoint>();
+
+  // Request bookkeeping, deliberately outside the event log: nothing about the fake business changes when
+  // a rate-limit budget is spent, so it is not replayed. reset() and rewind() clear it, because the spending
+  // it remembers belongs to a history that no longer exists.
+  private rateLimits = new Map<string, LeakyBucket>();
 
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
@@ -73,11 +79,22 @@ export class Twin {
     this.faultRandom = new SeededRandom(seed + 1);
     this.faultRules = [];
     this.checkpoints.clear();
+    this.rateLimits.clear();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
 
     for (const vendor of this.vendors.values()) {
       for (const event of vendor.seed(this.world)) this.record(event, "seed");
     }
+  }
+
+  /** The rate-limit budget for a key (e.g. one vendor app), created full on first use. */
+  rateLimitBucket(key: string, limits: BucketLimits): LeakyBucket {
+    let bucket = this.rateLimits.get(key);
+    if (!bucket) {
+      bucket = new LeakyBucket(limits);
+      this.rateLimits.set(key, bucket);
+    }
+    return bucket;
   }
 
   checkpoint(name: string): Checkpoint {
@@ -109,6 +126,7 @@ export class Twin {
       this.vendor(event.vendor).apply(this.state(event.vendor), replayed);
     }
     this.clock = new TwinClock(checkpoint.time);
+    this.rateLimits.clear();
 
     // Checkpoints taken after this one point at history that no longer exists.
     for (const [otherName, other] of this.checkpoints) {

@@ -17,11 +17,16 @@ export function setup(seed = 42) {
         headers: { ...auth, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
-    jobber: (query: string, variables?: Record<string, unknown>) =>
-      app.request("/api/graphql", {
-        method: "POST",
-        headers: { ...auth, "Content-Type": "application/json", "X-JOBBER-GRAPHQL-VERSION": "2025-04-16" },
-        body: JSON.stringify({ query, variables }),
-      }),
+    jobber: (query: string, variables?: Record<string, unknown>) => jobberAs(app, "test-token", query, variables),
+    /** The same request, made with a specific access token (a different app, or a fresh token). */
+    jobberAs: (token: string, query: string, variables?: Record<string, unknown>) => jobberAs(app, token, query, variables),
   };
+}
+
+function jobberAs(app: ReturnType<typeof createApp>["app"], token: string, query: string, variables?: Record<string, unknown>) {
+  return app.request("/api/graphql", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-JOBBER-GRAPHQL-VERSION": "2025-04-16" },
+    body: JSON.stringify({ query, variables }),
+  });
 }

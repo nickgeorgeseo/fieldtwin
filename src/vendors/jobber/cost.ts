@@ -30,6 +30,9 @@ import {
 
 export const ASSUMED_PAGE_SIZE = 100; // "All connection fields are configured to return a maximum of 100 nodes"
 
+/** The published budget: 10,000 points per app and account, restoring at 500 points per second. */
+export const COST_LIMITS = { capacity: 10_000, restorePerSecond: 500 };
+
 const PER_NODE_FIELDS = new Set(["nodes", "edges"]);
 
 interface Context {
@@ -188,34 +191,4 @@ function readInt(value: ValueNode, variables: Record<string, unknown>): number |
     return typeof variable === "number" ? variable : undefined;
   }
   return undefined;
-}
-
-// ---------------------------------------------------------------------------------------------------
-// the bucket the cost is paid from
-
-/** Published numbers: a 10,000 point bucket per app + account, refilling at 500 points per second. */
-export const MAXIMUM_AVAILABLE = 10_000;
-export const RESTORE_RATE_PER_SECOND = 500;
-
-export class CostBucket {
-  private available = MAXIMUM_AVAILABLE;
-  private lastUpdatedMs: number | null = null;
-
-  /** How many points are available at this twin time, after refilling for the time that passed. */
-  check(nowMs: number): number {
-    // After a reset or rewind the clock can be earlier than our last update. Start full.
-    if (this.lastUpdatedMs === null || nowMs < this.lastUpdatedMs) {
-      this.available = MAXIMUM_AVAILABLE;
-    } else {
-      const seconds = (nowMs - this.lastUpdatedMs) / 1000;
-      this.available = Math.min(MAXIMUM_AVAILABLE, this.available + seconds * RESTORE_RATE_PER_SECOND);
-    }
-    this.lastUpdatedMs = nowMs;
-    return this.available;
-  }
-
-  spend(points: number): number {
-    this.available = Math.max(0, this.available - points);
-    return this.available;
-  }
 }

@@ -1,5 +1,6 @@
 import { buildSchema, parse } from "graphql";
 import { describe, expect, it } from "vitest";
+import { createCheckpoint, resetTwin, rewindTo } from "../src/control/operations.ts";
 import { actualQueryCost, requestedQueryCost } from "../src/vendors/jobber/cost.ts";
 import { setup } from "./helpers.ts";
 
@@ -102,5 +103,37 @@ describe("Jobber twin: the cost bucket", () => {
     const body = await (await jobber(huge)).json();
     expect(body.extensions.cost.requestedQueryCost).toBe(15000);
     expect(body.errors[0].extensions.code).toBe("THROTTLED");
+  });
+});
+
+describe("Jobber twin: whose budget is it", () => {
+  const expensive = `{ clients(first: 1000) { nodes { emails { address } phones { number } } } }`;
+  const available = async (response: Response) => (await response.json()).extensions.cost.throttleStatus.currentlyAvailable;
+  const drain = async (send: () => Response | Promise<Response>) => {
+    while (!(await (await send()).json()).errors);
+  };
+
+  it("keeps a separate budget per access token, because Jobber budgets per app and account", async () => {
+    const { jobberAs } = setup();
+    await drain(() => jobberAs("app-one", expensive));
+    expect((await (await jobberAs("app-one", expensive)).json()).errors[0].extensions.code).toBe("THROTTLED");
+
+    // A different app on the same account still has its full 10,000 points.
+    expect(await available(await jobberAs("app-two", "{ account { name } }"))).toBe(9998);
+  });
+
+  it("starts every budget full again after a reset", async () => {
+    const { twin, jobberAs } = setup();
+    await drain(() => jobberAs("app-one", expensive));
+    resetTwin(twin);
+    expect(await available(await jobberAs("app-one", "{ account { name } }"))).toBe(9998);
+  });
+
+  it("forgets spending that a rewind undid", async () => {
+    const { twin, jobberAs } = setup();
+    createCheckpoint(twin, "start");
+    await drain(() => jobberAs("app-one", expensive));
+    rewindTo(twin, "start");
+    expect(await available(await jobberAs("app-one", "{ account { name } }"))).toBe(9998);
   });
 });
