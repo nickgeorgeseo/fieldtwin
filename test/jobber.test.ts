@@ -43,6 +43,14 @@ describe("Jobber twin: connections", () => {
     });
   });
 
+  it("treats after: null as the first page, the way Relay clients ask for it", async () => {
+    const { jobber } = setup();
+    const body = await (await jobber(CLIENTS_PAGE, { first: 3, after: null })).json();
+    expect(body.errors).toBeUndefined();
+    expect(body.data.clients.nodes).toHaveLength(3);
+    expect(body.data.clients.pageInfo.hasNextPage).toBe(true);
+  });
+
   it("rejects a cursor it never issued", async () => {
     const { jobber } = setup();
     const body = await (await jobber(`{ clients(first: 2, after: "not-a-cursor") { nodes { id } } }`)).json();

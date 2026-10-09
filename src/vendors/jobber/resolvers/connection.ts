@@ -2,18 +2,19 @@
  * Relay-style connections, the way every Jobber list is paged:
  * https://developer.getjobber.com/docs/using_jobbers_api/api_rate_limits (Avoiding Rate Limits)
  *
- * `first` sets the page size (100 when omitted, as documented) and `after` resumes after a cursor.
+ * `first` sets the page size (100 when omitted, as documented) and `after` resumes after a cursor. Both are
+ * nullable, so `after: null` (how Relay clients ask for the first page) means the same as leaving it out.
  * Cursors are opaque to callers; inside the twin a cursor is a position in the list.
  */
 export interface PageArgs {
-  first?: number;
-  after?: string;
+  first?: number | null;
+  after?: string | null;
 }
 
 const DEFAULT_PAGE_SIZE = 100;
 
 export function connection<T, Node>(items: readonly T[], args: PageArgs, toNode: (item: T) => Node) {
-  const start = args.after === undefined ? 0 : decodeCursor(args.after) + 1;
+  const start = args.after === undefined || args.after === null ? 0 : decodeCursor(args.after) + 1;
   const page = items.slice(start, start + (args.first ?? DEFAULT_PAGE_SIZE));
   const nodes = page.map(toNode);
   return {
