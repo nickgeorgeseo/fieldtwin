@@ -32,3 +32,37 @@ describe("fault rules", () => {
     expect((await badVendor.json()).error).toContain("0.vendor");
   });
 });
+
+describe("layered fault rules", () => {
+  it("gives every matching rule its own chance, not just the first one", async () => {
+    const { twin, qboGet } = setup();
+    twin.faultRules = [
+      { name: "never", vendor: "quickbooks", rate: 0, effect: { status: 429 } },
+      { name: "always", vendor: "quickbooks", rate: 1, effect: { status: 503 } },
+    ];
+    const response = await qboGet("/customer/1");
+    expect(response.status).toBe(503);
+    expect(response.headers.get("X-Twin-Fault")).toBe("always");
+  });
+
+  it("answers with the first error that fires, in rule order", async () => {
+    const { twin, qboGet } = setup();
+    twin.faultRules = [
+      { name: "first", vendor: "quickbooks", rate: 1, effect: { status: 429 } },
+      { name: "second", vendor: "quickbooks", rate: 1, effect: { status: 503 } },
+    ];
+    expect((await qboGet("/customer/1")).headers.get("X-Twin-Fault")).toBe("first");
+  });
+
+  it("adds latency from a slow-down rule and still applies an error rule after it", async () => {
+    const { twin, qboGet } = setup();
+    twin.faultRules = [
+      { name: "slow", vendor: "quickbooks", rate: 1, effect: { latencyMs: 20 } },
+      { name: "down", vendor: "quickbooks", rate: 1, effect: { status: 503 } },
+    ];
+    const started = performance.now();
+    const response = await qboGet("/customer/1");
+    expect(performance.now() - started).toBeGreaterThanOrEqual(15);
+    expect(response.headers.get("X-Twin-Fault")).toBe("down");
+  });
+});
