@@ -27,6 +27,10 @@ What each twin models, how closely, and whether it has been checked against the 
 | `DocNumber` | Approximate | check | [Invoice][qbo-invoice] | Kept when sent, else the last number plus one, starting at 1001 (`CustomTxnNumber` off). Longer than 21 characters answers 2050. Duplicates are accepted: the docs imply they may be rejected, and accepting them makes integrations dedupe for themselves, which is safe either way |
 | `DueDate` default | Approximate | | [Invoice][qbo-invoice] | `TxnDate` plus the sales terms' days. The twin has no terms, so it equals `TxnDate` |
 | Sales tax, discounts, group and description-only lines | Not yet | | [Invoice][qbo-invoice] | No `TxnTaxDetail`: `TotalAmt` is the line subtotal. Other line types answer 500 `Unsupported operation` |
+| `POST /payment` create, `GET /payment/{id}` | Modeled | docs only | [Payment][qbo-payment] | Lines apply amounts to invoices through `LinkedTxn`; each paid invoice's `Balance` drops (0 means paid) and it gains a `LinkedTxn` of type `Payment`. Whatever isn't applied is `UnappliedAmt`. A payment with no lines is a credit |
+| Paying an invoice changes its SyncToken | Approximate | check | [Invoice][qbo-invoice] | The payment modifies the invoice, so the twin bumps its SyncToken: code holding the old token gets 5010. Conservative; unconfirmed |
+| Overpaying an invoice, over-applying a payment, or paying another customer's invoice | Approximate | check | [Error codes][qbo-errors] | Each answers 6000 `Business Validation Error` and changes nothing. The docs don't give the real codes |
+| Payment update, delete, void; credit memos | Not yet | | [Payment][qbo-payment] | Answers 500 `Unsupported operation`. Payments apply to invoices only |
 | Error bodies 610, 2020, 4000, 4001, 5010, 6240 | Modeled | docs only | [Error codes][qbo-errors] | `Message` is copied from the reference, which documents it as literal. `Detail` fills in the reference's templates and may not match real responses word for word |
 | HTTP status of 610 on a read | Approximate | check | [Error codes][qbo-errors] | Twin answers 400. The docs list both 400 and 404 without saying which a missing Id gets |
 | Missing or invalid token: 401 `AuthenticationFault` 3200 | Modeled | docs only | [Error codes][qbo-errors] | |
@@ -35,7 +39,7 @@ What each twin models, how closely, and whether it has been checked against the 
 | Injected 5xx errors | Modeled | docs only | [Error codes][qbo-errors] | Code 10000, `SystemFault` |
 | `minorversion` parameter | Not yet | | | Accepted and ignored |
 | OAuth 2.0 | Not yet | | | Any bearer token is accepted |
-| Webhooks, CDC, Payment | Not yet | | | Roadmap v0.1 and v0.2 |
+| Webhooks, CDC | Not yet | | | Roadmap v0.1 and v0.2 |
 
 ## Jobber
 
@@ -66,5 +70,6 @@ What each twin models, how closely, and whether it has been checked against the 
 [qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
 [qbo-invoice]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice
 [qbo-item]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/item
+[qbo-payment]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
 [qbo-limits]: https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
 [qbo-rest]: https://developer.intuit.com/app/developer/qbo/docs/learn/rest-api-features

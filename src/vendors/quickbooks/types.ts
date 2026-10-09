@@ -125,13 +125,39 @@ export const WRITABLE_INVOICE_FIELDS = [
   "PrivateNote",
 ] as const;
 
+/**
+ * Payment: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
+ * Each line applies part of the payment to one invoice. Whatever isn't applied is a credit (UnappliedAmt).
+ */
+export interface QboPayment {
+  Id: string;
+  SyncToken: string;
+  TxnDate: string;
+  CustomerRef: QboRef;
+  TotalAmt: number;
+  UnappliedAmt: number; // read only: TotalAmt minus the line amounts
+  Line: QboPaymentLine[];
+  PaymentRefNum?: string; // e.g. a check number
+  PrivateNote?: string;
+  ProcessPayment: false; // the twin never charges a card
+  MetaData: QboMetaData;
+}
+
+export interface QboPaymentLine {
+  Amount: number;
+  LinkedTxn: QboLinkedTxn[];
+}
+
+export const WRITABLE_PAYMENT_FIELDS = ["CustomerRef", "TotalAmt", "Line", "TxnDate", "PaymentRefNum", "PrivateNote"] as const;
+
 /** The entities the twin serves. Each has its own Id sequence. */
-export type QboEntityName = "Customer" | "Item" | "Invoice";
+export type QboEntityName = "Customer" | "Item" | "Invoice" | "Payment";
 
 export interface QboState {
   realmId: string;
   customers: Map<string, QboCustomer>;
   items: Map<string, QboItem>;
   invoices: Map<string, QboInvoice>;
+  payments: Map<string, QboPayment>;
   nextId: Record<QboEntityName, number>;
 }

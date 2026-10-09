@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import { formatMoney, fromCents, toCents } from "../../../core/money.ts";
 import type { Twin } from "../../../core/twin.ts";
+import { qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
@@ -35,7 +36,7 @@ function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | Q
   const now = twin.clock.nowIso();
   const fields: InvoiceFields = pickWritable(body, WRITABLE_INVOICE_FIELDS);
 
-  const draft = draftInvoice(state, fields, { today: now.slice(0, 10), now, isCreate: true });
+  const draft = draftInvoice(state, fields, { today: qboToday(now), now, isCreate: true });
   if ("Fault" in draft) return draft;
 
   const invoice: QboInvoice = {
@@ -60,7 +61,7 @@ function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | Q
   if (conflict) return conflict;
 
   const fields: InvoiceFields = mergeUpdate(existing, body, WRITABLE_INVOICE_FIELDS);
-  const draft = draftInvoice(state, fields, { today: now.slice(0, 10), now, existingLines: existing.Line, isCreate: false });
+  const draft = draftInvoice(state, fields, { today: qboToday(now), now, existingLines: existing.Line, isCreate: false });
   if ("Fault" in draft) return draft;
 
   // Payments already applied stay applied, so the new balance is the new total minus what has been paid.

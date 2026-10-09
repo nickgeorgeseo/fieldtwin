@@ -1,4 +1,5 @@
 import { sameMoney, sumMoney } from "../../core/money.ts";
+import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
 
@@ -122,14 +123,4 @@ interface LineInput {
 function nextDocNumber(state: QboState): string {
   const numbers = [...state.invoices.values()].map((invoice) => Number(invoice.DocNumber)).filter(Number.isInteger);
   return String(Math.max(FIRST_DOC_NUMBER - 1, ...numbers) + 1);
-}
-
-/** QuickBooks dates are YYYY-MM-DD (the reference also accepts yyyy/MM/dd). Undefined if not a real date. */
-export function qboDate(value: unknown): string | undefined {
-  const match = typeof value === "string" ? /^(\d{4})[-/](\d{2})[-/](\d{2})$/.exec(value) : null;
-  if (!match) return undefined;
-  const iso = `${match[1]}-${match[2]}-${match[3]}`;
-  const parsed = new Date(`${iso}T00:00:00Z`);
-  // Rejects impossible dates like 2026-02-30, which would otherwise roll over into March.
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(iso) ? iso : undefined;
 }

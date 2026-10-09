@@ -6,6 +6,7 @@ import { customerRoutes } from "./customer.ts";
 import { COMPANY } from "./entity.ts";
 import { invoiceRoutes } from "./invoice.ts";
 import { itemRoutes } from "./item.ts";
+import { paymentRoutes } from "./payment.ts";
 import { queryRoutes } from "./query.ts";
 
 /**
@@ -34,6 +35,7 @@ export function quickbooksRoutes(twin: Twin): Hono {
   customerRoutes(app, twin);
   itemRoutes(app, twin);
   invoiceRoutes(app, twin);
+  paymentRoutes(app, twin);
   queryRoutes(app, twin);
   return app;
 }

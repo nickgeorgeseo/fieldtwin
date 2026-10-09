@@ -1,6 +1,6 @@
 import { formatMoney } from "../../core/money.ts";
 import type { TwinEvent } from "../../core/types.ts";
-import type { QboCustomer, QboInvoice, QboItem } from "./types.ts";
+import type { QboCustomer, QboInvoice, QboItem, QboPayment } from "./types.ts";
 
 /**
  * Every event the QuickBooks twin records. Events carry complete records (the whole customer,
@@ -12,7 +12,8 @@ export type QboEventData =
   | { type: "CustomerUpdated"; customer: QboCustomer }
   | { type: "ItemCreated"; item: QboItem }
   | { type: "InvoiceCreated"; invoice: QboInvoice }
-  | { type: "InvoiceUpdated"; invoice: QboInvoice };
+  | { type: "InvoiceUpdated"; invoice: QboInvoice }
+  | { type: "PaymentCreated"; payment: QboPayment };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asQboEvent(event: TwinEvent): QboEventData {
@@ -35,6 +36,10 @@ export function describeQboEvent(event: TwinEvent): string {
       const { Id, DocNumber, CustomerRef, TotalAmt, Balance, SyncToken } = data.invoice;
       const version = data.type === "InvoiceUpdated" ? ` SyncToken=${SyncToken}` : "";
       return `${data.type} Id=${Id} DocNumber=${DocNumber ?? "(none)"} "${CustomerRef.name}" TotalAmt=${formatMoney(TotalAmt)} Balance=${formatMoney(Balance)}${version}`;
+    }
+    case "PaymentCreated": {
+      const { Id, CustomerRef, TotalAmt, UnappliedAmt } = data.payment;
+      return `PaymentCreated Id=${Id} "${CustomerRef.name}" TotalAmt=${formatMoney(TotalAmt)} UnappliedAmt=${formatMoney(UnappliedAmt)}`;
     }
   }
 }

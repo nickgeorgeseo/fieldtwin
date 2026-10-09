@@ -8,7 +8,8 @@ export function createQboState(): QboState {
     customers: new Map(),
     items: new Map(),
     invoices: new Map(),
-    nextId: { Customer: 1, Item: 1, Invoice: 1 },
+    payments: new Map(),
+    nextId: { Customer: 1, Item: 1, Invoice: 1, Payment: 1 },
   };
 }
 
@@ -36,6 +37,11 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
     case "InvoiceUpdated":
       state.invoices.set(data.invoice.Id, data.invoice);
       claimId(state, "Invoice", data.invoice.Id);
+      return;
+
+    case "PaymentCreated":
+      state.payments.set(data.payment.Id, data.payment);
+      claimId(state, "Payment", data.payment.Id);
       return;
 
     default:
