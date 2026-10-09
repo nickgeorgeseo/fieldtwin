@@ -1,6 +1,9 @@
 import { endpointsAt } from "../src/endpoints.ts";
+import { createJobberClient } from "../src/jobber.ts";
 import { TokenManager } from "../src/oauth.ts";
+import { createQuickBooksClient } from "../src/quickbooks.ts";
 import type { Runtime } from "../src/runtime.ts";
+import { syncPaidInvoices } from "../src/sync.ts";
 import { connectWithoutBrowser } from "../src/twin.ts";
 
 /**
@@ -45,6 +48,18 @@ export async function connectBoth(target: InProcessTwin) {
     jobberTokens: new TokenManager(jobberOAuth, jobber.tokens, runtime),
   };
 }
+
+/** Everything connected and ready to sync, the way main.ts wires it, but in process. */
+export async function syncHarness(target: InProcessTwin) {
+  const connection = await connectBoth(target);
+  const { runtime, realmId, jobberTokens, quickbooksTokens } = connection;
+  const jobber = createJobberClient({ apiUrl: ENDPOINTS.jobber.apiUrl, tokens: jobberTokens, runtime });
+  const quickbooks = createQuickBooksClient({ apiBase: ENDPOINTS.quickbooks.apiBase, realmId, tokens: quickbooksTokens, runtime });
+  return { ...connection, jobber, quickbooks, sync: (since: string) => syncPaidInvoices({ jobber, quickbooks, log: runtime.log }, since) };
+}
+
+/** The beginning of time, for a first run that syncs everything. */
+export const EVER = "1970-01-01T00:00:00Z";
 
 /** mulberry32: a tiny seeded generator, so retry jitter is the same on every run. */
 function seededRandom(seed: number): () => number {
