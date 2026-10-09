@@ -134,16 +134,10 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing anything in `core/`.
 
 ## Contributing
 
-Good first contributions: one more QuickBooks entity (Invoice, Payment, Item), one more Jobber object (Job, Visit, Quote), or a new scenario.
-
-1. Find the behavior in the vendor's public documentation and link to it in a comment.
-2. Add or update the row in [FIDELITY.md](FIDELITY.md).
-3. Write the test first. `npm test` and `npm run typecheck` must pass.
-
-Build only from public documentation. Never paste in vendor code, private docs, or real customer data.
+Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row. Build only from public documentation; never paste vendor code, private docs, or real customer data.
 
 ## Disclaimer and license
 
 fieldtwin is an independent project. It is not affiliated with, endorsed by, or supported by Jobber or Intuit. Jobber and QuickBooks are trademarks of their respective owners.
 
-Copyright 2026 Nick George. Licensed under the Apache License 2.0.
+Copyright 2026 Nick George. Licensed under the [Apache License 2.0](LICENSE).
