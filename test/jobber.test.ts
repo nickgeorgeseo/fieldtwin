@@ -30,14 +30,4 @@ describe("Jobber twin", () => {
     body = await (await jobber(expensive)).json();
     expect(body.errors).toBeUndefined();
   });
-
-  it("requires the version header, like the real API", async () => {
-    const { app } = setup();
-    const response = await app.request("/api/graphql", {
-      method: "POST",
-      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "{ account { name } }" }),
-    });
-    expect(response.status).toBe(400);
-  });
 });

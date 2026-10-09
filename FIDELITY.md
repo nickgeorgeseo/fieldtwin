@@ -31,7 +31,8 @@ What each twin models, how closely, and whether it has been checked against the 
 | Behavior | Status | Verified | Notes |
 |---|---|---|---|
 | Single endpoint `POST /api/graphql` | Modeled | docs only | |
-| `X-JOBBER-GRAPHQL-VERSION` required | Modeled | docs only | Only `2025-04-16` is accepted. The real error response for a missing header is unconfirmed |
+| `X-JOBBER-GRAPHQL-VERSION` versions | Modeled | docs only | Every version the changelog lists as active is accepted and echoed in `extensions.versioning.version`. Historic versions resolve to the oldest active one. The twin serves the same schema subset for every version |
+| Missing or unknown version header | Approximate | check | The docs require the header but don't show the failure. The twin answers 400 with a GraphQL error naming the active versions. Deprecation `warning`s are not sent (end-of-support dates aren't published) |
 | `account`, `client`, `clients` queries | Modeled | docs only | Small field subset (see `schema.graphql`) |
 | Relay-style cursor pagination | Modeled | docs only | Cursors are opaque, as in the real API |
 | Encoded ids | Approximate | check | Base64 of `gid://Jobber/Type/n`. Treat ids as opaque |

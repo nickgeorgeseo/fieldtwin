@@ -5,13 +5,14 @@ import type { Twin } from "../../core/twin.ts";
 import { CostBucket, estimateQueryCost, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND } from "./cost.ts";
 import { createResolvers } from "./resolvers.ts";
 import type { JobberState } from "./types.ts";
+import { resolveVersion } from "./versions.ts";
 
 /**
  * Jobber Developer API: one GraphQL endpoint.
  * Real URL: https://api.getjobber.com/api/graphql
  * Every request needs `Authorization: Bearer ...` and an `X-JOBBER-GRAPHQL-VERSION` header.
+ * https://developer.getjobber.com/docs/using_jobbers_api/api_queries_and_mutations/
  */
-export const SUPPORTED_VERSIONS = ["2025-04-16"];
 
 const schema = buildSchema(readFileSync(new URL("./schema.graphql", import.meta.url), "utf8"));
 
@@ -25,13 +26,11 @@ export function jobberRoutes(twin: Twin): Hono {
       return c.json({ message: "Unauthorized" }, 401);
     }
 
-    const version = c.req.header("X-JOBBER-GRAPHQL-VERSION");
-    if (!version || !SUPPORTED_VERSIONS.includes(version)) {
-      return c.json(
-        graphQLError(`Unsupported or missing X-JOBBER-GRAPHQL-VERSION. Supported: ${SUPPORTED_VERSIONS.join(", ")}`, "UNSUPPORTED_VERSION"),
-        400,
-      );
-    }
+    // The docs require the header but do not show the response when it is missing or unknown.
+    // The twin fails loudly with a 400 (see FIDELITY.md).
+    const resolved = resolveVersion(c.req.header("X-JOBBER-GRAPHQL-VERSION"));
+    if ("error" in resolved) return c.json(graphQLError(resolved.error, "UNSUPPORTED_VERSION"), 400);
+    const { version } = resolved;
 
     const { query, variables = {} } = (await c.req.json()) as { query: string; variables?: Record<string, unknown> };
 
