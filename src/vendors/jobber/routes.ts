@@ -1,7 +1,7 @@
 import { execute } from "graphql";
 import { Hono } from "hono";
 import type { Twin } from "../../core/twin.ts";
-import { CostBucket, estimateQueryCost, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND } from "./cost.ts";
+import { actualQueryCost, CostBucket, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND, requestedQueryCost } from "./cost.ts";
 import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
 import { createResolvers } from "./resolvers.ts";
 import type { JobberState } from "./types.ts";
@@ -36,19 +36,23 @@ export function jobberRoutes(twin: Twin): Hono {
     if ("errors" in prepared) return c.json({ errors: prepared.errors });
     const { document } = prepared;
 
-    // Rate limiting happens before execution, the same order Jobber documents.
-    const requestedQueryCost = estimateQueryCost(document, request.variables);
-    const spend = bucket.trySpend(requestedQueryCost, twin.clock.nowMs());
-    const throttleStatus = {
+    // Jobber checks the requested cost against the bucket before running the query,
+    // then deducts what the query actually cost once it has resolved.
+    const requested = requestedQueryCost(schema, document, request.variables, request.operationName);
+    const available = bucket.check(twin.clock.nowMs());
+    const throttleStatus = (currentlyAvailable: number) => ({
       maximumAvailable: MAXIMUM_AVAILABLE,
-      currentlyAvailable: Math.floor(spend.currentlyAvailable),
+      currentlyAvailable: Math.floor(currentlyAvailable),
       restoreRate: RESTORE_RATE_PER_SECOND,
-    };
+    });
 
-    if (!spend.allowed) {
+    if (requested > available) {
       return c.json({
         ...graphQLError("Throttled", "THROTTLED", "https://developer.getjobber.com/docs/using_jobbers_api/api_rate_limits"),
-        extensions: { cost: { requestedQueryCost, actualQueryCost: 0, throttleStatus }, versioning: { version } },
+        extensions: {
+          cost: { requestedQueryCost: requested, actualQueryCost: 0, throttleStatus: throttleStatus(available) },
+          versioning: { version },
+        },
       });
     }
 
@@ -59,9 +63,14 @@ export function jobberRoutes(twin: Twin): Hono {
       variableValues: request.variables,
       operationName: request.operationName,
     });
+    const actual = actualQueryCost(schema, document, request.variables, result.data, request.operationName);
+    const remaining = bucket.spend(actual);
     return c.json({
       ...result,
-      extensions: { cost: { requestedQueryCost, actualQueryCost: requestedQueryCost, throttleStatus }, versioning: { version } },
+      extensions: {
+        cost: { requestedQueryCost: requested, actualQueryCost: actual, throttleStatus: throttleStatus(remaining) },
+        versioning: { version },
+      },
     });
   });
 

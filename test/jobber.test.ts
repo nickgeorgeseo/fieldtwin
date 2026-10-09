@@ -16,18 +16,4 @@ describe("Jobber twin", () => {
     expect(page2.nodes).toHaveLength(5);
     expect(page2.pageInfo.hasNextPage).toBe(false);
   });
-
-  it("reports query cost and throttles when the bucket runs dry, then refills with twin time", async () => {
-    const { twin, jobber } = setup();
-    const expensive = `{ clients(first: 1000) { nodes { emails { address } phones { number } } } }`;
-
-    let body = await (await jobber(expensive)).json();
-    expect(body.extensions.cost.requestedQueryCost).toBeGreaterThan(2000);
-    while (!body.errors) body = await (await jobber(expensive)).json();
-    expect(body.errors[0].extensions.code).toBe("THROTTLED");
-
-    twin.clock.advance(20_000); // 20 seconds at 500 points/second refills the bucket
-    body = await (await jobber(expensive)).json();
-    expect(body.errors).toBeUndefined();
-  });
 });

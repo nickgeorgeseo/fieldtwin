@@ -42,7 +42,10 @@ What each twin models, how closely, and whether it has been checked against the 
 | Syntax and validation errors | Approximate | docs only | HTTP 200 with an `errors` list, as documented. Messages come from graphql-js, so wording differs from Jobber's (which runs graphql-ruby) |
 | Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | |
 | `extensions.cost` and `THROTTLED` errors | Modeled | docs only | |
-| Query cost formula | Approximate | | Right shape (page size and nesting raise cost; a missing `first` assumes 100 nodes). Numbers will not match Jobber exactly |
+| Query cost formula | Modeled | docs only | One point per field; `edges`, `nodes`, `node`, and connection fields free; per-node fields multiplied by `first`/`last` or 100. Reproduces the docs' 7, 50, and 500 point examples |
+| `actualQueryCost` | Modeled | docs only | Counted over the data that came back, and that is what the bucket is charged |
+| Cost of `pageInfo`, `totalCount`, plain lists, `__typename` | Approximate | | The docs don't say. Connection-level fields are charged once, plain lists like one object, `__typename` free |
+| The docs' own sample response | Approximate | check | Jobber's "Response structure" sample prices `{ account { id name } }` at 1 point; the documented formula gives 3. The twin follows the formula |
 | 2,500 requests per 5 minutes DDoS guard | Via faults | | Use a fault rule with status 429 |
 | Mutations | Not yet | | Roadmap v0.1 |
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
