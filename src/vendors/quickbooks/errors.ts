@@ -14,19 +14,33 @@ export function qboFault(code: string, message: string, detail: string, now: str
 
 export const qboErrors = {
   staleObject: (id: string, now: string) =>
-    qboFault("5010", "Stale Object Error", `Stale Object Error : You and another user were working on the same thing. Customer Id=${id}`, now),
+    qboFault(
+      "5010",
+      "Stale Object Error",
+      `Stale Object Error : You and another user were working on the same thing. Customer Id=${id}`,
+      now,
+    ),
 
   notFound: (entity: string, id: string, now: string) =>
-    qboFault("610", "Object Not Found", `Object Not Found : Something you're trying to use has been made inactive. Check the fields with accounts, customers, items, vendors or employees. ${entity} Id=${id}`, now),
+    qboFault(
+      "610",
+      "Object Not Found",
+      `Object Not Found : Something you're trying to use has been made inactive. Check the fields with accounts, customers, items, vendors or employees. ${entity} Id=${id}`,
+      now,
+    ),
 
   duplicateName: (name: string, now: string) =>
     qboFault("6240", "Duplicate Name Exists Error", `The name supplied already exists. : ${name}`, now),
 
   missingField: (field: string, now: string) =>
-    qboFault("2020", "Required param missing, need to supply the required value for the API", `Required parameter ${field} is missing in the request`, now),
+    qboFault(
+      "2020",
+      "Required param missing, need to supply the required value for the API",
+      `Required parameter ${field} is missing in the request`,
+      now,
+    ),
 
-  badQuery: (detail: string, now: string) =>
-    qboFault("4000", "Error parsing query", `QueryParserError: ${detail}`, now),
+  badQuery: (detail: string, now: string) => qboFault("4000", "Error parsing query", `QueryParserError: ${detail}`, now),
 
   notAuthenticated: (now: string) =>
     qboFault("3200", "AuthenticationFailed", "Missing or malformed Authorization: Bearer header", now, "AuthenticationFault"),

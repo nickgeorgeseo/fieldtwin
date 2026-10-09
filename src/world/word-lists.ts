@@ -1,17 +1,60 @@
 /** Small, boring word lists. Fake data should look plausible, never like a real person. */
 
 export const FIRST_NAMES = [
-  "Avery", "Jordan", "Morgan", "Riley", "Casey", "Taylor", "Jamie", "Quinn", "Reese", "Rowan",
-  "Dana", "Elliot", "Harper", "Kendall", "Logan", "Parker", "Sage", "Skyler", "Blake", "Drew",
+  "Avery",
+  "Jordan",
+  "Morgan",
+  "Riley",
+  "Casey",
+  "Taylor",
+  "Jamie",
+  "Quinn",
+  "Reese",
+  "Rowan",
+  "Dana",
+  "Elliot",
+  "Harper",
+  "Kendall",
+  "Logan",
+  "Parker",
+  "Sage",
+  "Skyler",
+  "Blake",
+  "Drew",
 ] as const;
 
 export const LAST_NAMES = [
-  "Alder", "Brooks", "Calloway", "Dunmore", "Ellery", "Fairbanks", "Garrow", "Halvorsen", "Ingram", "Jessup",
-  "Kettering", "Lindqvist", "Marlow", "Northcott", "Okafor", "Pemberton", "Quayle", "Rowntree", "Stroud", "Thorne",
+  "Alder",
+  "Brooks",
+  "Calloway",
+  "Dunmore",
+  "Ellery",
+  "Fairbanks",
+  "Garrow",
+  "Halvorsen",
+  "Ingram",
+  "Jessup",
+  "Kettering",
+  "Lindqvist",
+  "Marlow",
+  "Northcott",
+  "Okafor",
+  "Pemberton",
+  "Quayle",
+  "Rowntree",
+  "Stroud",
+  "Thorne",
 ] as const;
 
 export const STREET_NAMES = [
-  "Maple Ave", "Cedar Ln", "Willow Dr", "Ridge Rd", "Lakeview Ct", "Oak St", "Pine Hollow Rd", "Mill Creek Dr",
+  "Maple Ave",
+  "Cedar Ln",
+  "Willow Dr",
+  "Ridge Rd",
+  "Lakeview Ct",
+  "Oak St",
+  "Pine Hollow Rd",
+  "Mill Creek Dr",
 ] as const;
 
 export const CITIES = [

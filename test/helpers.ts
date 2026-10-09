@@ -12,7 +12,11 @@ export function setup(seed = 42) {
     twin,
     qboGet: (path: string) => app.request(`${qbo}${path}`, { headers: auth }),
     qboPost: (path: string, body: unknown) =>
-      app.request(`${qbo}${path}`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+      app.request(`${qbo}${path}`, {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
     jobber: (query: string, variables?: Record<string, unknown>) =>
       app.request("/api/graphql", {
         method: "POST",

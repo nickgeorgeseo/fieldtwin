@@ -13,8 +13,7 @@ export interface QboQuery {
   maxResults: number;
 }
 
-const QUERY_PATTERN =
-  /^select \* from (\w+)(?: where (\w+) = '([^']*)')?(?: startposition (\d+))?(?: maxresults (\d+))?\s*$/i;
+const QUERY_PATTERN = /^select \* from (\w+)(?: where (\w+) = '([^']*)')?(?: startposition (\d+))?(?: maxresults (\d+))?\s*$/i;
 
 export function parseQboQuery(text: string): QboQuery | { error: string } {
   const match = QUERY_PATTERN.exec(text.trim());

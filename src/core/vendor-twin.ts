@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
-import type { NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { World } from "../world/generate-world.ts";
 import type { Twin } from "./twin.ts";
+import type { NewEvent, TwinEvent, VendorName } from "./types.ts";
 
 /**
  * The contract every vendor twin implements. Adding a vendor means adding one folder

@@ -3,7 +3,7 @@ import type { Twin } from "../../core/twin.ts";
 import { qboErrors } from "./errors.ts";
 import { parseQboQuery } from "./query.ts";
 import { newCustomerRecord } from "./state.ts";
-import { WRITABLE_CUSTOMER_FIELDS, type QboCustomer, type QboState } from "./types.ts";
+import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "./types.ts";
 
 /**
  * QuickBooks Online Accounting API, v3 (Customer only, for now).

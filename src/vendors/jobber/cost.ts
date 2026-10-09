@@ -1,4 +1,4 @@
-import { Kind, type DocumentNode, type SelectionSetNode, type ValueNode } from "graphql";
+import { type DocumentNode, Kind, type SelectionSetNode, type ValueNode } from "graphql";
 
 /**
  * Jobber's query-cost rate limit, modeled as a leaky bucket.
@@ -53,10 +53,12 @@ function costOf(selectionSet: SelectionSetNode, multiplier: number, variables: R
 
     cost += multiplier;
     const firstArg = selection.arguments?.find((arg) => arg.name.value === "first");
-    const isPaginated = firstArg || selection.selectionSet.selections.some(
-      (child) => child.kind === Kind.FIELD && (child.name.value === "nodes" || child.name.value === "edges"),
-    );
-    const pageSize = firstArg ? readInt(firstArg.value, variables) ?? ASSUMED_PAGE_SIZE : ASSUMED_PAGE_SIZE;
+    const isPaginated =
+      firstArg ||
+      selection.selectionSet.selections.some(
+        (child) => child.kind === Kind.FIELD && (child.name.value === "nodes" || child.name.value === "edges"),
+      );
+    const pageSize = firstArg ? (readInt(firstArg.value, variables) ?? ASSUMED_PAGE_SIZE) : ASSUMED_PAGE_SIZE;
     cost += costOf(selection.selectionSet, isPaginated ? multiplier * pageSize : multiplier, variables);
   }
   return cost;

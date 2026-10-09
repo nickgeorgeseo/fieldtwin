@@ -1,9 +1,9 @@
+import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
 import { SeededRandom } from "./random.ts";
 import type { Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
-import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
 
 export interface TwinOptions {
   seed: number;

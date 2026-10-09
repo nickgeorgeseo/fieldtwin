@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { buildSchema, type DocumentNode, execute, type GraphQLError, parse, validate } from "graphql";
 import { Hono } from "hono";
 import type { Twin } from "../../core/twin.ts";
-import { CostBucket, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND, estimateQueryCost } from "./cost.ts";
+import { CostBucket, estimateQueryCost, MAXIMUM_AVAILABLE, RESTORE_RATE_PER_SECOND } from "./cost.ts";
 import { createResolvers } from "./resolvers.ts";
 import type { JobberState } from "./types.ts";
 
@@ -27,7 +27,10 @@ export function jobberRoutes(twin: Twin): Hono {
 
     const version = c.req.header("X-JOBBER-GRAPHQL-VERSION");
     if (!version || !SUPPORTED_VERSIONS.includes(version)) {
-      return c.json(graphQLError(`Unsupported or missing X-JOBBER-GRAPHQL-VERSION. Supported: ${SUPPORTED_VERSIONS.join(", ")}`, "UNSUPPORTED_VERSION"), 400);
+      return c.json(
+        graphQLError(`Unsupported or missing X-JOBBER-GRAPHQL-VERSION. Supported: ${SUPPORTED_VERSIONS.join(", ")}`, "UNSUPPORTED_VERSION"),
+        400,
+      );
     }
 
     const { query, variables = {} } = (await c.req.json()) as { query: string; variables?: Record<string, unknown> };
@@ -44,7 +47,11 @@ export function jobberRoutes(twin: Twin): Hono {
     // Rate limiting happens before execution, the same order Jobber documents.
     const requestedQueryCost = estimateQueryCost(document, variables);
     const spend = bucket.trySpend(requestedQueryCost, twin.clock.nowMs());
-    const throttleStatus = { maximumAvailable: MAXIMUM_AVAILABLE, currentlyAvailable: Math.floor(spend.currentlyAvailable), restoreRate: RESTORE_RATE_PER_SECOND };
+    const throttleStatus = {
+      maximumAvailable: MAXIMUM_AVAILABLE,
+      currentlyAvailable: Math.floor(spend.currentlyAvailable),
+      restoreRate: RESTORE_RATE_PER_SECOND,
+    };
 
     if (!spend.allowed) {
       return c.json({

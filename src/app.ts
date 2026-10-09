@@ -1,7 +1,7 @@
 import { Hono } from "hono";
+import { controlRoutes } from "./control/http.ts";
 import { Twin } from "./core/twin.ts";
 import type { VendorTwin } from "./core/vendor-twin.ts";
-import { controlRoutes } from "./control/http.ts";
 import { faultMiddleware } from "./faults/fault-middleware.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
 import { quickbooksTwin } from "./vendors/quickbooks/index.ts";

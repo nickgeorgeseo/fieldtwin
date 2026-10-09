@@ -19,7 +19,13 @@ export interface QboCustomer {
 
 /** Fields a caller is allowed to send. Id, SyncToken, and MetaData are managed by QuickBooks. */
 export const WRITABLE_CUSTOMER_FIELDS = [
-  "DisplayName", "GivenName", "FamilyName", "PrimaryEmailAddr", "PrimaryPhone", "BillAddr", "Active",
+  "DisplayName",
+  "GivenName",
+  "FamilyName",
+  "PrimaryEmailAddr",
+  "PrimaryPhone",
+  "BillAddr",
+  "Active",
 ] as const;
 
 export interface QboState {

@@ -15,10 +15,10 @@ const server = new McpServer({ name: "fieldtwin", version: "0.0.1" });
 const asText = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
 server.registerTool("twin_status", { description: "Company, twin time, event count, and active faults." }, () =>
-  asText(ops.describeTwin(twin)));
+  asText(ops.describeTwin(twin)),
+);
 
-server.registerTool("twin_reset", { description: "Reset every vendor to the seeded starting world." }, () =>
-  asText(ops.resetTwin(twin)));
+server.registerTool("twin_reset", { description: "Reset every vendor to the seeded starting world." }, () => asText(ops.resetTwin(twin)));
 
 server.registerTool(
   "twin_advance_clock",

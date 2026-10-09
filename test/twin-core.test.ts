@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 import { createCheckpoint, listChanges, loadScenario, rewindTo } from "../src/control/operations.ts";
 import { setup } from "./helpers.ts";
 

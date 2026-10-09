@@ -26,11 +26,7 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
 }
 
 /** Helper for routes: the record a CustomerCreated event should carry. */
-export function newCustomerRecord(
-  state: QboState,
-  fields: Partial<QboCustomer> & { DisplayName: string },
-  now: string,
-): QboCustomer {
+export function newCustomerRecord(state: QboState, fields: Partial<QboCustomer> & { DisplayName: string }, now: string): QboCustomer {
   return {
     Active: true,
     ...fields,
