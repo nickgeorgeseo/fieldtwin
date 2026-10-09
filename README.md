@@ -25,7 +25,7 @@ npm start
 ```
 
 ```text
-fieldtwin: Thorne Heating & Air is open for business at http://localhost:4010
+fieldtwin: Rowntree Electric is open for business at http://localhost:4010
 ```
 
 Read a customer from the QuickBooks twin (any bearer token works for now):
