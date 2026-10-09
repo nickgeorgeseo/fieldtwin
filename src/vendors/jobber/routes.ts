@@ -1,8 +1,10 @@
 import { execute } from "graphql";
 import { Hono } from "hono";
+import { checkBearer } from "../../core/auth.ts";
 import type { Twin } from "../../core/twin.ts";
 import { actualQueryCost, COST_LIMITS, requestedQueryCost } from "./cost.ts";
 import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
+import { JOBBER_OAUTH_POLICY, jobberOAuthRoutes } from "./oauth.ts";
 import { createResolvers } from "./resolvers/index.ts";
 import type { JobberState } from "./types.ts";
 import { resolveVersion } from "./versions.ts";
@@ -22,9 +24,12 @@ export function jobberRoutes(twin: Twin): Hono {
     (event) => twin.record(event, "api"),
   );
 
+  jobberOAuthRoutes(app, twin);
+
   app.post("/api/graphql", async (c) => {
-    const token = bearerToken(c.req.header("Authorization"));
-    if (!token) return c.json({ message: "Unauthorized" }, 401);
+    // "If the access token is invalid or expired, the API returns a 401 'Invalid Token Error'."
+    const auth = checkBearer(twin, "jobber", JOBBER_OAUTH_POLICY, c.req.header("Authorization"));
+    if ("problem" in auth) return c.json({ message: auth.problem === "missing" ? "Unauthorized" : "Invalid Token Error" }, 401);
 
     // The docs require the header but do not show the response when it is missing or unknown.
     // The twin fails loudly with a 400 (see FIDELITY.md).
@@ -41,9 +46,9 @@ export function jobberRoutes(twin: Twin): Hono {
     // Jobber checks the requested cost against the bucket before running the query,
     // then deducts what the query actually cost once it has resolved.
     const requested = requestedQueryCost(schema, document, request.variables, request.operationName);
-    // Jobber budgets per app and account. The twin has one account, and until the OAuth twin lands
-    // each access token stands in for one app.
-    const bucket = twin.rateLimitBucket(`jobber:${token}`, COST_LIMITS);
+    // Jobber budgets per app and account. The twin has one account, so the budget is the app's: every token
+    // the OAuth twin issued to one client_id shares it (in any-token mode, an unknown token is its own app).
+    const bucket = twin.rateLimitBucket(`jobber:${auth.app}`, COST_LIMITS);
     const available = bucket.check(twin.clock.nowMs());
     const throttleStatus = (currentlyAvailable: number) => ({
       maximumAvailable: COST_LIMITS.capacity,
@@ -84,9 +89,4 @@ export function jobberRoutes(twin: Twin): Hono {
 
 export function graphQLError(message: string, code: string, documentation?: string) {
   return { errors: [{ message, extensions: { code, ...(documentation && { documentation }) } }] };
-}
-
-function bearerToken(header: string | undefined): string | undefined {
-  const match = /^Bearer (\S+)$/.exec(header ?? "");
-  return match?.[1];
 }

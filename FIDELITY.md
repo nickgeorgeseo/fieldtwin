@@ -67,7 +67,7 @@ What each twin models, how closely, and whether it has been checked against the 
 | Invalid `EncodedId` variable | Modeled | docs only | The documented `Variable $id of type EncodedId! was provided invalid value` error with `extensions.problems` |
 | Unknown id | Modeled | docs only | Resolves to `null`, not an error |
 | Syntax and validation errors | Approximate | docs only | HTTP 200 with an `errors` list, as documented. Messages come from graphql-js, so wording differs from Jobber's (which runs graphql-ruby) |
-| Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | One budget per app, as documented (per app and account; the twin has one account). Until OAuth, each access token counts as one app. Reset and rewind start every budget full |
+| Query cost bucket: 10,000 points, 500/sec refill | Modeled | docs only | One budget per app and account (the twin has one account). Reset and rewind start every budget full |
 | `extensions.cost` and `THROTTLED` errors | Modeled | docs only | |
 | Query cost formula | Modeled | docs only | One point per field; `edges`, `nodes`, `node`, and connection fields free; per-node fields multiplied by `first`/`last` or 100. Reproduces the docs' 7, 50, and 500 point examples |
 | `actualQueryCost` | Modeled | docs only | Counted over the data that came back, and that is what the bucket is charged |
@@ -91,7 +91,11 @@ What each twin models, how closely, and whether it has been checked against the 
 | `jobCreate` and visit scheduling | Not yet | | `JobCreateAttributes` exists (changelog) but its fields aren't in the public docs, so the twin doesn't guess them |
 | Other mutations | Not yet | | |
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
-| OAuth 2.0 | Not yet | | Any bearer token is accepted |
+| OAuth 2.0 authorization (`GET /api/oauth/authorize`) | Modeled | docs only | Approved at once and redirected back with `code` and `state`. PKCE with S256 only, as documented |
+| OAuth 2.0 tokens (`POST /api/oauth/token`) | Modeled | docs only | Client credentials in the form body; `authorization_code` (with `code_verifier` when PKCE was used; a wrong one is 400 `invalid_grant`, as documented) and `refresh_token` grants; `{ access_token, refresh_token, token_type: "Bearer", expires_in: 3600 }`. Access tokens are HS256 JWTs whose payload carries `exp`. Codes last 10 minutes and work once |
+| Refresh token rotation | Modeled | docs only | On, as for apps created after January 2, 2024: each refresh returns a new refresh token and the old one fails at once with "The provided refresh token is not valid." The pre-2024 warning behavior and rotation-off mode are not modeled |
+| Expired or unknown token on the API | Approximate | check | In `auth: oauth` mode, 401 `{ "message": "Invalid Token Error" }`. The docs name the error but don't show the body. Any `client_id` and `client_secret` are accepted; scopes are not enforced |
+| Cost budget per app | Modeled | docs only | Every token issued to one `client_id` shares one budget, so refreshing doesn't refill it. In any-token mode an unknown token counts as its own app |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
