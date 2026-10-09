@@ -1,6 +1,6 @@
 {
   "name": "fieldtwin",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Local, stateful twins of the software trades and logistics businesses run on. Build and test integrations and AI agents without touching a real customer's account.",
   "license": "Apache-2.0",
   "type": "module",
