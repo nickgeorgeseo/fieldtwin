@@ -189,3 +189,16 @@ describe("QuickBooks query clause: COUNT(*)", () => {
     expect((await query(harness, "select count(*) from Invoice")).body.QueryResponse).toEqual({ totalCount: 0 });
   });
 });
+
+describe("QuickBooks twin: POST /query", () => {
+  it("runs a query sent as the request body, for statements too long for a URL", async () => {
+    const { app } = setup();
+    const response = await app.request("/v3/company/9341000000000001/query", {
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/text" },
+      body: "SELECT COUNT(*) FROM Customer WHERE Active = true",
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).QueryResponse).toEqual({ totalCount: 25 });
+  });
+});

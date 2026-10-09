@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { parseQboQuery, type QboQuery, type QueryValue } from "../query-language.ts";
@@ -34,16 +34,20 @@ const QUERYABLE: Record<string, { records: (state: QboState) => Iterable<object>
 export function queryRoutes(app: Hono, twin: Twin): void {
   const now = () => twin.clock.nowIso();
 
-  app.get(`${COMPANY}/query`, (c) => {
-    const query = parseQboQuery(c.req.query("query") ?? "");
+  const answer = (statement: string) => {
+    const query = parseQboQuery(statement);
     if ("error" in query) {
-      const error = query.kind === "syntax" ? qboErrors.badQuery(query.error, now()) : qboErrors.unsupportedOperation(query.error, now());
-      return c.json(error, 400);
+      return query.kind === "syntax" ? qboErrors.badQuery(query.error, now()) : qboErrors.unsupportedOperation(query.error, now());
     }
     const result = runQuery(twin.state<QboState>("quickbooks"), query);
-    if ("invalid" in result) return c.json(qboErrors.invalidQuery(result.invalid, now()), 400);
-    return c.json({ QueryResponse: result.response, time: now() });
-  });
+    if ("invalid" in result) return qboErrors.invalidQuery(result.invalid, now());
+    return { QueryResponse: result.response, time: now() };
+  };
+  const respond = (c: Context, body: ReturnType<typeof answer>) => ("Fault" in body ? c.json(body, 400) : c.json(body));
+
+  app.get(`${COMPANY}/query`, (c) => respond(c, answer(c.req.query("query") ?? "")));
+  // "Use a POST operation ... sending the query details in the request body", content type application/text.
+  app.post(`${COMPANY}/query`, async (c) => respond(c, answer(await c.req.text())));
 }
 
 function runQuery(state: QboState, query: QboQuery): { response: object } | { invalid: string } {
