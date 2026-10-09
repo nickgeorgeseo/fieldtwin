@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findImports, isAllowedImport, listTypeScriptFiles, projectImports } from "./architecture-rules.ts";
 
@@ -31,13 +31,27 @@ describe("import boundaries (ARCHITECTURE.md, 'Layers and who may import whom')"
     expect(violations).toEqual([]);
   });
 
+  it("tells the project's src/ apart from an example's own src/ folder", () => {
+    const example = join(EXAMPLES, "some-example", "test", "harness.ts");
+    expect(importsProjectSrc(example, "../../../src/app.ts")).toBe(true);
+    expect(importsProjectSrc(example, "../src/retry.ts")).toBe(false);
+    expect(importsProjectSrc(example, "vitest")).toBe(false);
+  });
+
   it("keeps examples honest: they reach the twin over HTTP and never import src/", () => {
     const files = existsSync(EXAMPLES) ? listTypeScriptFiles(EXAMPLES).filter((path) => !path.endsWith(".test.ts")) : [];
     const violations = files.flatMap((path) =>
       findImports(readFileSync(join(EXAMPLES, path), "utf8"))
-        .filter((specifier) => specifier.includes("/src/"))
+        .filter((specifier) => importsProjectSrc(join(EXAMPLES, path), specifier))
         .map((specifier) => `examples/${path} imports ${specifier}`),
     );
     expect(violations).toEqual([]);
   });
 });
+
+/** Whether a file's import resolves into the project's src/. An example may have a src/ folder of its own. */
+function importsProjectSrc(file: string, specifier: string): boolean {
+  if (!specifier.startsWith(".")) return false;
+  const fromSrc = relative(SRC, resolve(dirname(file), specifier));
+  return !fromSrc.startsWith("..") && !isAbsolute(fromSrc);
+}
