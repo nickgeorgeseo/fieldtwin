@@ -117,3 +117,29 @@ describe("QuickBooks twin: querying each entity", () => {
     expect(body.QueryResponse.Payment.map((payment: { TotalAmt: number }) => payment.TotalAmt)).toEqual([60]);
   });
 });
+
+describe("QuickBooks query clause: WHERE Id = and IN", () => {
+  it("parses IN lists", () => {
+    expect(parseQboQuery("SELECT * FROM Invoice WHERE id in ('64523', '18761', '35767')")).toMatchObject({
+      where: { property: "id", operator: "in", values: ["64523", "18761", "35767"] },
+    });
+  });
+
+  it("finds one record by Id, and several with IN", async () => {
+    const harness = setup();
+    const one = await query(harness, "select * from Customer where Id = '7'");
+    expect(one.body.QueryResponse.Customer.map((c: { Id: string }) => c.Id)).toEqual(["7"]);
+
+    const several = await query(harness, "select * from Customer where Id in ('2', '5', '999')");
+    expect(several.body.QueryResponse.Customer.map((c: { Id: string }) => c.Id)).toEqual(["2", "5"]);
+  });
+
+  it("supports IN on other properties, like the documented Active IN (true, false)", async () => {
+    const { body } = await query(setup(), "select * from Customer where Active IN (true, false) maxresults 1000");
+    expect(body.QueryResponse.Customer).toHaveLength(25);
+  });
+
+  it("rejects range operators on Id, which QuickBooks doesn't allow there", () => {
+    expect(parseQboQuery("select * from Customer where Id > '3'")).toMatchObject({ kind: "unsupported" });
+  });
+});

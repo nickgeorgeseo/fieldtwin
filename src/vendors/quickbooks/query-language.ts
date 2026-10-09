@@ -2,10 +2,10 @@
  * A deliberately small parser for the QuickBooks query language.
  * https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
  *
- *   SELECT * | COUNT(*) FROM Entity [WHERE Property = value] [STARTPOSITION n] [MAXRESULTS n]
+ *   SELECT * | COUNT(*) FROM Entity [WHERE Property = value | Property IN (value, ...)] [STARTPOSITION n] [MAXRESULTS n]
  *
  * Reserved words, entity names, and property names are case-insensitive. Values are 'quoted strings'
- * (with \' for an apostrophe), numbers, true, or false. The rest of the language (AND, IN, LIKE, <, >,
+ * (with \' for an apostrophe), numbers, true, or false. The rest of the language (AND, LIKE, <, >,
  * ORDERBY) is valid QuickBooks, so the parser reports it as "unsupported" rather than as a syntax error.
  * Extend it one clause at a time, with a test for each, rather than reaching for a general SQL parser.
  */
@@ -15,7 +15,7 @@ export type QueryValue = string | number | boolean;
 export interface QboQuery {
   select: "*" | "count";
   entity: string;
-  where?: { property: string; operator: "="; values: QueryValue[] };
+  where?: { property: string; operator: "=" | "in"; values: QueryValue[] };
   startPosition: number; // 1-based, like QuickBooks
   maxResults: number;
 }
@@ -132,8 +132,17 @@ class Parser {
       this.position++;
       return { property, operator: "=", values: [this.value()] };
     }
-    if (operator && /^(in|like|<|>|<=|>=|!=)$/i.test(operator.text)) {
-      throw new ParseFailure("unsupported", `The twin supports = in WHERE so far, not ${operator.text.toUpperCase()}`);
+    if (operator?.kind === "word" && operator.text.toUpperCase() === "IN") {
+      this.position++;
+      this.expectSymbol("(");
+      const values = [this.value()];
+      while (this.acceptSymbol(",")) values.push(this.value());
+      this.expectSymbol(")");
+      return { property, operator: "in", values };
+    }
+    // Valid QuickBooks, but not modeled yet. (On Id, QuickBooks itself allows only = and IN.)
+    if (operator && /^(like|<|>|<=|>=|!=)$/i.test(operator.text)) {
+      throw new ParseFailure("unsupported", `The twin supports = and IN in WHERE so far, not ${operator.text.toUpperCase()}`);
     }
     throw new ParseFailure("syntax", `Expected an operator after ${property}`);
   }
@@ -175,6 +184,12 @@ class Parser {
   private peekWord(word: string): boolean {
     const token = this.tokens[this.position];
     return token?.kind === "word" && token.text.toUpperCase() === word;
+  }
+
+  private expectSymbol(symbol: string): void {
+    if (this.acceptSymbol(symbol)) return;
+    const token = this.tokens[this.position];
+    throw new ParseFailure("syntax", `Expected "${symbol}"${token ? `, got "${token.text}"` : ""}`);
   }
 
   private acceptSymbol(symbol: string): boolean {
