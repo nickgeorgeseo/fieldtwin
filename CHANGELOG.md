@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- World drift and the `mismatched-books` scenario: customers spelled differently in QuickBooks (same email), customers only in Jobber with work QuickBooks has never seen, and customers only in QuickBooks.
 - Scenario timelines: schedule vendor actions (`jobber: { newClients: 15 }`, `jobber: { payInvoices: 3 }`) at business times, offsets, or exact times. Advancing the clock runs them in order, recorded with source `scenario`; rewinding re-arms them. `GET /_twin` shows what's coming next.
 - Twin OAuth 2.0 servers for QuickBooks and Jobber at the vendors' own paths: authorization, token exchange, refresh (Jobber rotates, QuickBooks rolls), PKCE, revocation, and expiry on twin time. An auth mode (`FIELDTWIN_AUTH=oauth`, `auth: oauth` in a scenario, or `PUT /_twin/auth`) makes the APIs reject unknown and expired tokens; the default still accepts any token, and the README says so up front.
 - Jobber `clientCreate`, matching the docs' sample mutation and its `userErrors` contract.

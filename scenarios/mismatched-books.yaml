@@ -1,0 +1,15 @@
+# Jobber and QuickBooks disagree, the way they do in real businesses.
+# Use it to test how your sync matches customers across systems: exact names won't always work.
+name: Mismatched books
+description: >
+  An electrician whose books have drifted from the field. Three customers are spelled differently in QuickBooks
+  (same email address), two new customers exist only in Jobber with work QuickBooks has never seen, and two
+  customers exist only in QuickBooks.
+seed: 21
+startTime: "2026-07-13T12:00:00Z"
+world:
+  customers: 30
+  drift:
+    renamedInAccounting: 3 # "Lindqvist" in Jobber, "Lindquist" in QuickBooks
+    fieldServiceOnly: 2 # jobs and invoices in Jobber, unknown to QuickBooks
+    accountingOnly: 2 # in the books, never in the field

@@ -1,3 +1,4 @@
+import type { DriftOptions } from "../world/drift.ts";
 import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
@@ -12,6 +13,7 @@ export interface TwinOptions {
   seed: number;
   startTime: string;
   worldSize?: Partial<WorldSize>;
+  drift?: DriftOptions;
   auth?: AuthMode;
   vendors: VendorTwin[];
 }
@@ -125,10 +127,10 @@ export class Twin {
 
   /** Back to the seeded starting world. Same seed and options give a byte-identical log. */
   reset(): void {
-    const { seed, startTime, worldSize } = this.options;
+    const { seed, startTime, worldSize, drift } = this.options;
     this.clock = new TwinClock(startTime);
     this.log = new EventLog();
-    this.world = generateWorld(new SeededRandom(seed), { startTime, size: worldSize });
+    this.world = generateWorld(new SeededRandom(seed), { startTime, size: worldSize, drift });
     this.faultRandom = new SeededRandom(seed + 1);
     this.faultRules = [];
     this.checkpoints.clear();

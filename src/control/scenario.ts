@@ -34,7 +34,22 @@ const ScenarioSchema = z.object({
   description: z.string().optional(),
   seed: z.number().int(),
   startTime: z.string(),
-  world: z.object({ customers: z.number().int().positive(), technicians: z.number().int().positive() }).partial().optional(),
+  world: z
+    .object({
+      customers: z.number().int().positive(),
+      technicians: z.number().int().positive(),
+      drift: z
+        .object({
+          renamedInAccounting: z.number().int().nonnegative(),
+          fieldServiceOnly: z.number().int().nonnegative(),
+          accountingOnly: z.number().int().nonnegative(),
+        })
+        .partial()
+        .strict(),
+    })
+    .partial()
+    .strict()
+    .optional(),
   auth: z.enum(["any-token", "oauth"]).optional(),
   faults: z.array(FaultRuleSchema).default([]),
   timeline: z.array(TimelineEntrySchema).default([]),

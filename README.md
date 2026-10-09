@@ -144,6 +144,13 @@ faults:
 
 Injected failures come back in the vendor's own error format and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs.
 
+Ready-made scenarios in `scenarios/`:
+
+| Scenario | What it tests |
+|---|---|
+| `heat-wave-monday.yaml` | A busy HVAC Monday: 120 customers, throttled QuickBooks writes, a slow Jobber, and new clients calling in all morning |
+| `mismatched-books.yaml` | Jobber and QuickBooks disagree: customers spelled differently (same email), customers only in Jobber with unsynced work, customers only in QuickBooks |
+
 A scenario can also schedule what happens as twin time passes. Advancing the clock runs each entry at its own time, recorded with source `scenario`:
 
 ```yaml

@@ -72,7 +72,8 @@ export function parseAuthMode(mode: unknown): AuthMode {
 /** Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults. */
 export function loadScenario(twin: Twin, yamlText: string) {
   const scenario = parseScenario(yamlText);
-  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize: scenario.world });
+  const { drift, ...worldSize } = scenario.world ?? {};
+  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift });
   twin.faultRules = scenario.faults;
   if (scenario.auth) twin.authMode = scenario.auth;
 

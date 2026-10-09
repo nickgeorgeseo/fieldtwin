@@ -11,21 +11,26 @@ const SEED_TIME = "2020-01-01T00:00:00.000Z";
 export function seedQuickBooks(world: World): NewEvent[] {
   const events: NewEvent[] = [{ vendor: "quickbooks", type: "CompanyCreated", data: { realmId: TWIN_REALM_ID } }];
 
-  const customers = world.customers.map(
-    (person, index): QboCustomer => ({
+  // QuickBooks is the accounting system: new customers the books haven't caught up with aren't here, and
+  // some are spelled the way the bookkeeper keyed them in (see world/drift.ts). Emails always match.
+  const customers = new Map<string, QboCustomer>();
+  world.customers.forEach((person, index) => {
+    if (world.drift.fieldServiceOnly.includes(person.key)) return;
+    const { firstName, lastName } = world.drift.accountingSpellings[person.key] ?? person;
+    customers.set(person.key, {
       Id: String(index + 1),
       SyncToken: "0",
-      DisplayName: `${person.firstName} ${person.lastName}`,
-      GivenName: person.firstName,
-      FamilyName: person.lastName,
+      DisplayName: `${firstName} ${lastName}`,
+      GivenName: firstName,
+      FamilyName: lastName,
       PrimaryEmailAddr: { Address: person.email },
       PrimaryPhone: { FreeFormNumber: person.phone },
       BillAddr: { Line1: person.street, City: person.city, CountrySubDivisionCode: person.state, PostalCode: person.postalCode },
       Active: true,
       MetaData: { CreateTime: SEED_TIME, LastUpdatedTime: SEED_TIME },
-    }),
-  );
-  for (const customer of customers) events.push({ vendor: "quickbooks", type: "CustomerCreated", data: { customer } });
+    });
+  });
+  for (const customer of customers.values()) events.push({ vendor: "quickbooks", type: "CustomerCreated", data: { customer } });
 
   // The price list becomes Items: services as Service, parts as NonInventory (sold, not stocked).
   world.catalog.forEach((entry, index) => {

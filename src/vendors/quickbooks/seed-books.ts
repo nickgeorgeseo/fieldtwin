@@ -14,16 +14,16 @@ import type { QboCustomer, QboInvoice, QboPayment, QboSalesItemLine } from "./ty
 export const BOOKKEEPING_LAG_DAYS = 14;
 const LAG_MS = BOOKKEEPING_LAG_DAYS * 86_400_000;
 
-export function seedBooks(world: World, customers: QboCustomer[]): NewEvent[] {
+export function seedBooks(world: World, customers: Map<string, QboCustomer>): NewEvent[] {
   const events: NewEvent[] = [];
   const cutoff = Date.parse(world.asOf) - LAG_MS;
-  const customerFor = (key: string) => customers[world.customers.findIndex((customer) => customer.key === key)]!;
   const itemId = (catalogKey: string) => String(world.catalog.findIndex((entry) => entry.key === catalogKey) + 1);
 
-  const entered = world.history.invoices.filter((invoice) => Date.parse(invoice.issuedAt) <= cutoff);
+  // The bookkeeper can only have entered invoices for customers who are in the books at all.
+  const entered = world.history.invoices.filter((invoice) => Date.parse(invoice.issuedAt) <= cutoff && customers.has(invoice.customerKey));
   const invoices = new Map<string, QboInvoice>();
   entered.forEach((worldInvoice, index) => {
-    const customer = customerFor(worldInvoice.customerKey);
+    const customer = customers.get(worldInvoice.customerKey)!;
     const lines: QboSalesItemLine[] = worldInvoice.lineItems.map((line, lineIndex) => ({
       Id: String(lineIndex + 1),
       LineNum: lineIndex + 1,

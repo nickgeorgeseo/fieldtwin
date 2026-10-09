@@ -1,5 +1,6 @@
 import type { SeededRandom } from "../core/random.ts";
 import { type CatalogEntry, makeCatalog } from "./catalog.ts";
+import { type DriftOptions, makeDrift, type WorldDrift } from "./drift.ts";
 import { makeHistory, type WorldHistory } from "./history.ts";
 import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-lists.ts";
 
@@ -17,6 +18,7 @@ export interface World {
   technicians: WorldTechnician[];
   catalog: CatalogEntry[];
   history: WorldHistory;
+  drift: WorldDrift; // how far the field-service and accounting systems disagree (nothing, by default)
 }
 
 export interface WorldCustomer {
@@ -47,6 +49,7 @@ const DEFAULT_SIZE: WorldSize = { customers: 25, technicians: 4 };
 export interface WorldOptions {
   startTime: string; // history is laid out around this moment: the past behind it, the schedule ahead
   size?: Partial<WorldSize>;
+  drift?: DriftOptions;
 }
 
 export function generateWorld(random: SeededRandom, options: WorldOptions): World {
@@ -71,16 +74,18 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
     lastName: random.pick(LAST_NAMES),
   }));
   const catalog = makeCatalog(random, trade.name);
+  const drift = makeDrift(customerList, options.drift);
   const history = makeHistory({
     random,
-    customers: customerList,
+    // Customers who exist only in the books have never had field work.
+    customers: customerList.filter((customer) => !drift.accountingOnly.includes(customer.key)),
     technicians: technicianList,
     catalog,
     startMs: Date.parse(options.startTime),
     utcOffsetHours: home.utcOffsetHours,
   });
 
-  return { asOf: options.startTime, company, customers: customerList, technicians: technicianList, catalog, history };
+  return { asOf: options.startTime, company, customers: customerList, technicians: technicianList, catalog, history, drift };
 }
 
 type Home = { city: string; state: string; zipPrefix: string };

@@ -19,7 +19,9 @@ export function seedJobber(world: World): NewEvent[] {
   ];
   const record = (type: string, data: object) => events.push({ vendor: "jobber", type, data });
 
+  // Jobber is the field-service system: customers who exist only in the books aren't here (see world/drift.ts).
   world.customers.forEach((person, index) => {
+    if (world.drift.accountingOnly.includes(person.key)) return;
     const client: JobberClient = {
       id: encodeId("Client", index + 1),
       firstName: person.firstName,

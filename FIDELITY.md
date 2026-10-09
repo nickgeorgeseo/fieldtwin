@@ -4,6 +4,8 @@ What each twin models, how closely, and whether it has been checked against the 
 
 **Modeled** means it behaves like the public docs describe. **Approximate** means the shape is right but details differ. **Not yet** means calls fail clearly instead of returning wrong data.
 
+Scenarios can make the two twins disagree on purpose (`world.drift`: respelled customers, customers in only one system), the way real businesses' systems drift.
+
 **Verified** means checked against a live vendor sandbox, with the date. Until the conformance suite exists (roadmap v0.3), everything is built from public documentation and marked "docs only". Anything marked "check" is our best reading of the docs and should be confirmed first.
 
 ## QuickBooks Online
