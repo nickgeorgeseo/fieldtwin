@@ -36,7 +36,7 @@ export function createCheckpoint(twin: Twin, name: string) {
 /** Plain-language list of what changed since a checkpoint, newest last. */
 export function listChanges(twin: Twin, checkpointName: string, options: { onlyFromApi?: boolean } = {}) {
   const changes = twin.changesSince(checkpointName).filter((event) => !options.onlyFromApi || event.source === "api");
-  return changes.map((event) => ({ ...event, summary: summarize(event) }));
+  return changes.map((event) => ({ ...event, summary: summarize(twin, event) }));
 }
 
 export function rewindTo(twin: Twin, checkpointName: string) {
@@ -62,9 +62,6 @@ export function exportLog(twin: Twin): string {
   return twin.log.toJsonl();
 }
 
-function summarize(event: TwinEvent): string {
-  const data = event.data as Record<string, any>;
-  const record = data.customer ?? data.client;
-  const label = record?.DisplayName ?? (record ? `${record.firstName} ${record.lastName}` : "");
-  return `${event.at}  ${event.vendor}  ${event.type}${label ? `  "${label}"` : ""}  (${event.source})`;
+function summarize(twin: Twin, event: TwinEvent): string {
+  return `${event.at}  ${event.vendor}  ${twin.vendor(event.vendor).describeEvent(event)}  (${event.source})`;
 }

@@ -10,15 +10,16 @@ export interface JobberClient {
   createdAt: string;
 }
 
+/** Jobber's `Client.name`: the company name for a business client, otherwise the person's name. */
+export function clientName(client: JobberClient): string {
+  return client.companyName ?? `${client.firstName} ${client.lastName}`;
+}
+
 export interface JobberState {
   account: { id: string; name: string };
   clients: Map<string, JobberClient>;
   clientOrder: string[]; // insertion order, so pagination is stable
 }
-
-export type JobberEventData =
-  | { type: "AccountCreated"; account: { id: string; name: string } }
-  | { type: "ClientCreated"; client: JobberClient };
 
 /**
  * Jobber ids are opaque strings. The twin makes them the same way Jobber appears to:

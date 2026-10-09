@@ -1,5 +1,6 @@
 import type { TwinEvent } from "../../core/types.ts";
-import type { QboCustomer, QboEventData, QboState } from "./types.ts";
+import { asQboEvent } from "./events.ts";
+import type { QboCustomer, QboState } from "./types.ts";
 
 export function createQboState(): QboState {
   return { realmId: "", customers: new Map(), nextId: 1 };
@@ -7,7 +8,7 @@ export function createQboState(): QboState {
 
 /** The only place QuickBooks state changes. Events carry complete records, so this stays simple. */
 export function applyQboEvent(state: QboState, event: TwinEvent): void {
-  const data = { type: event.type, ...(event.data as object) } as QboEventData;
+  const data = asQboEvent(event);
 
   switch (data.type) {
     case "CompanyCreated":

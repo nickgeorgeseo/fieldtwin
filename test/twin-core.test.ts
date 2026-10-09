@@ -22,6 +22,21 @@ describe("the twin", () => {
     expect(listChanges(twin, "before-sync")).toEqual([]);
   });
 
+  it("summarizes each change in one line, in the vendor's own words", async () => {
+    const { twin, qboGet, qboPost } = setup();
+    const { Customer } = await (await qboGet("/customer/1")).json();
+    createCheckpoint(twin, "before");
+    await qboPost("/customer", { Id: "1", SyncToken: "0", sparse: true, DisplayName: "Renamed Customer" });
+
+    const [change] = listChanges(twin, "before");
+    expect(change!.summary).toBe(`2026-07-13T11:00:00.000Z  quickbooks  CustomerUpdated Id=1 "Renamed Customer" SyncToken=1  (api)`);
+    expect(Customer.DisplayName).not.toBe("Renamed Customer");
+
+    // Every vendor describes its own events; control/ never looks inside a payload.
+    const firstClient = twin.log.all().find((event) => event.type === "ClientCreated")!;
+    expect(twin.vendor("jobber").describeEvent(firstClient)).toMatch(/^ClientCreated "[A-Z][a-z]+ [A-Z][a-z]+"$/);
+  });
+
   it("loads a scenario: new world size, start time, and faults", () => {
     const { twin } = setup();
     loadScenario(twin, readFileSync("scenarios/heat-wave-monday.yaml", "utf8"));

@@ -1,5 +1,6 @@
 import type { TwinEvent } from "../../core/types.ts";
-import type { JobberEventData, JobberState } from "./types.ts";
+import { asJobberEvent } from "./events.ts";
+import type { JobberState } from "./types.ts";
 
 export function createJobberState(): JobberState {
   return { account: { id: "", name: "" }, clients: new Map(), clientOrder: [] };
@@ -7,7 +8,7 @@ export function createJobberState(): JobberState {
 
 /** The only place Jobber state changes. */
 export function applyJobberEvent(state: JobberState, event: TwinEvent): void {
-  const data = { type: event.type, ...(event.data as object) } as JobberEventData;
+  const data = asJobberEvent(event);
 
   switch (data.type) {
     case "AccountCreated":

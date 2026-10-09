@@ -23,7 +23,7 @@ export interface TwinEvent {
   source: EventSource;
   vendor: VendorName;
   type: string; // past tense, e.g. "CustomerCreated"
-  data: unknown; // shape depends on vendor + type; each vendor's events.ts documents it
+  data: unknown; // shape depends on vendor + type; each vendor's events.ts defines it
 }
 
 /** What vendor code hands to twin.record(). The twin fills in seq, at, and source. */

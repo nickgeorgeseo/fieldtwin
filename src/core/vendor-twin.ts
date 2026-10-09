@@ -24,6 +24,12 @@ export interface VendorTwin<State = unknown> {
    */
   apply(state: State, event: TwinEvent): void;
 
+  /**
+   * One plain-language line about one of this vendor's events, e.g. `CustomerUpdated Id=1 "Ada Alder" SyncToken=2`.
+   * This is how change lists and MCP tools explain events without control/ knowing any payload shape.
+   */
+  describeEvent(event: TwinEvent): string;
+
   /** Turn the shared fake business into this vendor's starting records. */
   seed(world: World): NewEvent[];
 

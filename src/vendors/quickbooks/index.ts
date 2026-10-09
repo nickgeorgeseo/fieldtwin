@@ -1,5 +1,6 @@
 import type { VendorTwin } from "../../core/vendor-twin.ts";
 import { qboFault } from "./errors.ts";
+import { describeQboEvent } from "./events.ts";
 import { quickbooksRoutes } from "./routes.ts";
 import { seedQuickBooks } from "./seed.ts";
 import { applyQboEvent, createQboState } from "./state.ts";
@@ -10,6 +11,7 @@ export const quickbooksTwin: VendorTwin<QboState> = {
   pathPrefix: "/v3",
   createState: createQboState,
   apply: applyQboEvent,
+  describeEvent: describeQboEvent,
   seed: seedQuickBooks,
   routes: quickbooksRoutes,
   errorBody: (status, message, twin) =>

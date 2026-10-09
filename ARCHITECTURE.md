@@ -79,7 +79,8 @@ Every vendor has the same files, so once you have read one you can read them all
 
 | File | Holds |
 |---|---|
-| `types.ts` | Record shapes, named exactly as the vendor's docs name them, plus the event payloads |
+| `types.ts` | Record shapes, named exactly as the vendor's docs name them |
+| `events.ts` | The event payloads this vendor records, and `describeEvent()`: one plain-language line per event |
 | `state.ts` | `createState()` and `apply()`, the only code that changes this vendor's state |
 | `seed.ts` | Turns the shared world into this vendor's starting events |
 | `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()` |

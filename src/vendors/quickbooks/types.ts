@@ -33,9 +33,3 @@ export interface QboState {
   customers: Map<string, QboCustomer>;
   nextId: number;
 }
-
-/** Event payloads for this vendor. The event's `type` tells you which one you have. */
-export type QboEventData =
-  | { type: "CompanyCreated"; realmId: string }
-  | { type: "CustomerCreated"; customer: QboCustomer }
-  | { type: "CustomerUpdated"; customer: QboCustomer };

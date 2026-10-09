@@ -1,4 +1,4 @@
-import type { JobberClient, JobberState } from "./types.ts";
+import { clientName, type JobberClient, type JobberState } from "./types.ts";
 
 /**
  * Resolvers for schema.graphql. Each one is a plain function of the current state,
@@ -32,7 +32,7 @@ export function createResolvers(getState: () => JobberState) {
 }
 
 function toGraphQL(client: JobberClient) {
-  return { ...client, name: client.companyName ?? `${client.firstName} ${client.lastName}` };
+  return { ...client, name: clientName(client) };
 }
 
 // Cursors are opaque to callers. Inside the twin, a cursor is just a position in clientOrder.
