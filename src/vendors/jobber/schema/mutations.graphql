@@ -1,0 +1,34 @@
+# Mutations: https://developer.getjobber.com/docs/using_jobbers_api/api_queries_and_mutations/
+# "The userErrors field should always be included ... An empty userErrors array indicates the mutation succeeded."
+# ClientCreateInput's name is in the changelog; the other input, enum, and payload type names are not in the
+# public docs, so FIDELITY.md marks them "check". Only the documented email description, MAIN, is modeled.
+type Mutation {
+  clientCreate(input: ClientCreateInput!): ClientCreatePayload!
+}
+
+input ClientCreateInput {
+  firstName: String
+  lastName: String
+  companyName: String
+  emails: [EmailCreateAttributes!]
+}
+
+input EmailCreateAttributes {
+  description: EmailDescription
+  primary: Boolean
+  address: String!
+}
+
+enum EmailDescription {
+  MAIN
+}
+
+type ClientCreatePayload {
+  client: Client
+  userErrors: [MutationErrors!]!
+}
+
+type MutationErrors {
+  message: String!
+  path: [String!]
+}

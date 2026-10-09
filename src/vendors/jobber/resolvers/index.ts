@@ -1,21 +1,25 @@
+import type { NewEvent } from "../../../core/types.ts";
 import type { JobberState } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
 import type { ResolverContext } from "./context.ts";
 import { invoiceNode, invoicesConnection } from "./invoices.ts";
 import { jobNode, jobsConnection } from "./jobs.ts";
+import { createMutations } from "./mutations.ts";
 import { quoteNode, quotesConnection } from "./quotes.ts";
 import { userNode } from "./users.ts";
 
 /**
- * Root resolvers for schema.graphql. Each returns plain objects; a field whose value is a function
+ * Root resolvers for the schema in schema/, queries and mutations alike. Each returns plain objects; a field whose value is a function
  * (like a nested connection) is called by graphql-js with that field's arguments. Everything is a
  * plain function of the current state and the twin's clock, so resolvers are easy to test.
  */
-export function createResolvers(state: () => JobberState, nowMs: () => number) {
+export function createResolvers(state: () => JobberState, nowMs: () => number, record: (event: NewEvent) => void) {
   const context: ResolverContext = { state, nowMs };
 
   return {
+    ...createMutations(context, record),
+
     account: () => {
       const { id, name } = state().account;
       return { id, name };

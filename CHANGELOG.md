@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Jobber `clientCreate`, matching the docs' sample mutation and its `userErrors` contract.
 - QuickBooks starts with the books a bookkeeper two weeks behind would have: older invoices (numbered as in Jobber) and the payments against them. The last two weeks are deliberately missing, so there is real sync work to do from the first request.
 - Jobber invoices (`invoices`, `invoice`, `Client.invoices`, `Job.invoices`), paid, open, or past due, with `amounts`, `Client.balance`, and `Job.invoicedTotal`. An invoice turns `past_due` on its own as twin time passes its due date.
 - Jobber quotes (`quotes`, `quote`, `Client.quotes`, `Job.quote`), converted or awaiting a response.

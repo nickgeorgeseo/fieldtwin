@@ -82,7 +82,10 @@ What each twin models, how closely, and whether it has been checked against the 
 | Payment records | Not yet | | `paymentRecords` is documented but its fields are not; payments show only in `amounts` and `invoiceStatus` |
 | Job, quote, and invoice line items | Approximate | check | `name` and `quantity` are documented; `unitPrice` and `totalPrice` are not in the public docs |
 | `users` | Approximate | check | The business's technicians. `User` is documented, but a root `users` query and the fields of `Name` (`first`, `last`, `full`) and `UserEmail` (`raw`) are not |
-| Mutations | Not yet | | Roadmap v0.1 |
+| `clientCreate` | Modeled | docs only | The docs' sample mutation works as written: `input { firstName lastName companyName emails }`, answering `{ client, userErrors { message path } }`. A missing last name answers the documented `Last name is required` at `["input", "lastName"]`, with HTTP 200 and nothing created |
+| `clientCreate` details | Approximate | check | Whether a company name alone is enough is unconfirmed (the twin requires a last name, as the docs' example error implies). Input and payload type names other than `ClientCreateInput` aren't public; only the `MAIN` email description is documented. Phones, addresses, and the app-name lead source are not modeled |
+| `jobCreate` and visit scheduling | Not yet | | `JobCreateAttributes` exists (changelog) but its fields aren't in the public docs, so the twin doesn't guess them |
+| Other mutations | Not yet | | |
 | Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
 | OAuth 2.0 | Not yet | | Any bearer token is accepted |
 

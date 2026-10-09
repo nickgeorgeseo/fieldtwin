@@ -19,6 +19,7 @@ export function jobberRoutes(twin: Twin): Hono {
   const resolvers = createResolvers(
     () => twin.state<JobberState>("jobber"),
     () => twin.clock.nowMs(),
+    (event) => twin.record(event, "api"),
   );
 
   app.post("/api/graphql", async (c) => {
