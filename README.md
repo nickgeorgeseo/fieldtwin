@@ -57,6 +57,17 @@ Change only the base URL. Paths, headers, and body shapes match the real APIs.
 
 The QuickBooks twin serves one company, realm `9341000000000001`.
 
+## A worked example: Jobber to QuickBooks
+
+[`examples/sync-jobber-invoice-to-quickbooks`](examples/sync-jobber-invoice-to-quickbooks) is a reference integration written like production code. It books every paid Jobber invoice into QuickBooks (customer, invoice, payment) and handles everything the twins throw at it: 429s and 5xx with backoff, Jobber's query-cost throttle, expiring and rotating OAuth tokens, stale SyncTokens, customers spelled differently in each system, and being run twice.
+
+```bash
+npm start                  # terminal 1
+npm run example:sync       # terminal 2
+```
+
+Its tests show what testing against a twin buys you: the same sync under `flaky-apis` settles to exactly the books a clean run produces, and the two hours it waits for its tokens to expire take no real time.
+
 ## Authentication
 
 > **By default the twin accepts any bearer token.** That keeps the quick start to one command, and it is the

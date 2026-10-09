@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- `examples/sync-jobber-invoice-to-quickbooks`: a reference integration that books paid Jobber invoices into QuickBooks (customer, invoice, payment, stamp), written like production code: retries with backoff and `Retry-After`, QuickBooks' 60-second throttle wait, Jobber's exact `THROTTLED` wait, a `requestid` on every QuickBooks write, single-flight token refresh that keeps rotated refresh tokens, stale-SyncToken recovery, customer matching by email, and full idempotency. Its tests run it against in-process twins, including `flaky-apis` and `mismatched-books`. `npm run example:sync` runs the demo against a running twin.
 - MCP tools `twin_list_scenarios`, `twin_load_scenario`, `twin_set_faults`, `twin_set_auth`, and `twin_export_log`, with matching control-plane routes (`GET /_twin/scenarios`, `POST /_twin/scenarios/:name`, `GET /_twin/log.jsonl?since=`).
 - The `flaky-apis` scenario for retry testing: real OAuth checks and layered faults on both vendors.
 - World drift and the `mismatched-books` scenario: customers spelled differently in QuickBooks (same email), customers only in Jobber with work QuickBooks has never seen, and customers only in QuickBooks.
@@ -32,6 +33,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- Jobber connections treat `after: null` as the first page, the way Relay clients ask for it. It used to fail the whole query.
 - Every fault rule that matches a request gets its own chance to fire (it used to be only the first), so rules can be layered.
 - QuickBooks query values match without regard to case and accept `\'` escapes, as documented. Features the twin doesn't model answer 500 `Unsupported operation` instead of a parse error.
 - QuickBooks error bodies now use the documented messages (610, 2020, 4000, 4001, 5010, 6240) and carry the `element` field. A request for another company answers 403 `AuthorizationFault` 3100 instead of 3200.
