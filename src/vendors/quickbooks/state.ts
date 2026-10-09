@@ -3,7 +3,13 @@ import { asQboEvent } from "./events.ts";
 import type { QboCustomer, QboEntityName, QboState } from "./types.ts";
 
 export function createQboState(): QboState {
-  return { realmId: "", customers: new Map(), items: new Map(), nextId: { Customer: 1, Item: 1 } };
+  return {
+    realmId: "",
+    customers: new Map(),
+    items: new Map(),
+    invoices: new Map(),
+    nextId: { Customer: 1, Item: 1, Invoice: 1 },
+  };
 }
 
 /** The only place QuickBooks state changes. Events carry complete records, so this stays simple. */
@@ -24,6 +30,12 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
     case "ItemCreated":
       state.items.set(data.item.Id, data.item);
       claimId(state, "Item", data.item.Id);
+      return;
+
+    case "InvoiceCreated":
+    case "InvoiceUpdated":
+      state.invoices.set(data.invoice.Id, data.invoice);
+      claimId(state, "Invoice", data.invoice.Id);
       return;
 
     default:

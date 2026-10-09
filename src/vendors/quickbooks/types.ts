@@ -25,9 +25,16 @@ export interface QboCustomer {
   FamilyName?: string;
   PrimaryEmailAddr?: { Address: string };
   PrimaryPhone?: { FreeFormNumber: string };
-  BillAddr?: { Line1?: string; City?: string; CountrySubDivisionCode?: string; PostalCode?: string };
+  BillAddr?: QboPhysicalAddress;
   Active: boolean;
   MetaData: QboMetaData;
+}
+
+export interface QboPhysicalAddress {
+  Line1?: string;
+  City?: string;
+  CountrySubDivisionCode?: string;
+  PostalCode?: string;
 }
 
 /** Fields a caller is allowed to send. Id, SyncToken, and MetaData are managed by QuickBooks. */
@@ -60,12 +67,71 @@ export interface QboItem {
   MetaData: QboMetaData;
 }
 
+/**
+ * Invoice: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice
+ * The twin models SalesItemLine lines (an Item, a quantity, a price) and the SubTotalLine QuickBooks adds.
+ * No sales tax: TxnTaxDetail is not modeled, so TotalAmt is the sum of the lines.
+ */
+export interface QboInvoice {
+  Id: string;
+  SyncToken: string;
+  DocNumber?: string; // at most 21 characters
+  TxnDate: string; // YYYY-MM-DD
+  DueDate: string;
+  CustomerRef: QboRef;
+  Line: QboInvoiceLine[];
+  TotalAmt: number; // read only: computed from the lines
+  Balance: number; // read only: TotalAmt minus payments applied. 0 means paid in full
+  LinkedTxn: QboLinkedTxn[]; // read only: the payments applied to this invoice
+  BillAddr?: QboPhysicalAddress;
+  BillEmail?: { Address: string };
+  CustomerMemo?: { value: string };
+  PrivateNote?: string;
+  MetaData: QboMetaData;
+}
+
+export interface QboSalesItemLine {
+  Id: string;
+  LineNum: number;
+  Description?: string;
+  Amount: number;
+  DetailType: "SalesItemLineDetail";
+  SalesItemLineDetail: { ItemRef: QboRef; Qty?: number; UnitPrice?: number; ServiceDate?: string };
+}
+
+export interface QboSubTotalLine {
+  Amount: number;
+  DetailType: "SubTotalLineDetail";
+  SubTotalLineDetail: Record<string, never>;
+}
+
+export type QboInvoiceLine = QboSalesItemLine | QboSubTotalLine;
+
+/** A link to a related transaction. On an invoice, payments appear here with TxnType "Payment". */
+export interface QboLinkedTxn {
+  TxnId: string;
+  TxnType: "Payment" | "Invoice";
+}
+
+export const WRITABLE_INVOICE_FIELDS = [
+  "CustomerRef",
+  "Line",
+  "DocNumber",
+  "TxnDate",
+  "DueDate",
+  "BillAddr",
+  "BillEmail",
+  "CustomerMemo",
+  "PrivateNote",
+] as const;
+
 /** The entities the twin serves. Each has its own Id sequence. */
-export type QboEntityName = "Customer" | "Item";
+export type QboEntityName = "Customer" | "Item" | "Invoice";
 
 export interface QboState {
   realmId: string;
   customers: Map<string, QboCustomer>;
   items: Map<string, QboItem>;
+  invoices: Map<string, QboInvoice>;
   nextId: Record<QboEntityName, number>;
 }

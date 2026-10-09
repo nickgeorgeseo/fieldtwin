@@ -45,6 +45,32 @@ export const qboErrors = {
       now,
     ),
 
+  stringTooLong: (element: string, max: number, supplied: number, now: string) =>
+    qboFault({ code: "2050", Message: "Invalid String Length", Detail: `Min: 0, Max: ${max}, Supplied length: ${supplied}`, element }, now),
+
+  invalidDate: (element: string, supplied: string, now: string) =>
+    qboFault({ code: "2070", Message: "Invalid Date", Detail: `Supplied value: ${supplied}`, element }, now),
+
+  negativeAmount: (element: string, now: string) =>
+    qboFault({ code: "2290", Message: "NegativeAmount", Detail: "Negative amounts aren't supported on transaction lines.", element }, now),
+
+  invalidReference: (element: string, reference: string, now: string) =>
+    qboFault({ code: "2500", Message: "Invalid Reference Id", Detail: `The reference ID is invalid: ${reference}.`, element }, now),
+
+  businessValidation: (detail: string, now: string) =>
+    qboFault({ code: "6000", Message: "Business Validation Error", Detail: `BusinessValidationError: ${detail}` }, now),
+
+  amountMismatch: (supplied: number, now: string) =>
+    qboFault(
+      {
+        code: "6070",
+        Message: "Amount calculation incorrect in the request",
+        Detail: `The amount isn't equal to the Qty * UnitPrice. Supplied value: ${supplied}.`,
+        element: "Line.Amount",
+      },
+      now,
+    ),
+
   badQuery: (detail: string, now: string) =>
     qboFault(
       {
