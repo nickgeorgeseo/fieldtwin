@@ -1,3 +1,5 @@
+import type { ClientErrorStatusCode, ServerErrorStatusCode } from "hono/utils/http-status";
+
 /**
  * Shared vocabulary for the whole project. If you are new here, read this file first.
  */
@@ -45,8 +47,20 @@ export interface FaultRule {
   pathIncludes?: string; // e.g. "/customer". Omit to match any path.
   rate: number; // share of matching requests affected, 0 to 1
   effect: {
-    status?: number; // respond with this HTTP status instead of calling the twin
+    status?: FaultStatus; // respond with this HTTP error status instead of calling the twin
     latencyMs?: number; // wait this long before answering
     message?: string; // error message, rendered in the vendor's own error format
   };
+}
+
+/** The HTTP statuses a fault may answer with: Hono's client and server error codes, so no cast is ever needed. */
+export type FaultStatus = ClientErrorStatusCode | ServerErrorStatusCode;
+
+const FAULT_STATUSES: readonly FaultStatus[] = [
+  400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429,
+  431, 451, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511,
+];
+
+export function isFaultStatus(status: number): status is FaultStatus {
+  return (FAULT_STATUSES as readonly number[]).includes(status);
 }

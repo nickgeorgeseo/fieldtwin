@@ -1,6 +1,6 @@
 import type { Twin } from "../core/twin.ts";
-import type { FaultRule, TwinEvent } from "../core/types.ts";
-import { parseScenario } from "./scenario.ts";
+import type { TwinEvent } from "../core/types.ts";
+import { parseFaultRules, parseScenario } from "./scenario.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -44,9 +44,10 @@ export function rewindTo(twin: Twin, checkpointName: string) {
   return describeTwin(twin);
 }
 
-export function setFaults(twin: Twin, rules: FaultRule[]) {
-  twin.faultRules = rules;
-  return { activeFaults: rules.map((rule) => rule.name) };
+/** Replace the active fault rules. Rules are validated first, so a bad rule never half-applies. */
+export function setFaults(twin: Twin, rules: unknown) {
+  twin.faultRules = parseFaultRules(rules);
+  return { activeFaults: twin.faultRules.map((rule) => rule.name) };
 }
 
 /** Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults. */

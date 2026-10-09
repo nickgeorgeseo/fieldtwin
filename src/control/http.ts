@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Twin } from "../core/twin.ts";
-import type { FaultRule } from "../core/types.ts";
 import * as ops from "./operations.ts";
 
 /**
@@ -18,7 +17,7 @@ export function controlRoutes(twin: Twin): Hono {
     c.json(ops.listChanges(twin, c.req.param("name"), { onlyFromApi: c.req.query("source") === "api" })),
   );
   app.post("/_twin/checkpoints/:name/rewind", (c) => c.json(ops.rewindTo(twin, c.req.param("name"))));
-  app.put("/_twin/faults", async (c) => c.json(ops.setFaults(twin, (await c.req.json()) as FaultRule[])));
+  app.put("/_twin/faults", async (c) => c.json(ops.setFaults(twin, await c.req.json())));
   app.post("/_twin/scenario", async (c) => c.json(ops.loadScenario(twin, await c.req.text())));
   app.get("/_twin/log.jsonl", (c) => c.text(ops.exportLog(twin)));
 

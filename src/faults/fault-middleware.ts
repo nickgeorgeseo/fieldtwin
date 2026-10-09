@@ -19,7 +19,7 @@ export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandl
     if (rule.effect.status) {
       const message = rule.effect.message ?? `Injected by fault rule "${rule.name}"`;
       c.header("X-Twin-Fault", rule.name); // so you can tell injected failures from real bugs
-      return c.json(vendor.errorBody(rule.effect.status, message, twin), rule.effect.status as 400);
+      return c.json(vendor.errorBody(rule.effect.status, message, twin), rule.effect.status);
     }
     return next();
   };

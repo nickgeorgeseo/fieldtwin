@@ -1,5 +1,6 @@
 import { parse } from "yaml";
 import { z } from "zod";
+import { type FaultRule, isFaultStatus } from "../core/types.ts";
 
 /**
  * A scenario is a YAML file describing a situation to test against:
@@ -13,7 +14,7 @@ const FaultRuleSchema = z.object({
   pathIncludes: z.string().optional(),
   rate: z.number().min(0).max(1),
   effect: z.object({
-    status: z.number().int().optional(),
+    status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
     latencyMs: z.number().int().nonnegative().optional(),
     message: z.string().optional(),
   }),
@@ -32,5 +33,17 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
 
 /** Parse and validate a scenario. Errors name the exact field that is wrong. */
 export function parseScenario(yamlText: string): Scenario {
-  return ScenarioSchema.parse(parse(yamlText));
+  return validate(ScenarioSchema, parse(yamlText), "Invalid scenario");
+}
+
+/** Validate fault rules from any source (a scenario, the control plane, an MCP tool) before they take effect. */
+export function parseFaultRules(value: unknown): FaultRule[] {
+  return validate(z.array(FaultRuleSchema), value, "Invalid fault rules");
+}
+
+function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown, what: string): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  const problems = result.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
+  throw new Error(`${what}. ${problems.join("; ")}`);
 }
