@@ -104,6 +104,13 @@ describe("npm start", () => {
     expect(response.status).toBe(200);
   }, 20_000);
 
+  it("says the port it really listens on when FIELDTWIN_PORT is 0, which lets the system pick one", async () => {
+    const output = await start(0).printed("is open for business at");
+    const port = Number(/localhost:(\d+)/.exec(output)?.[1]);
+    expect(port).toBeGreaterThan(0);
+    expect((await fetch(`http://localhost:${port}/_twin`)).status).toBe(200);
+  }, 20_000);
+
   it("starts through a symlinked path too, instead of exiting without a word", async () => {
     const linked = join(mkdtempSync(join(tmpdir(), "fieldtwin-")), "checkout");
     symlinkSync(join(import.meta.dirname, ".."), linked);

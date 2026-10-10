@@ -61,7 +61,8 @@ export function startServer(args = process.argv.slice(2), env: Env = process.env
     const { app, twin } = createApp(settingsFrom(env));
     if (args[0]) loadScenarioArgument(twin, args[0]);
     const { hostname, port } = listenOn(env);
-    const server = serve({ fetch: app.fetch, hostname, port }, () => announce(twin, hostname, port));
+    // The port it really got: FIELDTWIN_PORT=0 lets the system pick one.
+    const server = serve({ fetch: app.fetch, hostname, port }, (address) => announce(twin, hostname, address.port));
     server.on("error", (error: NodeJS.ErrnoException) =>
       exitWith(
         error.code === "EADDRINUSE"

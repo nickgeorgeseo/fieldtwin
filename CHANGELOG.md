@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- With `FIELDTWIN_PORT=0` the startup line says which port the system picked, instead of `http://localhost:0`.
+
 - A `FIELDTWIN_` setting left empty counts as unset, as when a compose file passes on a variable nobody set. An empty `FIELDTWIN_HOST` listened on every address and printed `http://:4010`.
 
 - QuickBooks refuses a quantity, price, or amount written with too many digits to be a number (2160 or 2140). A `Qty` of four hundred 9s was stored as `null`.
