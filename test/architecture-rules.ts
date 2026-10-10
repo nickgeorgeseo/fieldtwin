@@ -27,11 +27,23 @@ export function findNondeterminism(source: string, fileName = "source.ts"): Find
   const findings: Finding[] = [];
   const report = (node: ts.Node, text: string) =>
     findings.push({ line: file.getLineAndCharacterOfPosition(node.getStart()).line + 1, text });
+  const cryptoAliases = cryptoModuleNames(file);
+  /** What a banned read is reached through: `Date`, `globalThis.Date`, or a local name for node:crypto. */
+  const bannedOf = (object: string | undefined) =>
+    object && cryptoAliases.has(object) ? BANNED_PROPERTY_READS.crypto : object && BANNED_PROPERTY_READS[object];
 
   const visit = (node: ts.Node): void => {
-    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
-      const banned = BANNED_PROPERTY_READS[node.expression.text];
-      if (banned?.includes(node.name.text)) report(node, `${node.expression.text}.${node.name.text}`);
+    if (ts.isPropertyAccessExpression(node)) {
+      const object = lastName(node.expression);
+      if (bannedOf(object)?.includes(node.name.text)) report(node, `${object}.${node.name.text}`);
+    }
+    // const { now } = Date; const { random: roll } = Math
+    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) {
+      const object = lastName(node.initializer);
+      for (const element of node.name.elements) {
+        const property = (element.propertyName ?? element.name).getText(file);
+        if (bannedOf(object)?.includes(property)) report(element, `${object}.${property}`);
+      }
     }
     // `new Date()` and `Date()` both read the wall clock. `new Date(value)` is fine.
     if ((ts.isNewExpression(node) || ts.isCallExpression(node)) && ts.isIdentifier(node.expression)) {
@@ -52,6 +64,30 @@ export function findNondeterminism(source: string, fileName = "source.ts"): Find
   };
   visit(file);
   return findings;
+}
+
+/** `Date` for `Date` and for `globalThis.Date`: the name a property is read from. */
+function lastName(expression: ts.Expression): string | undefined {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  return undefined;
+}
+
+/** Local names that stand for node:crypto as a whole: `import * as c`, `import c`, and `import { webcrypto }`. */
+function cryptoModuleNames(file: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  for (const statement of file.statements) {
+    if (!ts.isImportDeclaration(statement) || !/^(node:)?crypto$/.test(moduleName(statement) ?? "")) continue;
+    const clause = statement.importClause;
+    if (clause?.name) names.add(clause.name.text);
+    const bindings = clause?.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) names.add(bindings.name.text);
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements)
+        if ((element.propertyName ?? element.name).text === "webcrypto") names.add(element.name.text);
+    }
+  }
+  return names;
 }
 
 /** Every module specifier a file imports or re-exports, including dynamic import("..."). */

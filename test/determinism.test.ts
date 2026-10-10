@@ -27,6 +27,27 @@ describe("rule 2: time comes from twin.clock, randomness from SeededRandom", () 
     ]);
   });
 
+  it("catches the same reads however they are reached: through globalThis, a namespace import, or destructuring", () => {
+    const source = [
+      'import * as nodeCrypto from "node:crypto";',
+      'import { webcrypto } from "node:crypto";',
+      "const a = nodeCrypto.randomUUID();",
+      "const b = globalThis.crypto.randomUUID();",
+      "const c = webcrypto.getRandomValues(new Uint8Array(4));",
+      "const { now } = Date;",
+      "const { random: roll } = Math;",
+      "const d = globalThis.Date.now();",
+    ].join("\n");
+    expect(findNondeterminism(source).map((finding) => finding.text)).toEqual([
+      "nodeCrypto.randomUUID",
+      "crypto.randomUUID",
+      "webcrypto.getRandomValues",
+      "Date.now",
+      "Math.random",
+      "Date.now",
+    ]);
+  });
+
   it("allows dates built from a value, and ignores comments and strings", () => {
     const source = [
       "// Never call Date.now() or Math.random() here.",
