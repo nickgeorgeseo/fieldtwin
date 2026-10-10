@@ -50,7 +50,7 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   const customer = state.customers.get(String(fields.CustomerRef.value));
   if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
   if (!customer.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${customer.Id}, which is inactive`, now);
-  const TxnDate = fields.TxnDate === undefined ? qboToday(now) : qboDate(fields.TxnDate);
+  const TxnDate = fields.TxnDate === undefined ? qboToday(twin.clock.nowMs(), state.utcOffsetHours) : qboDate(fields.TxnDate);
   if (!TxnDate) return qboErrors.invalidDate("TxnDate", String(fields.TxnDate), now);
 
   // Check every line before changing anything, so a bad line never leaves a payment half-applied.

@@ -7,7 +7,7 @@ import type { QboCustomer, QboInvoice, QboItem, QboPayment } from "./types.ts";
  * not "field X changed"), so apply() stays trivially simple and the log reads on its own.
  */
 export type QboEventData =
-  | { type: "CompanyCreated"; realmId: string }
+  | { type: "CompanyCreated"; realmId: string; utcOffsetHours: number }
   | ({ type: "CustomerCreated"; customer: QboCustomer } & RequestIdentified)
   | ({ type: "CustomerUpdated"; customer: QboCustomer } & RequestIdentified)
   | { type: "ItemCreated"; item: QboItem }

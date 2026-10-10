@@ -9,7 +9,8 @@ export const TWIN_REALM_ID = "9341000000000001";
 const SEED_TIME = "2020-01-01T00:00:00.000Z";
 
 export function seedQuickBooks(world: World): NewEvent[] {
-  const events: NewEvent[] = [{ vendor: "quickbooks", type: "CompanyCreated", data: { realmId: TWIN_REALM_ID } }];
+  const company = { realmId: TWIN_REALM_ID, utcOffsetHours: world.company.utcOffsetHours };
+  const events: NewEvent[] = [{ vendor: "quickbooks", type: "CompanyCreated", data: company }];
 
   // QuickBooks is the accounting system: new customers the books haven't caught up with aren't here, and
   // some are spelled the way the bookkeeper keyed them in (see world/drift.ts). Emails always match.

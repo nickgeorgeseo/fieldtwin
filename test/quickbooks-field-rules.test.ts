@@ -96,3 +96,13 @@ describe("QuickBooks twin: paid invoices and their customers", () => {
     expect(error.Detail).toContain("inactive");
   });
 });
+
+describe("QuickBooks twin: today's date", () => {
+  it("defaults TxnDate to the business's date, not UTC's: 8 p.m. in Texas is still the 13th", async () => {
+    const harness = setup(); // Rowntree Electric, in Oak Hollow, Texas: UTC-5
+    harness.twin.clock.advance(14 * 3_600_000); // 2026-07-14T01:00Z
+    expect((await invoice(harness)).TxnDate).toBe("2026-07-13");
+    const payment = await (await harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 5 })).json();
+    expect(payment.Payment.TxnDate).toBe("2026-07-13");
+  });
+});

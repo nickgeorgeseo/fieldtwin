@@ -50,7 +50,7 @@ function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: stri
   const now = twin.clock.nowIso();
   const fields: InvoiceFields = pickWritable(body, WRITABLE_INVOICE_FIELDS);
 
-  const draft = draftInvoice(state, fields, { today: qboToday(now), now, isCreate: true });
+  const draft = draftInvoice(state, fields, { today: qboToday(twin.clock.nowMs(), state.utcOffsetHours), now, isCreate: true });
   if ("Fault" in draft) return draft;
 
   const invoice: QboInvoice = {
@@ -81,7 +81,7 @@ function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: stri
     return qboErrors.businessValidation(`Invoice ${existing.Id} has payments applied, so it can't move to another customer.`, now);
   }
   const draft = draftInvoice(state, fields, {
-    today: qboToday(now),
+    today: qboToday(twin.clock.nowMs(), state.utcOffsetHours),
     now,
     existingLines: existing.Line,
     existingCustomerId: existing.CustomerRef.value,

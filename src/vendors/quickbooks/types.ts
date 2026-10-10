@@ -155,6 +155,7 @@ export type QboEntityName = "Customer" | "Item" | "Invoice" | "Payment";
 
 export interface QboState {
   realmId: string;
+  utcOffsetHours: number; // the company's time zone, which decides what "today" is
   customers: Map<string, QboCustomer>;
   items: Map<string, QboItem>;
   invoices: Map<string, QboInvoice>;

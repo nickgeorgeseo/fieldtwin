@@ -14,9 +14,12 @@ export function qboDate(value: unknown): string | undefined {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(iso) ? iso : undefined;
 }
 
-/** "If the date is not supplied, the current date on the server is used": today, in twin time. */
-export function qboToday(nowIso: string): string {
-  return nowIso.slice(0, 10);
+/**
+ * "If the date is not supplied, the current date on the server is used": today in twin time, at the company. A
+ * company keeps its books in its own time zone, so at 8 p.m. in Texas it is still today there, though tomorrow in UTC.
+ */
+export function qboToday(nowMs: number, utcOffsetHours: number): string {
+  return new Date(nowMs + utcOffsetHours * 3_600_000).toISOString().slice(0, 10);
 }
 
 /**

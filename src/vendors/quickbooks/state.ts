@@ -5,6 +5,7 @@ import type { QboAnswer, QboCustomer, QboEntityName, QboState } from "./types.ts
 export function createQboState(): QboState {
   return {
     realmId: "",
+    utcOffsetHours: 0,
     customers: new Map(),
     items: new Map(),
     invoices: new Map(),
@@ -21,6 +22,7 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
   switch (data.type) {
     case "CompanyCreated":
       state.realmId = data.realmId;
+      state.utcOffsetHours = data.utcOffsetHours;
       return;
 
     case "CustomerCreated":
