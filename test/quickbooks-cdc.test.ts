@@ -66,6 +66,23 @@ describe("QuickBooks twin: change data capture", () => {
     }
   });
 
+  it("reads a changedSince without a UTC offset as UTC, whatever time zone the twin's machine is in", async () => {
+    const machineZone = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles"; // 2026-07-13T11:30:00 there would be 18:30 UTC
+    try {
+      const harness = setup();
+      harness.twin.clock.advance(HOUR);
+      await harness.qboPost("/customer", { DisplayName: "Changed At Noon UTC" });
+      const before = await cdc(harness, "Customer", "2026-07-13T11:30:00");
+      expect(before.body.CDCResponse[0].QueryResponse[0].Customer).toHaveLength(1);
+      const after = await cdc(harness, "Customer", "2026-07-13T12:30:00");
+      expect(after.body.CDCResponse[0].QueryResponse).toEqual([{}]);
+    } finally {
+      if (machineZone === undefined) delete process.env.TZ;
+      else process.env.TZ = machineZone;
+    }
+  });
+
   it("refuses to look back more than 30 days", async () => {
     const { status, body } = await cdc(setup(), "Customer", "2026-06-01T00:00:00Z");
     expect(status).toBe(400);

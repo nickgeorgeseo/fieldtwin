@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
+import { qboDateTimeMs } from "../dates.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboEntityName, QboState } from "../types.ts";
 import { asResponse, COMPANY, ENTITY_RECORDS, entityNamed } from "./entity.ts";
@@ -27,7 +28,7 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
     if (!entityList) return c.json(qboErrors.missingField("entities", now()), 400);
     if (!changedSince) return c.json(qboErrors.missingField("changedSince", now()), 400);
 
-    const sinceMs = parseChangedSince(changedSince);
+    const sinceMs = qboDateTimeMs(changedSince);
     if (sinceMs === undefined) return c.json(qboErrors.invalidDate("changedSince", changedSince, now()), 400);
     if (twin.clock.nowMs() - sinceMs > LOOK_BACK_DAYS * 86_400_000) {
       return c.json(qboErrors.invalidDateRange("changedSince", `changedSince must be within the last ${LOOK_BACK_DAYS} days`, now()), 400);
@@ -61,11 +62,4 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
 
     return c.json({ CDCResponse: [{ QueryResponse: groups }], time: now() });
   });
-}
-
-/** Accepts the documented forms: "2015-11-28", "2011-08-10T10:20:30-0700", and full ISO 8601. */
-function parseChangedSince(value: string): number | undefined {
-  const normalized = value.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
-  const ms = Date.parse(normalized);
-  return Number.isNaN(ms) ? undefined : ms;
 }

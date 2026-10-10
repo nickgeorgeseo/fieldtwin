@@ -55,6 +55,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | OAuth details the docs don't give | Approximate | check | [OAuth][qbo-oauth] | Authorization codes last 10 minutes. Any `client_id` and `client_secret` are accepted (there is no app registry). Error bodies use the standard OAuth `error`/`error_description` |
 | Expired or unknown token on the API | Approximate | check | [Error codes][qbo-errors] | In `auth: oauth` mode, 401 `AuthenticationFault` 3200 with a Detail saying what to do. Real 401 bodies reportedly differ in casing; unconfirmed |
 | `GET /cdc` change data capture | Modeled | docs only | [CDC][qbo-cdc] | Customer, Item, Invoice, Payment changed since `changedSince` (date, date-time, or UTC offset), grouped by entity and ordered by `LastUpdatedTime`, latest version only, at most 1,000 objects. Reads `MetaData.LastUpdatedTime` |
+| A date-time without a UTC offset | Approximate | check | [CDC][qbo-cdc] | `changedSince=2026-07-13T09:00:00` and plain dates are read as UTC, on every machine. The docs don't say which time zone QuickBooks reads them in; send an offset to be sure |
 | CDC look-back over 30 days | Approximate | check | [CDC][qbo-cdc] | The docs limit look-back to 30 days but don't show the error. Twin answers 2190 `Invalid Date Range` |
 | CDC group with no changes | Approximate | check | [CDC][qbo-cdc] | Answered as `{}`; the docs only show groups with changes |
 | Deleted objects in CDC | Not yet | | [CDC][qbo-cdc] | The twin models no deletes, so `status: "Deleted"` entries never appear |
