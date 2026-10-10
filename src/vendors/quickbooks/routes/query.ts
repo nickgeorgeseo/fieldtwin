@@ -61,6 +61,11 @@ function runQuery(state: QboState, query: QboQuery): { response: object } | { in
     conditions.push({ property, operator: condition.operator, values: values as QueryValue[] });
   }
 
+  // "To get all active and inactive customers ... filter using the Active attribute": without one, only active records.
+  if (properties.includes("Active") && !conditions.some((condition) => condition.property === "Active")) {
+    conditions.push({ property: "Active", operator: "=", values: [true] });
+  }
+
   const sortKeys: QboQuery["orderBy"] = [];
   for (const key of query.orderBy) {
     const property = named(key.property);

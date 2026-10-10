@@ -113,6 +113,23 @@ export const quickbooksCases: ConformanceCase[] = [
     },
   },
   {
+    name: "inactive-customer-in-query",
+    vendor: "quickbooks",
+    endpoint: "GET /query",
+    fidelity: "Inactive customers and items in queries",
+    writes: true,
+    async observe(target) {
+      const DisplayName = unique("inactive customer");
+      const { Id, SyncToken } = expectOk(await quickbooks(target, "POST", "customer", { DisplayName }), "create a customer").Customer;
+      expectOk(await quickbooks(target, "POST", "customer", { Id, SyncToken, sparse: true, Active: false }), "make it inactive");
+      const count = async (where: string) =>
+        expectOk(await quickbooksQuery(target, `select count(*) from Customer where ${where}`), "count customers").QueryResponse
+          ?.totalCount ?? 0;
+      const byName = `DisplayName = '${DisplayName}'`;
+      return { byNameOnly: await count(byName), withActiveFalse: await count(`Active = false and ${byName}`) };
+    },
+  },
+  {
     name: "stale-synctoken",
     vendor: "quickbooks",
     endpoint: "POST /invoice",

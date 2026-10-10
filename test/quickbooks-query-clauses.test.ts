@@ -168,3 +168,32 @@ describe("QuickBooks query clause: ORDERBY", () => {
     expect(body.Fault.Error[0].Detail).toContain("ORDERBY");
   });
 });
+
+describe("QuickBooks queries and inactive records", () => {
+  /** Customer 5, made inactive the way QuickBooks does it: a sparse update setting Active to false. */
+  async function withInactiveCustomer() {
+    const harness = setup();
+    const { Customer } = await (await harness.qboGet("/customer/5")).json();
+    await harness.qboPost("/customer", { Id: "5", SyncToken: Customer.SyncToken, sparse: true, Active: false });
+    return { harness, name: Customer.DisplayName as string };
+  }
+
+  it("leaves inactive customers out unless the query filters on Active, as the docs' Active IN (true, false) sample implies", async () => {
+    const { harness, name } = await withInactiveCustomer();
+    expect((await query(harness, `select * from Customer where DisplayName = '${name}'`)).body.QueryResponse).toEqual({});
+    expect((await query(harness, "select count(*) from Customer")).body.QueryResponse).toEqual({ totalCount: 24 });
+  });
+
+  it("finds them when the query asks for inactive records", async () => {
+    const { harness, name } = await withInactiveCustomer();
+    const inactive = await query(harness, "select * from Customer where Active = false");
+    expect(inactive.body.QueryResponse.Customer.map((customer: { DisplayName: string }) => customer.DisplayName)).toEqual([name]);
+    const both = await query(harness, `select * from Customer where Active in (true, false) and DisplayName = '${name}'`);
+    expect(both.body.QueryResponse.Customer).toHaveLength(1);
+  });
+
+  it("still reads an inactive customer by Id", async () => {
+    const { harness } = await withInactiveCustomer();
+    expect((await (await harness.qboGet("/customer/5")).json()).Customer).toMatchObject({ Id: "5", Active: false });
+  });
+});
