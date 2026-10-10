@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { loadScenario, parseAuthMode } from "./control/operations.ts";
@@ -34,4 +35,5 @@ export function startServer() {
   return twin;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) startServer();
+// pathToFileURL, not `file://${path}`: the path may hold spaces (percent-encoded in the URL) or be a Windows path.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) startServer();

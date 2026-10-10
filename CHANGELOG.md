@@ -2,6 +2,12 @@
 
 All notable changes to fieldtwin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- `npm start` and `npm run example:sync` start from any folder. From a path with a space in it, or on Windows, they used to exit silently without starting anything.
+
 ## 0.2.1 - 2026-10-09
 
 Ready to be public: the twin listens on this machine only unless you open it up, there is a policy for reporting vulnerabilities privately, and npm won't publish the package by accident.

@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
 import { endpointsAt } from "./endpoints.ts";
 import { InvoiceQueue } from "./invoice-queue.ts";
@@ -103,7 +104,8 @@ function report(stats: SyncStats, log: (line: string) => void): void {
   );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL, not `file://${path}`: the path may hold spaces (percent-encoded in the URL) or be a Windows path.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const baseUrl = process.env.FIELDTWIN_URL ?? "http://localhost:4010";
   runDemo(baseUrl).catch((error: Error) => {
     const hint = error instanceof TypeError ? ` Is fieldtwin running at ${baseUrl}? Start it with npm start.` : "";
