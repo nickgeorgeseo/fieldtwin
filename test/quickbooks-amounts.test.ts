@@ -66,6 +66,11 @@ describe("QuickBooks twin: amounts", () => {
     expect(await faultOf(response)).toMatchObject({ code: "2160", element: "Line.SalesItemLineDetail.Qty" });
   });
 
+  it("refuses a quantity written with too many digits to be a number (2160), instead of storing it as null", async () => {
+    const response = await setup().qboPost("/invoice", invoiceWith([line(10, { Qty: "9".repeat(400) })]));
+    expect(await faultOf(response)).toMatchObject({ code: "2160", element: "Line.SalesItemLineDetail.Qty" });
+  });
+
   it("checks Amount against Qty × UnitPrice to the cent, rounding half a cent up: 2.5 × 33.33 is 83.33", async () => {
     const harness = setup();
     expect((await harness.qboPost("/invoice", invoiceWith([line(83.33, { Qty: 2.5, UnitPrice: 33.33 })]))).status).toBe(200);

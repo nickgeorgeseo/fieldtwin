@@ -13,7 +13,7 @@ const MAX_AMOUNT = 999_999_999_999.99;
 /** A number sent as a JSON number or a numeric string; undefined for anything else. */
 export function numberFrom(value: unknown): number | undefined {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (typeof value === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) return Number(value);
+  if (typeof value === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) return numberFrom(Number(value)); // "999...9": Infinity
   return undefined;
 }
 

@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks refuses a quantity, price, or amount written with too many digits to be a number (2160 or 2140). A `Qty` of four hundred 9s was stored as `null`.
+
 - QuickBooks accepts every whole-cent amount up to its limit. Amounts above about $136 million could be refused as "fractions of a cent" (2140): floating point stores 136216566.02 a hair under, and the check allowed for that only in small amounts.
 
 - QuickBooks queries compare each property as one kind of value. Text made only of digits compared as a number, so `ORDERBY DocNumber` with DocNumbers 90, 100, and 1st gave a different order depending on which invoice was made first, and `DocNumber = '123456789012345678900'` found invoice 123456789012345678901 (both round to the same number). Booleans read anything but "true" as false, so `DisplayName = false` matched every customer and `Active = 'yes'` found inactive ones; it now answers 4001, as does a `TotalAmt` that isn't a number. FIDELITY.md also said records without a property sort first; under `DESC` they sort last, as the lowest value.
