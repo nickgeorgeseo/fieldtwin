@@ -33,7 +33,7 @@ The demo connects to both vendors through the twin's OAuth endpoints, syncs, sle
 For a rougher ride, start the twin with real OAuth checks and faults on both vendors:
 
 ```bash
-npm start -- scenarios/flaky-apis.yaml
+npm start -- flaky-apis
 ```
 
 The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, and writes whose answer was lost are answered from their `requestid` on the retry), refreshes its tokens mid-run, and the second run picks up the invoices customers paid while the first was struggling. `FIELDTWIN_URL` points the demo at a twin on another address.

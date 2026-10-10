@@ -194,10 +194,11 @@ The MCP tools only control the test world. Your agent still calls the vendor API
 
 ## Scenarios and faults
 
-A scenario is a YAML file: seed, start time, world size, and active faults.
+A scenario is a YAML file: seed, start time, world size, and active faults. Start the twin with a ready-made one by name, or with your own file:
 
 ```bash
-npm start -- scenarios/heat-wave-monday.yaml
+npm start -- heat-wave-monday
+npm start -- my-scenario.yaml
 ```
 
 ```yaml

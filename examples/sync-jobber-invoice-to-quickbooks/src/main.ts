@@ -13,7 +13,7 @@ import { jobberWebhookHandler } from "./webhooks.ts";
 /**
  * The demo: sync paid Jobber invoices into QuickBooks against a running fieldtwin.
  *
- *   npm start                  # in one terminal: the twin (try FIELDTWIN_AUTH=oauth, or -- scenarios/flaky-apis.yaml)
+ *   npm start                  # in one terminal: the twin (try FIELDTWIN_AUTH=oauth, or -- flaky-apis)
  *   npm run example:sync       # in another: this file
  *
  * It syncs every paid invoice, syncs again two hours later from where it left off, then subscribes to webhooks

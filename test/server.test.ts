@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { listenOn } from "../src/server.ts";
+import { type ChildProcess, spawn } from "node:child_process";
+import { createServer } from "node:net";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { createApp } from "../src/app.ts";
+import { listenOn, loadScenarioArgument, settingsFrom } from "../src/server.ts";
 
 /**
  * The twin accepts any bearer token by default and its control plane has no auth (it is a local test tool), so
@@ -13,4 +17,109 @@ describe("the server", () => {
   it("listens wherever FIELDTWIN_HOST and FIELDTWIN_PORT say, for running in a container", () => {
     expect(listenOn({ FIELDTWIN_HOST: "0.0.0.0", FIELDTWIN_PORT: "8080" })).toEqual({ hostname: "0.0.0.0", port: 8080 });
   });
+
+  it("says what a port looks like when FIELDTWIN_PORT isn't one", () => {
+    expect(() => listenOn({ FIELDTWIN_PORT: "four thousand" })).toThrow(
+      'FIELDTWIN_PORT must be a port number like 4010, not "four thousand"',
+    );
+  });
+
+  it("takes its seed and auth mode from FIELDTWIN_SEED and FIELDTWIN_AUTH, and explains bad values", () => {
+    expect(settingsFrom({})).toEqual({ seed: 42, auth: "any-token" });
+    expect(settingsFrom({ FIELDTWIN_SEED: "7", FIELDTWIN_AUTH: "oauth" })).toEqual({ seed: 7, auth: "oauth" });
+    expect(() => settingsFrom({ FIELDTWIN_SEED: "abc" })).toThrow('FIELDTWIN_SEED must be a whole number like 42, not "abc"');
+  });
 });
+
+describe("the scenario named on the command line", () => {
+  it("can be a ready-made scenario's name, so `npm start -- flaky-apis` works", () => {
+    const { twin } = createApp();
+    expect(loadScenarioArgument(twin, "flaky-apis").scenario).toBe("Flaky APIs");
+  });
+
+  it("can be a path to a YAML file", () => {
+    const { twin } = createApp();
+    expect(loadScenarioArgument(twin, join(import.meta.dirname, "..", "scenarios", "mismatched-books.yaml")).scenario).toBe(
+      "Mismatched books",
+    );
+  });
+
+  it("names the ready-made scenarios when the file doesn't exist", () => {
+    const { twin } = createApp();
+    expect(() => loadScenarioArgument(twin, "scenarios/no-such-file.yaml")).toThrow(
+      'Can\'t read the scenario file "scenarios/no-such-file.yaml". Ready-made scenarios: flaky-apis, heat-wave-monday, mismatched-books',
+    );
+  });
+});
+
+/** `npm start` itself, run as a real process: the first command every new user types. */
+describe("npm start", () => {
+  const children: ChildProcess[] = [];
+  afterEach(() => {
+    for (const child of children.splice(0)) child.kill();
+  });
+
+  /** Runs src/server.ts the way `npm start` does, collecting what it prints. */
+  function start(port: number, args: string[] = []) {
+    const child = spawn(process.execPath, ["--import", "tsx", join(import.meta.dirname, "..", "src", "server.ts"), ...args], {
+      env: { ...process.env, FIELDTWIN_PORT: String(port) },
+    });
+    children.push(child);
+    let output = "";
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+    });
+    const printed = (text: string) =>
+      new Promise<string>((resolve, reject) => {
+        const check = () => (output.includes(text) ? resolve(output) : undefined);
+        child.stderr.on("data", check);
+        child.on("exit", () =>
+          output.includes(text) ? resolve(output) : reject(new Error(`Exited without printing "${text}":\n${output}`)),
+        );
+        check();
+      });
+    const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+    return { printed, exited };
+  }
+
+  it("serves the twin and says where", async () => {
+    const port = await freePort();
+    const server = start(port);
+    await server.printed(`is open for business at http://localhost:${port}`);
+    const response = await fetch(`http://localhost:${port}/_twin`);
+    expect(response.status).toBe(200);
+  }, 20_000);
+
+  it("explains how to pick another port when its port is taken, instead of crashing", async () => {
+    const port = await freePort();
+    const blocker = createServer().listen(port, "127.0.0.1");
+    try {
+      const server = start(port);
+      const output = await server.printed("already in use");
+      expect(output).toContain(
+        `fieldtwin: port ${port} is already in use (is another twin running?). Set FIELDTWIN_PORT to use another one.`,
+      );
+      expect(output).not.toContain("open for business");
+      expect(await server.exited).toBe(1);
+    } finally {
+      blocker.close();
+    }
+  }, 20_000);
+
+  it("explains a scenario it can't load, instead of printing a stack trace", async () => {
+    const server = start(await freePort(), ["no-such-scenario"]);
+    const output = await server.printed("No scenario named");
+    expect(output).toContain('fieldtwin: No scenario named "no-such-scenario". Available: flaky-apis, heat-wave-monday, mismatched-books');
+    expect(output).not.toContain("    at ");
+    expect(await server.exited).toBe(1);
+  }, 20_000);
+});
+
+function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const probe = createServer().listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      probe.close(() => resolve(typeof address === "object" && address ? address.port : 0));
+    });
+  });
+}
