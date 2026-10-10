@@ -41,6 +41,15 @@ describe("QuickBooks twin: amounts", () => {
     });
   });
 
+  it.each([136216566.02, "136216566.02", 999999999999.99])(
+    "accepts a large amount in whole cents, however floating point stores it: %s",
+    async (Amount) => {
+      const response = await setup().qboPost("/invoice", invoiceWith([line(Amount)]));
+      expect(response.status).toBe(200);
+      expect((await response.json()).Invoice.TotalAmt).toBe(Number(Amount));
+    },
+  );
+
   it.each([
     ["too big to add up", 1e307],
     ["text that isn't a number", "ninety"],

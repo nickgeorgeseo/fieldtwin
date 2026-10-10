@@ -25,8 +25,9 @@ export function readAmount(value: unknown, element: string, now: string): number
     return qboErrors.invalidAmount(element, `${element} must be an amount up to ${MAX_AMOUNT}, not ${JSON.stringify(value)}.`, now);
   }
   if (amount < 0) return qboErrors.negativeAmount(element, now);
+  // Floating point stores 136216566.02 as a hair under, so allow for its rounding, which grows with the amount.
   const cents = amount * 100;
-  if (Math.abs(cents - Math.round(cents)) > 1e-6) {
+  if (Math.abs(cents - Math.round(cents)) > Math.max(1e-6, Math.abs(cents) * Number.EPSILON * 4)) {
     return qboErrors.invalidAmount(
       element,
       `${element} is in fractions of a cent: ${JSON.stringify(value)}. Round it to two decimals.`,
