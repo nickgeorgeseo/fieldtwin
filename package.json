@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "Local, stateful twins of the software trades and logistics businesses run on. Build and test integrations and AI agents without touching a real customer's account.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickgeorgeseo/fieldtwin.git"
+  },
+  "homepage": "https://github.com/nickgeorgeseo/fieldtwin#readme",
+  "bugs": {
+    "url": "https://github.com/nickgeorgeseo/fieldtwin/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"
