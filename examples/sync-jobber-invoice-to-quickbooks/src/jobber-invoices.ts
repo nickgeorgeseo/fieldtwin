@@ -75,16 +75,23 @@ const MORE_LINE_ITEMS = `
     invoice(id: $id) { lineItems(first: $lines, after: $after) { ${LINE_ITEM_FIELDS} } }
   }`;
 
-/** Every paid invoice updated after `since` (an ISO time), oldest invoice number first. */
+/**
+ * How far before `since` the scheduled sync looks again. `since` comes from your server's clock and updatedAt from
+ * Jobber's, and the two never agree exactly; every step of the sync looks before it writes, so reading a few invoices
+ * twice costs nothing, while missing one would leave it unbooked for good.
+ */
+const OVERLAP_MS = 10 * 60_000;
+
+/** Every paid invoice updated since `since` (an ISO time), or a little before it, oldest invoice number first. */
 export async function fetchPaidInvoicesSince(jobber: JobberClient, since: string, pageSizes = PAGE_SIZES): Promise<JobberInvoice[]> {
-  const sinceMs = Date.parse(since);
+  const fromMs = Date.parse(since) - OVERLAP_MS;
   const paid: JobberInvoice[] = [];
   let after: string | null = null;
   do {
     const variables: Record<string, unknown> = { first: pageSizes.invoices, after, lines: pageSizes.lineItems };
     const { invoices } = await jobber.query<{ invoices: Page<InvoiceNode> }>(INVOICES, variables);
     for (const node of invoices.nodes) {
-      const invoice = Date.parse(node.updatedAt) > sinceMs ? await paidInvoiceFrom(jobber, node, pageSizes) : undefined;
+      const invoice = Date.parse(node.updatedAt) >= fromMs ? await paidInvoiceFrom(jobber, node, pageSizes) : undefined;
       if (invoice) paid.push(invoice);
     }
     after = invoices.pageInfo.hasNextPage ? invoices.pageInfo.endCursor : null;

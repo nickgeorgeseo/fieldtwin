@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: the scheduled sync reads again what changed in the ten minutes before its cutoff. With a strict `>` and no overlap, an invoice paid as a run started, or stamped by a server whose clock ran behind Jobber's, was never synced.
+
 - Reference integration: a Jobber line whose quantity times unit price isn't its total, to the cent, is booked at its total with the pricing in its description. Sending all three made QuickBooks refuse the invoice with 6070 on every run, which also held the scheduled sync's cutoff back.
 
 - QuickBooks paths the twin doesn't model (`/vendor/1`, `/estimate`, `/reports/...`) answer a Fault saying so, with what the twin serves, instead of a plain-text 404 an SDK can't parse.
