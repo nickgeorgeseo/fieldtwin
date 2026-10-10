@@ -14,6 +14,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Conformance score: a recorded case the twin couldn't run now counts as nothing matched. It was left out, so one match and one crash read "4/4 observations match (100%)". Percentages round down, so nothing short of every observation reads as 100%.
+
 - Reference integration: two syncs at once (the scheduled one and a webhook's) booked an invoice and its payment twice. Each QuickBooks write's `requestid` is now a hash of the write, so the identical write from either sync carries the same id and QuickBooks books it once.
 
 - Reference integration: a lost connection (`OAuthError`) pauses the webhook queue instead of leaving it permanently rejected, which crashed a web server with an unhandled rejection or silently dropped every later webhook while still answering Jobber 200. What hadn't synced stays queued; `queue.connectionLost` says why, and `queue.resume()` carries on after the person reconnects.

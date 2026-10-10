@@ -51,16 +51,14 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
       lines.push(`${label} not recorded yet`);
       continue;
     }
-    if ("error" in observed) {
-      lines.push(`${label} the twin couldn't run it: ${observed.error}`);
-      continue;
-    }
-    const result = compare(recorded, observed);
+    // A recorded case the twin couldn't run matched nothing it was meant to: it counts, as zero.
+    const result = "error" in observed ? { matched: 0, total: Object.keys(recorded).length, differences: [] } : compare(recorded, observed);
     matched += result.matched;
     total += result.total;
     const endpoint = byEndpoint.get(testCase.endpoint) ?? { matched: 0, total: 0 };
     byEndpoint.set(testCase.endpoint, { matched: endpoint.matched + result.matched, total: endpoint.total + result.total });
-    lines.push(`${label} ${result.matched}/${result.total}${result.differences.length ? "" : "  matches"}`);
+    if ("error" in observed) lines.push(`${label} 0/${result.total}  the twin couldn't run it: ${observed.error}`);
+    else lines.push(`${label} ${result.matched}/${result.total}${result.differences.length ? "" : "  matches"}`);
     for (const { key, recorded: real, twin: ours } of result.differences) {
       lines.push(
         `${" ".repeat(46)}${key}: real ${JSON.stringify(real)}, twin ${JSON.stringify(ours)}   (FIDELITY.md: ${testCase.fidelity})`,
@@ -74,6 +72,7 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
   return lines.join("\n");
 }
 
+/** Rounded down, so nothing short of every observation reads as 100%. */
 function percent({ matched, total }: { matched: number; total: number }): string {
-  return `${matched}/${total} observations match (${Math.round((100 * matched) / total)}%)`;
+  return `${matched}/${total} observations match (${Math.floor((100 * matched) / total)}%)`;
 }

@@ -63,6 +63,33 @@ describe("the conformance score", () => {
     expect(text).toContain("Fidelity: 1/2 observations match (50%)");
   });
 
+  const readMissing = CASES.find((testCase) => testCase.name === "read-missing-entity")!;
+  const recordingOf = (observations: Record<string, string | number>) => ({
+    recordedAt: "2026-10-12T00:00:00Z",
+    target: "test",
+    cases: { "read-missing-entity": observations },
+  });
+
+  it("counts a recorded case the twin couldn't run as nothing matched, rather than leaving it out", () => {
+    const text = report(
+      [readMissing],
+      { [caseId(readMissing)]: { error: "the twin crashed" } },
+      { quickbooks: recordingOf({ status: 404, code: "610" }) },
+    );
+    expect(text).toContain("the twin couldn't run it: the twin crashed");
+    expect(text).toContain("GET /customer/{id}                 0/2 observations match (0%)");
+    expect(text).toContain("Fidelity: 0/2 observations match (0%)");
+  });
+
+  it("never rounds a score up: 2 of 3 is 66%, and nothing short of all is 100%", () => {
+    const text = report(
+      [readMissing],
+      { [caseId(readMissing)]: { status: 404, code: "610", type: "x" } },
+      { quickbooks: recordingOf({ status: 404, code: "610", type: "y" }) },
+    );
+    expect(text).toContain("Fidelity: 2/3 observations match (66%)");
+  });
+
   it("counts an observation the twin doesn't make as a difference", () => {
     expect(compare({ a: 1, b: 2 }, { a: 1 })).toMatchObject({ matched: 1, total: 2, differences: [{ key: "b", recorded: 2, twin: null }] });
   });
