@@ -7,12 +7,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 ### Added
 
 - `GET /` says where everything is: the QuickBooks base URL and realm with a request to try, the Jobber endpoint and version header, how auth works right now, the control plane, and the docs. It answered "404 Not Found", which is what a browser showed anyone who opened the address the twin prints at startup.
-
 - `GET /_twin` (and `twin_status`) shows the seed, the loaded scenario, and the checkpoints, so a run can be reproduced from its status alone. `?source=` on a change list takes any source (`seed`, `scenario`, `api`, `control`); one it doesn't know is an error instead of returning everything unfiltered.
-
-- Reference integration: `TokenManager`'s `loadTokens` option, for processes that share one connection. Before refreshing, and once more after an `invalid_grant`, it reads the saved tokens and uses the set another process already rotated to, instead of telling the person to reconnect.
-
-- QuickBooks queries take the rest of the documented language: `AND`, `<`, `>`, `<=`, `>=`, `LIKE` with `%`, and `ORDERBY` with `ASC`/`DESC` on several properties. `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '2026-07-01T00:00:00-05:00' ORDERBY TxnDate DESC` now works instead of answering "Unsupported operation". Numbers compare by value, `MetaData` times as instants, and text without regard to case.
+- Reference integration: `TokenManager`'s `loadTokens` option, for processes that share one connection. Before refreshing, and after an `invalid_grant` (three times, a second apart, in case the other process is still saving), it reads the saved tokens and takes them if they are newer than its own, instead of telling the person to reconnect. It never takes an older saved set over its own: after a save that failed, that set's refresh token is already dead.
+- QuickBooks queries take the rest of the documented language: `AND`, `<`, `>`, `<=`, `>=`, `LIKE` with `%`, and `ORDERBY` with `ASC`/`DESC` on several properties. `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '2026-07-01T00:00:00-05:00' ORDERBY TxnDate DESC` now works instead of answering "Unsupported operation". Each property compares as one kind of value, in `WHERE` and `ORDERBY` alike: numbers by value, `MetaData` times as instants, `Id` and `CustomerRef` as whole numbers, and other text as text, without regard to case and however many digits it holds (DocNumber `100` sorts before `90`).
 - QuickBooks queries leave inactive customers and items out unless they filter on `Active`, as Intuit's docs imply. Code that looks a customer up before creating it now meets the inactive duplicate on the twin, as it would in production.
 - A conformance case for a QuickBooks `requestid` reused on another endpoint. The twin answers with the first write's answer (`{"Customer": ...}` for an invoice write), as the docs word it; FIDELITY.md marks it "check" until a sandbox recording settles it.
 - `npm start -- flaky-apis` starts a ready-made scenario by name; a path to a `.yaml` (or `.yml`) file still works.
@@ -25,123 +22,63 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
-- `npm run conformance` leaves out the "By endpoint:" heading while nothing is recorded, instead of printing it with nothing under it.
-
-- Conformance: `encoded-id-format` won't record a Jobber account whose first ids need no base64 padding, an answer the twin could never match, as it already wouldn't record an account with no clients. The README says which QuickBooks cases depend on the sandbox company's settings.
-
-- `npm run conformance` scores a fresh twin when run from outside the checkout (`npx tsx /path/to/fieldtwin/conformance/cli.ts score`). The twin it started looked for tsx in the current folder and never started.
-
-- The conformance score compares observations the way the test does. It ignored observations only the twin made and counted a recorded `null` as matching one the twin didn't make, so a case could read "matches" in the score while failing `npm test`.
-
-- `FIELDTWIN_URL=http://localhost:4010/ npm run conformance` works with the trailing slash, and something other than a twin answering there is named as such, instead of "Unexpected non-whitespace character after JSON".
-
-- The conformance recorder names the missing variable when only one of `QBO_ACCESS_TOKEN` and `QBO_REALM_ID` is set. It skipped QuickBooks without a word and recorded only Jobber.
-
-- The conformance recorder refuses production QuickBooks however its URL is written. `https://QuickBooks.api.intuit.com/v3`, or one with a user name before the host, got past the check.
-
-- Conformance: `orderby-text-case` creates two customers of its own, named so that ignoring case and sorting by character code put them in opposite orders. It sorted the company's existing customers, which in most sandboxes sort the same either way, and whose answer changed once earlier runs had added lowercase names.
-
-- Conformance: scoring a running twin that had been written to (by your app, or by an earlier score) no longer fails `cdc-nothing-changed`. Twin time stands still between requests, so a record written just before counted as changed since "now"; asking a twin for the time now moves it on a second, as a sandbox's clock would.
-
-- Conformance recorder: an answer that says nothing about the API is never recorded. A 429, 502, 503, or 504, Jobber's `THROTTLED`, or a 401 for the run's own token (expired part way) stops the case instead of being saved as evidence. A case that couldn't run keeps what it observed last time, where the whole file used to be replaced with this run's cases only; the recorder then exits with an error, and writes each file whole or not at all.
-
-- `npm run conformance:record --dry-run`, without the `--`, is a dry run. npm keeps a flag given that way for itself, so it recorded for real and overwrote the recordings. A misspelled command or option is refused instead of running a score.
-
-- Reference integration: a `Retry-After` asking for more than ten minutes fails the request at once instead of being waited out, so a server that answers `Retry-After: 86400` (or a date years away) can't hold the webhook queue for a day.
-
-- Reference integration: a token endpoint that is down, throttling, or out of reach is a `TokenEndpointError`, not a lost connection. It was an `OAuthError`, so a short outage paused the webhook queue until someone reconnected an app that was still connected. A refresh that can't reach the endpoint is no longer retried by the API client as well (32 token requests for one API call, now 4), and a scheduled run stops at the outage instead of trying a refresh for every invoice.
-
-- Reference integration: when two processes sharing a connection refresh at the same moment, the one Jobber turns away looks for the other's saved tokens three times, a second apart, before reporting the connection lost. It looked once, at once, which could be before the other process had finished saving.
-
-- Reference integration: with `loadTokens`, a `TokenManager` takes the saved tokens only when they are newer than its own. It took any saved set that differed, so after a save that failed it swapped its working tokens for the old saved ones, whose refresh token Jobber had already killed, and reported the connection lost.
-
-- With `FIELDTWIN_PORT=0` the startup line says which port the system picked, instead of `http://localhost:0`.
-
-- A `FIELDTWIN_` setting left empty counts as unset, as when a compose file passes on a variable nobody set. An empty `FIELDTWIN_HOST` listened on every address and printed `http://:4010`.
-
-- QuickBooks refuses a quantity, price, or amount written with too many digits to be a number (2160 or 2140). A `Qty` of four hundred 9s was stored as `null`.
-
-- QuickBooks accepts every whole-cent amount up to its limit. Amounts above about $136 million could be refused as "fractions of a cent" (2140): floating point stores 136216566.02 a hair under, and the check allowed for that only in small amounts.
-
-- QuickBooks queries compare each property as one kind of value. Text made only of digits compared as a number, so `ORDERBY DocNumber` with DocNumbers 90, 100, and 1st gave a different order depending on which invoice was made first, and `DocNumber = '123456789012345678900'` found invoice 123456789012345678901 (both round to the same number). Booleans read anything but "true" as false, so `DisplayName = false` matched every customer and `Active = 'yes'` found inactive ones; it now answers 4001, as does a `TotalAmt` that isn't a number. FIDELITY.md also said records without a property sort first; under `DESC` they sort last, as the lowest value.
-
-- Reference integration: a customer the bookkeeper made inactive in QuickBooks is found instead of created again. QuickBooks queries leave inactive customers out unless asked, so the sync made a "Name (email)" duplicate and then reported the customer's own invoices as conflicts. It now looks among inactive customers too, and makes one active again (QuickBooks refuses invoices and payments for an inactive customer) only when there is new work to book, saying so in the log; the run's report counts them.
-
-- The `twin_load_scenario` MCP tool refuses a call that gives both `name` and `yaml`. It loaded the named scenario and ignored the YAML without saying so.
-
-- After a rewind, the same requests meet the same faults they did the first time. Fault rules kept rolling on from where they were, so a run repeated from a checkpoint failed different requests. Webhook fault rules also roll dice of their own now: subscribing an app to webhooks used to change which API requests failed.
-
-- An app slow to answer webhooks no longer holds up deliveries to other URLs. Deliveries went out one at a time across every subscription, so with two apps subscribed, one that stalled delayed the other's by a second (Jobber) or three (QuickBooks) per delivery, and `POST /_twin/clock/advance` and `/_twin/actions` with them. Each URL still gets its own deliveries in order.
-
-- In a drifted world, every customer who is only in the field-service system has at least one invoiced job, as drift promises. Across seeds, about a quarter had no invoice, so `mismatched-books` with another seed tested less than it said.
-
-- Today's visits in the generated world start at 8:00 or later, as every other day's do. With the default 6 a.m. start, some started at 7:00, and a world starting at midnight booked visits at 2:30 a.m.
-
-- Jobber: an id sent without its base64 padding finds the same record as the padded id. It resolved to `null`, though Jobber's own examples show ids both ways.
-
-- QuickBooks: an invoice or payment shows its customer's current name in `CustomerRef.name` after the customer is renamed, instead of the name it had when the invoice was written.
-
 - QuickBooks customers keep `CompanyName` (at most 100 characters, and filterable), which was silently dropped. A colon, tab, or newline in a name answers 2040, as the Customer reference's business rules say, and a DisplayName counts as taken whatever its case or surrounding spaces. FIDELITY.md now says that fields the twin doesn't model are dropped, and how its timestamps differ from QuickBooks'.
-
-- Reference integration: the webhook handler verifies the signature over the raw bytes (decoding first changed them when a body began with a byte-order mark), answers 400 instead of throwing on a signed body that isn't JSON, and refuses bodies over 64 KiB before hashing them. A malformed URL is no longer retried eight times as if it were a network failure, and the demo accepts a `FIELDTWIN_URL` with a trailing slash.
-
-- With `FIELDTWIN_HOST` set to a specific address, the startup line prints that address instead of a localhost URL that wouldn't work, and listening on `::1` no longer warns that others can reach the twin.
-
-- QuickBooks defaults `TxnDate` to the company's date in its own time zone. At 8 p.m. in Texas, new invoices and payments were dated tomorrow, the UTC date.
-
+- QuickBooks: an invoice or payment shows its customer's current name in `CustomerRef.name` after the customer is renamed, instead of the name it had when the invoice was written.
 - QuickBooks: one numeric `DocNumber` of 21 digits made every later invoice number `1e+21`, failing 2050 until a reset; numbering now counts on from ordinary numbers only. Text fields read a number as its digits and refuse objects and lists with 2010, instead of storing `{"a": 1}` as a DisplayName. An invoice with payments can't move to another customer (6000), which left payments and invoices belonging to different people. An invoice whose customer was made inactive can still be updated, and naming an inactive customer on a new invoice or payment says it is inactive.
-
 - QuickBooks payment lines: a `LinkedTxn` without `TxnType` answers 2020 naming it, instead of "not to undefined", and a line linked to several transactions is refused instead of applied to the first with the rest ignored (even ones naming invoices that don't exist).
-
-- Jobber `clientCreate` trims names and treats a blank `companyName` as none. A last name alone made the name " Smith", and `companyName: ""` made a company client with an empty name.
-
-- Jobber `newClients` never runs out of names: once the word lists' names are taken, newcomers get a middle initial. A long timeline used to fail hours into twin time with "no unused names left", leaving the clock half advanced. New clients also never take the name of a customer who is only in QuickBooks, whose email address could otherwise match.
-
-- Jobber: a query that costs more than the whole 10,000-point budget still answers `THROTTLED`, but its message now says it can never run and to ask for fewer nodes. It looked like a temporary limit, so retry loops retried it forever.
-
-- `POST /_twin/clock/advance` counts only the scenario events it recorded. An API write that arrived while its webhooks were going out was counted too.
-
-- Control-plane mistakes say what to send: an empty or malformed body used to answer "Unexpected end of JSON input" or "Cannot read properties of null", and an action's error suggested `{ newClients: 5 }`, which fails over HTTP. A bug in the twin behind the control plane is now a 500, logged with its stack, instead of a 400 blaming the request.
-
-- `POST /_twin/reset` after loading a scenario restores the scenario's faults along with its world and timeline. It used to drop them, so a test harness that reset between cases lost its faults after the first. Loading a scenario without `auth` returns to the twin's own auth mode (`FIELDTWIN_AUTH`) instead of keeping the previous scenario's.
-
-- Conformance recorder: before recording anything, it checks that each sandbox accepts its token and that its URL is right. An expired token (they last an hour) or a base URL missing `/v3` used to produce a recording of 401s or 404s that failed every case as if the twin were wrong. A Jobber testing account with no clients is no longer recorded as an observation the twin could never match.
-- `npm run conformance` scores a fresh twin of its own instead of whatever twin is running, which it used to write records into and whose faults skewed the score. `FIELDTWIN_URL` still scores a running twin, and says how to start one if none answers.
-
-- Conformance score: a recorded case the twin couldn't run now counts as nothing matched. It was left out, so one match and one crash read "4/4 observations match (100%)". Percentages round down, so nothing short of every observation reads as 100%.
-
-- Reference integration: two syncs at once (the scheduled one and a webhook's) booked an invoice and its payment twice. Each QuickBooks write's `requestid` is now a hash of the write, so the identical write from either sync carries the same id and QuickBooks books it once.
-
-- Reference integration: a lost connection (`OAuthError`) pauses the webhook queue instead of leaving it permanently rejected, which crashed a web server with an unhandled rejection or silently dropped every later webhook while still answering Jobber 200. What hadn't synced stays queued; `queue.connectionLost` says why, and `queue.resume()` carries on after the person reconnects.
-
-- Reference integration: the scheduled sync reads again what changed in the ten minutes before its cutoff. With a strict `>` and no overlap, an invoice paid as a run started, or stamped by a server whose clock ran behind Jobber's, was never synced.
-
-- Reference integration: a Jobber line whose quantity times unit price isn't its total, to the cent, is booked at its total with the pricing in its description. Sending all three made QuickBooks refuse the invoice with 6070 on every run, which also held the scheduled sync's cutoff back.
-
+- QuickBooks amounts: an amount sent as a numeric string (`"93.00"`, as python-quickbooks sends decimals) is accepted instead of answering "Required parameter Line.Amount is missing". Fractions of a cent, and amounts too big to add up, answer 2140 Invalid Amount; they used to be stored as sent while totals were kept in rounded cents, so lines and totals disagreed, and a 1e307 line made `TotalAmt` null. Qty × UnitPrice is checked to the cent with decimal-correct rounding, so 2.5 × 33.33 = 83.33 is no longer refused with 6070. Every whole-cent amount up to the limit is accepted however floating point stores it, and a number written with too many digits to be one (four hundred 9s) is refused rather than stored as `null`.
+- QuickBooks defaults `TxnDate` to the company's date in its own time zone. At 8 p.m. in Texas, new invoices and payments were dated tomorrow, the UTC date.
+- QuickBooks queries refuse an `Active` that is neither `true` nor `false` with 4001. `Active = 'yes'` read as false and found the inactive customers. A `TotalAmt` or `Balance` that isn't a number answers 4001 too, instead of matching nothing.
 - QuickBooks paths the twin doesn't model (`/vendor/1`, `/estimate`, `/reports/...`) answer a Fault saying so, with what the twin serves, instead of a plain-text 404 an SDK can't parse.
-
-- QuickBooks amounts: an amount sent as a numeric string (`"93.00"`, as python-quickbooks sends decimals) is accepted instead of answering "Required parameter Line.Amount is missing". Fractions of a cent, and amounts too big to add up, answer 2140 Invalid Amount; they used to be stored as sent while totals were kept in rounded cents, so lines and totals disagreed, and a 1e307 line made `TotalAmt` null. Qty × UnitPrice is checked to the cent with decimal-correct rounding, so 2.5 × 33.33 = 83.33 is no longer refused with 6070.
-
+- QuickBooks: `POST /customer?operation=delete` was ignored and the body applied as a full update, wiping the customer's other fields. Operations the twin doesn't model now answer "Unsupported operation" and change nothing, for every entity. `?operation=update`, which Intuit's SDKs send on every update, now works for invoices as it did for customers.
+- QuickBooks: a write whose body was still uploading when its retry arrived could be made twice despite its `requestid`. The requestid is now checked after the body is read.
+- QuickBooks change data capture reads a `changedSince` without a UTC offset as UTC. It used the time zone of the machine running the twin, so the same request found different changes on different machines.
+- A request body the twin can't use gets the vendor's own error, with a 400 that says what was wrong, instead of a plain-text 500 "Internal Server Error": malformed JSON, a body that isn't an object, QuickBooks lines that aren't objects, Jobber `variables` sent as a string, a `redirect_uri` that isn't an absolute URL, and an OAuth token request that isn't form-encoded. Anything else the twin didn't expect answers a 500 in the vendor's format and is logged with its stack, so bugs in the twin are visible.
+- Jobber: an id sent without its base64 padding finds the same record as the padded id. It resolved to `null`, though Jobber's own examples show ids both ways.
+- Jobber `clientCreate` trims names and treats a blank `companyName` as none. A last name alone made the name " Smith", and `companyName: ""` made a company client with an empty name.
+- Jobber `newClients` never runs out of names: once the word lists' names are taken, newcomers get a middle initial. A long timeline used to fail hours into twin time with "no unused names left", leaving the clock half advanced. New clients also never take the name of a customer who is only in QuickBooks, whose email address could otherwise match.
+- Jobber: a query that costs more than the whole 10,000-point budget still answers `THROTTLED`, but its message now says it can never run and to ask for fewer nodes. It looked like a temporary limit, so retry loops retried it forever.
+- Jobber connections return at most 100 nodes, as documented. `clients(first: 500)` returned every client, so code that never pages passed against the twin and would miss records in production.
+- Jobber query cost: a negative `first` or `last` made the requested cost negative, which let any query past the throttle (and answered `hasNextPage: true` with no cursor). It now counts as 0. Variables' declared defaults (`$n: Int = 10`) and `@skip`/`@include` now count, so a cheap query that relies on them is no longer priced as if every page held 100 nodes and throttled forever.
+- An app slow to answer webhooks no longer holds up deliveries to other URLs. Deliveries went out one at a time across every subscription, so with two apps subscribed, one that stalled delayed the other's by a second (Jobber) or three (QuickBooks) per delivery, and `POST /_twin/clock/advance` and `/_twin/actions` with them. Each URL still gets its own deliveries in order.
+- After a rewind, the same requests meet the same faults they did the first time. Fault rules kept rolling on from where they were, so a run repeated from a checkpoint failed different requests. Webhook fault rules also roll dice of their own now: subscribing an app to webhooks used to change which API requests failed.
 - A webhook delivery on its way during a reset or rewind is forgotten. If it failed, it used to be queued again, and the next clock advance sent news about an invoice the reset had erased.
-
-- Twin time can't be pushed past what a date can hold. `POST /_twin/clock/advance {"minutes": 1e12}` used to leave the twin answering "Invalid time value" until a reset, and with a webhook retry pending it crashed the process. Advances are capped at ten years and webhook `delayMs` faults at a week. `twin_advance_clock` accepts 0, as the control plane does, to send the deliveries already due.
 - Webhooks can't break anything else: a failure while queueing one no longer turns a write that succeeded into a 500, and a delivery round that fails is logged instead of failing every round after it.
-
+- `POST /_twin/reset` after loading a scenario restores the scenario's faults along with its world and timeline. It used to drop them, so a test harness that reset between cases lost its faults after the first. Loading a scenario without `auth` returns to the twin's own auth mode (`FIELDTWIN_AUTH`) instead of keeping the previous scenario's.
+- `POST /_twin/clock/advance` counts only the scenario events it recorded. An API write that arrived while its webhooks were going out was counted too.
+- Twin time can't be pushed past what a date can hold. `POST /_twin/clock/advance {"minutes": 1e12}` used to leave the twin answering "Invalid time value" until a reset, and with a webhook retry pending it crashed the process. Advances are capped at ten years and webhook `delayMs` faults at a week. `twin_advance_clock` accepts 0, as the control plane does, to send the deliveries already due.
+- Control-plane mistakes say what to send: an empty or malformed body used to answer "Unexpected end of JSON input" or "Cannot read properties of null", and an action's error suggested `{ newClients: 5 }`, which fails over HTTP. A bug in the twin behind the control plane is now a 500, logged with its stack, instead of a 400 blaming the request.
 - A scenario that fails to load leaves the twin as it was. A bad start time, an unreadable timeline time, or a world too big to name used to fail part way: the twin kept the new company and faults but no timeline, or emptied its log while still serving old data, and `POST /_twin/reset` failed until another scenario loaded.
 - Scenario and fault-rule keys the twin doesn't know are errors. `path` instead of `pathIncludes` used to be dropped silently, so the rule faulted every request; a misspelled effect or webhook topic did nothing. A request rule with neither `status` nor `latencyMs` is refused too.
 - Scenario times need a UTC offset (`2026-07-13T08:00:00-05:00` or `...Z`). Without one, a start time meant a different moment on every machine.
-
-- Jobber connections return at most 100 nodes, as documented. `clients(first: 500)` returned every client, so code that never pages passed against the twin and would miss records in production.
-- Jobber query cost: a negative `first` or `last` made the requested cost negative, which let any query past the throttle (and answered `hasNextPage: true` with no cursor). It now counts as 0. Variables' declared defaults (`$n: Int = 10`) and `@skip`/`@include` now count, so a cheap query that relies on them is no longer priced as if every page held 100 nodes and throttled forever.
-
-- QuickBooks: `POST /customer?operation=delete` was ignored and the body applied as a full update, wiping the customer's other fields. Operations the twin doesn't model now answer "Unsupported operation" and change nothing, for every entity. `?operation=update`, which Intuit's SDKs send on every update, now works for invoices as it did for customers.
-- QuickBooks: a write whose body was still uploading when its retry arrived could be made twice despite its `requestid`. The requestid is now checked after the body is read.
-
-- A request body the twin can't use gets the vendor's own error, with a 400 that says what was wrong, instead of a plain-text 500 "Internal Server Error": malformed JSON, a body that isn't an object, QuickBooks lines that aren't objects, Jobber `variables` sent as a string, a `redirect_uri` that isn't an absolute URL, and an OAuth token request that isn't form-encoded. Anything else the twin didn't expect answers a 500 in the vendor's format and is logged with its stack, so bugs in the twin are visible.
-
-- QuickBooks change data capture reads a `changedSince` without a UTC offset as UTC. It used the time zone of the machine running the twin, so the same request found different changes on different machines.
+- The `twin_load_scenario` MCP tool refuses a call that gives both `name` and `yaml`. It loaded the named scenario and ignored the YAML without saying so.
 - Startup problems are one readable line instead of a crash: a port already in use says so and how to pick another, a scenario that can't be found lists the ones that exist, and `FIELDTWIN_PORT` or `FIELDTWIN_SEED` values that aren't numbers say what is expected. The "open for business" line now appears only once the twin is really listening.
 - `npm start` and `npm run example:sync` start from any folder. From a path with a space in it, through a symlink, or on Windows, they used to exit silently without starting anything.
+- With `FIELDTWIN_HOST` set to a specific address, the startup line prints that address instead of a localhost URL that wouldn't work, and listening on `::1` no longer warns that others can reach the twin.
+- A `FIELDTWIN_` setting left empty counts as unset, as when a compose file passes on a variable nobody set. An empty `FIELDTWIN_HOST` listened on every address and printed `http://:4010`.
+- With `FIELDTWIN_PORT=0` the startup line says which port the system picked, instead of `http://localhost:0`.
+- In a drifted world, every customer who is only in the field-service system has at least one invoiced job, as drift promises. Across seeds, about a quarter had no invoice, so `mismatched-books` with another seed tested less than it said.
+- Today's visits in the generated world start at 8:00 or later, as every other day's do. With the default 6 a.m. start, some started at 7:00, and a world starting at midnight booked visits at 2:30 a.m.
+- Reference integration: the webhook handler verifies the signature over the raw bytes (decoding first changed them when a body began with a byte-order mark), answers 400 instead of throwing on a signed body that isn't JSON, and refuses bodies over 64 KiB before hashing them. A malformed URL is no longer retried eight times as if it were a network failure, and the demo accepts a `FIELDTWIN_URL` with a trailing slash.
+- Reference integration: two syncs at once (the scheduled one and a webhook's) booked an invoice and its payment twice. Each QuickBooks write's `requestid` is now a hash of the write, so the identical write from either sync carries the same id and QuickBooks books it once.
+- Reference integration: a lost connection (`OAuthError`) pauses the webhook queue instead of leaving it permanently rejected, which crashed a web server with an unhandled rejection or silently dropped every later webhook while still answering Jobber 200. What hadn't synced stays queued; `queue.connectionLost` says why, and `queue.resume()` carries on after the person reconnects.
+- Reference integration: a token endpoint that is down, throttling, or out of reach is a `TokenEndpointError`, not a lost connection. It was an `OAuthError`, so a short outage paused the webhook queue until someone reconnected an app that was still connected. A refresh that can't reach the endpoint is no longer retried by the API client as well (32 token requests for one API call, now 4), and a scheduled run stops at the outage instead of trying a refresh for every invoice.
+- Reference integration: a `Retry-After` asking for more than ten minutes fails the request at once instead of being waited out, so a server that answers `Retry-After: 86400` (or a date years away) can't hold the webhook queue for a day.
+- Reference integration: the scheduled sync reads again what changed in the ten minutes before its cutoff. With a strict `>` and no overlap, an invoice paid as a run started, or stamped by a server whose clock ran behind Jobber's, was never synced.
+- Reference integration: a Jobber line whose quantity times unit price isn't its total, to the cent, is booked at its total with the pricing in its description. Sending all three made QuickBooks refuse the invoice with 6070 on every run, which also held the scheduled sync's cutoff back.
+- Reference integration: a customer the bookkeeper made inactive in QuickBooks is found instead of created again. QuickBooks queries leave inactive customers out unless asked, so the sync made a "Name (email)" duplicate and then reported the customer's own invoices as conflicts. It now looks among inactive customers too, and makes one active again (QuickBooks refuses invoices and payments for an inactive customer) only when there is new work to book, saying so in the log; the run's report counts them.
+- Conformance recorder: before recording anything, it checks that each sandbox accepts its token and that its URL is right. An expired token (they last an hour) or a base URL missing `/v3` used to produce a recording of 401s or 404s that failed every case as if the twin were wrong. A Jobber testing account with no clients is no longer recorded as an observation the twin could never match.
+- Conformance recorder: an answer that says nothing about the API is never recorded. A 429, 502, 503, or 504, Jobber's `THROTTLED`, or a 401 for the run's own token (expired part way) stops the case instead of being saved as evidence. A case that couldn't run keeps what it observed last time, where the whole file used to be replaced with this run's cases only; the recorder then exits with an error, and writes each file whole or not at all.
+- `npm run conformance:record --dry-run`, without the `--`, is a dry run. npm keeps a flag given that way for itself, so it recorded for real and overwrote the recordings. A misspelled command or option is refused instead of running a score.
+- The conformance recorder refuses production QuickBooks however its URL is written. `https://QuickBooks.api.intuit.com/v3`, or one with a user name before the host, got past the check.
+- The conformance recorder names the missing variable when only one of `QBO_ACCESS_TOKEN` and `QBO_REALM_ID` is set. It skipped QuickBooks without a word and recorded only Jobber.
+- Conformance: `encoded-id-format` won't record a Jobber account whose first ids need no base64 padding, an answer the twin could never match, as it already wouldn't record an account with no clients. The README says which QuickBooks cases depend on the sandbox company's settings.
+- `npm run conformance` scores a fresh twin of its own instead of whatever twin is running, which it used to write records into and whose faults skewed the score. `FIELDTWIN_URL` still scores a running twin, and says how to start one if none answers. It finds tsx from any folder, so `npx tsx /path/to/fieldtwin/conformance/cli.ts score` works from outside the checkout.
+- `FIELDTWIN_URL=http://localhost:4010/ npm run conformance` works with the trailing slash, and something other than a twin answering there is named as such, instead of "Unexpected non-whitespace character after JSON".
+- Conformance: scoring a running twin that had been written to (by your app, or by an earlier score) no longer fails `cdc-nothing-changed`. Twin time stands still between requests, so a record written just before counted as changed since "now"; asking a twin for the time now moves it on a second, as a sandbox's clock would.
+- Conformance score: a recorded case the twin couldn't run now counts as nothing matched. It was left out, so one match and one crash read "4/4 observations match (100%)". Percentages round down, so nothing short of every observation reads as 100%.
+- The conformance score compares observations the way the test does. It ignored observations only the twin made and counted a recorded `null` as matching one the twin didn't make, so a case could read "matches" in the score while failing `npm test`.
+- `npm run conformance` leaves out the "By endpoint:" heading while nothing is recorded, instead of printing it with nothing under it.
 
 ## 0.2.1 - 2026-10-09
 
