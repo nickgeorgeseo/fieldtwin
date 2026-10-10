@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { caseId, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
@@ -168,4 +169,15 @@ describe("scoring a twin that is already running", () => {
       "isn't a fieldtwin",
     );
   });
+});
+
+describe("npm run conformance", () => {
+  it("scores a fresh twin when run from outside the checkout too", () => {
+    const cli = new URL("./cli.ts", import.meta.url).pathname;
+    const tsx = import.meta.resolve("tsx"); // the outer process finds tsx wherever it runs; the twin it starts must too
+    const run = spawnSync(process.execPath, ["--import", tsx, cli, "score"], { cwd: tmpdir(), encoding: "utf8", timeout: 30_000 });
+    expect(run.stderr).not.toContain("didn't start");
+    expect(run.stdout).toContain("quickbooks cdc-nothing-changed");
+    expect(run.status).toBe(0);
+  }, 30_000);
 });

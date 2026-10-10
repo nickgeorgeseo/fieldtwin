@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- `npm run conformance` scores a fresh twin when run from outside the checkout (`npx tsx /path/to/fieldtwin/conformance/cli.ts score`). The twin it started looked for tsx in the current folder and never started.
+
 - The conformance score compares observations the way the test does. It ignored observations only the twin made and counted a recorded `null` as matching one the twin didn't make, so a case could read "matches" in the score while failing `npm test`.
 
 - `FIELDTWIN_URL=http://localhost:4010/ npm run conformance` works with the trailing slash, and something other than a twin answering there is named as such, instead of "Unexpected non-whitespace character after JSON".

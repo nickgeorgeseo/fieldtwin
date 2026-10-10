@@ -81,7 +81,8 @@ async function startFreshTwin(): Promise<{ url: string; stop: () => void }> {
     });
   });
   const server = fileURLToPath(new URL("../src/server.ts", import.meta.url));
-  const child = spawn(process.execPath, ["--import", "tsx", server], {
+  // tsx as this checkout has it: `--import tsx` alone would look for it in whatever folder the score was run from.
+  const child = spawn(process.execPath, ["--import", import.meta.resolve("tsx"), server], {
     env: { ...process.env, FIELDTWIN_PORT: String(port), FIELDTWIN_HOST: "127.0.0.1" },
     stdio: ["ignore", "ignore", "pipe"],
   });
