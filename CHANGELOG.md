@@ -6,6 +6,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- `GET /` says where everything is: the QuickBooks base URL and realm with a request to try, the Jobber endpoint and version header, how auth works right now, the control plane, and the docs. It answered "404 Not Found", which is what a browser showed anyone who opened the address the twin prints at startup.
+
 - `GET /_twin` (and `twin_status`) shows the seed, the loaded scenario, and the checkpoints, so a run can be reproduced from its status alone. `?source=` on a change list takes any source (`seed`, `scenario`, `api`, `control`); one it doesn't know is an error instead of returning everything unfiltered.
 
 - Reference integration: `TokenManager`'s `loadTokens` option, for processes that share one connection. Before refreshing, and once more after an `invalid_grant`, it reads the saved tokens and uses the set another process already rotated to, instead of telling the person to reconnect.

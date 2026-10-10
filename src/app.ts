@@ -7,7 +7,9 @@ import type { WebhookSender } from "./core/webhooks.ts";
 import { faultMiddleware } from "./faults/fault-middleware.ts";
 import { webhookFaults } from "./faults/webhook-faults.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
+import { ACTIVE_VERSIONS } from "./vendors/jobber/versions.ts";
 import { quickbooksTwin } from "./vendors/quickbooks/index.ts";
+import { TWIN_REALM_ID } from "./vendors/quickbooks/seed.ts";
 
 /** Every vendor twin this build serves. Adding a vendor = one import and one entry here. */
 export const ALL_VENDORS: VendorTwin[] = [quickbooksTwin, jobberTwin];
@@ -35,6 +37,7 @@ export function createApp(options: AppOptions = {}) {
   twin.webhooks.faults = webhookFaults(twin); // fault rules with `webhook:` make deliveries misbehave
 
   const app = new Hono();
+  app.get("/", (c) => c.json(startHere(twin, new URL(c.req.url).origin)));
   app.route("/", controlRoutes(twin));
   for (const vendor of ALL_VENDORS) {
     // Faults are scoped to the vendor's own URL prefix, so a QuickBooks fault never hits Jobber.
@@ -49,6 +52,21 @@ export function createApp(options: AppOptions = {}) {
   app.onError(answerUnexpectedErrors(twin));
 
   return { app, twin };
+}
+
+/** What GET / answers: where everything is, for whoever opens the twin's address in a browser first. */
+function startHere(twin: Twin, origin: string) {
+  return {
+    fieldtwin: `${twin.world.company.name} is open for business`,
+    quickbooks: { baseUrl: origin, realmId: TWIN_REALM_ID, try: `GET ${origin}/v3/company/${TWIN_REALM_ID}/customer/1` },
+    jobber: { graphql: `POST ${origin}/api/graphql`, headers: { "X-JOBBER-GRAPHQL-VERSION": ACTIVE_VERSIONS[0] } },
+    auth:
+      twin.authMode === "any-token"
+        ? "Any bearer token works: Authorization: Bearer dev"
+        : "Get a token from each vendor's OAuth endpoints; the docs show how",
+    controlPlane: `GET ${origin}/_twin`,
+    docs: "https://github.com/nickgeorgeseo/fieldtwin#readme",
+  };
 }
 
 /**

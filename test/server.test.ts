@@ -123,3 +123,24 @@ function freePort(): Promise<number> {
     });
   });
 }
+
+describe("GET /, where a browser lands first", () => {
+  it("says where each API, the control plane, and the docs are, instead of 404", async () => {
+    const { app } = createApp();
+    const response = await app.request("http://localhost:4010/");
+    expect(response.status).toBe(200);
+    const page = await response.json();
+    expect(page).toMatchObject({
+      fieldtwin: "Rowntree Electric is open for business",
+      quickbooks: {
+        baseUrl: "http://localhost:4010",
+        realmId: "9341000000000001",
+        try: "GET http://localhost:4010/v3/company/9341000000000001/customer/1",
+      },
+      jobber: { graphql: "POST http://localhost:4010/api/graphql" },
+      controlPlane: "GET http://localhost:4010/_twin",
+      docs: "https://github.com/nickgeorgeseo/fieldtwin#readme",
+    });
+    expect(page.jobber.headers["X-JOBBER-GRAPHQL-VERSION"]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
