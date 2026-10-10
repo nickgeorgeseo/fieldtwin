@@ -1,7 +1,7 @@
 # User: "A user belongs to an account and generally completes work for clients."
 # The fields of Name and UserEmail are not in Jobber's public docs; FIDELITY.md marks them "check".
 extend type Query {
-  users(first: Int, after: String): UserConnection!
+  users(first: Int, after: String, last: Int, before: String): UserConnection!
 }
 
 type User {

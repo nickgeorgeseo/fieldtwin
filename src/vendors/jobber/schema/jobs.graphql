@@ -1,7 +1,7 @@
 # Job: "A scheduled event where work will take place." Visit: "each time a Service Provider goes to a
 # client property to complete work." Status values are not in the public docs; FIDELITY.md marks them "check".
 extend type Query {
-  jobs(first: Int, after: String): JobConnection!
+  jobs(first: Int, after: String, last: Int, before: String): JobConnection!
   job(id: EncodedId!): Job
 }
 
@@ -18,10 +18,10 @@ type Job {
   total: Float!
   invoicedTotal: Float!
   uninvoicedTotal: Float!
-  invoices(first: Int, after: String): InvoiceConnection!
+  invoices(first: Int, after: String, last: Int, before: String): InvoiceConnection!
   quote: Quote
-  lineItems(first: Int, after: String): JobLineItemConnection!
-  visits(first: Int, after: String): VisitConnection!
+  lineItems(first: Int, after: String, last: Int, before: String): JobLineItemConnection!
+  visits(first: Int, after: String, last: Int, before: String): VisitConnection!
   createdAt: ISO8601DateTime!
   updatedAt: ISO8601DateTime!
 }
@@ -57,7 +57,7 @@ type Visit {
   duration: Int
   client: Client!
   job: Job!
-  assignedUsers(first: Int, after: String): UserConnection
+  assignedUsers(first: Int, after: String, last: Int, before: String): UserConnection
   createdAt: ISO8601DateTime!
 }
 

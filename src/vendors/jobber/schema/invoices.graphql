@@ -2,7 +2,7 @@
 # The root invoices/invoice queries, the status values other than "voided", and the fields of InvoiceAmounts
 # are not in the public docs; FIDELITY.md marks them "check".
 extend type Query {
-  invoices(first: Int, after: String): InvoiceConnection!
+  invoices(first: Int, after: String, last: Int, before: String): InvoiceConnection!
   invoice(id: EncodedId!): Invoice
 }
 
@@ -15,8 +15,8 @@ type Invoice {
   amounts: InvoiceAmounts
   issuedDate: ISO8601DateTime
   dueDate: ISO8601DateTime
-  lineItems(first: Int, after: String): InvoiceLineItemConnection!
-  jobs(first: Int, after: String): JobConnection!
+  lineItems(first: Int, after: String, last: Int, before: String): InvoiceLineItemConnection!
+  jobs(first: Int, after: String, last: Int, before: String): JobConnection!
   createdAt: ISO8601DateTime!
   updatedAt: ISO8601DateTime!
 }

@@ -1,7 +1,7 @@
 # Quote: "A cost estimate which service providers sent to their clients before any work is done."
 # Status values and the fields of QuoteAmounts are not in the public docs; FIDELITY.md marks them "check".
 extend type Query {
-  quotes(first: Int, after: String): QuoteConnection!
+  quotes(first: Int, after: String, last: Int, before: String): QuoteConnection!
   quote(id: EncodedId!): Quote
 }
 
@@ -12,8 +12,8 @@ type Quote {
   title: String
   client: Client
   amounts: QuoteAmounts!
-  lineItems(first: Int, after: String): QuoteLineItemConnection!
-  jobs(first: Int, after: String): JobConnection
+  lineItems(first: Int, after: String, last: Int, before: String): QuoteLineItemConnection!
+  jobs(first: Int, after: String, last: Int, before: String): JobConnection
   sentAt: ISO8601DateTime
   transitionedAt: ISO8601DateTime!
   createdAt: ISO8601DateTime!
