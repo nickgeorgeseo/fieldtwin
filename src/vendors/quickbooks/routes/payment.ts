@@ -5,7 +5,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
-import { readAmount } from "../values.ts";
+import { checkLengths, readAmount } from "../values.ts";
 import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody, writeKind } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
@@ -43,6 +43,8 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_PAYMENT_FIELDS);
+  const tooLong = checkLengths(fields, { PrivateNote: 4000 }, now); // "max character: Max of 4000 chars"
+  if (tooLong) return tooLong;
 
   const TotalAmt = readAmount(fields.TotalAmt, "TotalAmt", now);
   if (typeof TotalAmt !== "number") return TotalAmt;

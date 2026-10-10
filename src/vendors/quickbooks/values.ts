@@ -66,3 +66,16 @@ export function readTextFields(fields: object, names: readonly string[], now: st
   }
   return undefined;
 }
+
+/**
+ * Text fields' documented maximum lengths, by path (`PrimaryPhone.FreeFormNumber`): the Fault for the first one a
+ * value exceeds, 2050 Invalid String Length, or undefined. Run after readTextFields, so numbers count as their digits.
+ */
+export function checkLengths(fields: object, maxima: Readonly<Record<string, number>>, now: string): QboFault | undefined {
+  for (const [path, max] of Object.entries(maxima)) {
+    let value: unknown = fields;
+    for (const key of path.split(".")) value = (value as Record<string, unknown> | undefined)?.[key];
+    if (typeof value === "string" && value.length > max) return qboErrors.stringTooLong(path, max, value.length, now);
+  }
+  return undefined;
+}

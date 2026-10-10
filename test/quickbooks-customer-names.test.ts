@@ -27,6 +27,17 @@ describe("QuickBooks twin: customer names", () => {
     });
   });
 
+  it.each([
+    ["DisplayName", 500, (value: string) => ({ DisplayName: value })],
+    ["GivenName", 100, (value: string) => ({ DisplayName: "Long Given", GivenName: value })],
+    ["FamilyName", 100, (value: string) => ({ DisplayName: "Long Family", FamilyName: value })],
+    ["PrimaryPhone.FreeFormNumber", 30, (value: string) => ({ DisplayName: "Long Phone", PrimaryPhone: { FreeFormNumber: value } })],
+  ] as const)("refuses a %s longer than its documented %i characters (2050), and takes one at the limit", async (element, max, body) => {
+    const harness = setup();
+    expect(await faultOf(await harness.qboPost("/customer", body("5".repeat(max + 1))))).toMatchObject({ code: "2050", element });
+    expect((await harness.qboPost("/customer", body("5".repeat(max)))).status).toBe(200);
+  });
+
   it("refuses a colon, tab, or newline in a name (2040), as the business rules say", async () => {
     for (const DisplayName of ["Smith: Kitchen job", "Tab\there", "Two\nlines"]) {
       expect(await faultOf(await setup().qboPost("/customer", { DisplayName }))).toMatchObject({ code: "2040", element: "DisplayName" });

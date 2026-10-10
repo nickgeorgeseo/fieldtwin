@@ -3,7 +3,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
-import { readTextFields } from "../values.ts";
+import { checkLengths, readTextFields } from "../values.ts";
 import {
   asResponse,
   COMPANY,
@@ -83,7 +83,8 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
 }
 
 const PERSON_NAME_FIELDS = ["DisplayName", "GivenName", "FamilyName"] as const;
-const COMPANY_NAME_MAX_LENGTH = 100; // "max character: maximum of 100 chars"
+// Each field's "max character" in the Customer reference.
+const MAX_LENGTHS = { DisplayName: 500, GivenName: 100, FamilyName: 100, CompanyName: 100, "PrimaryPhone.FreeFormNumber": 30 };
 
 /** The Customer reference's rules for names, or the Fault for the first one broken. */
 function checkNames(fields: Partial<QboCustomer>, now: string): QboFault | undefined {
@@ -95,11 +96,7 @@ function checkNames(fields: Partial<QboCustomer>, now: string): QboFault | undef
     const value = fields[name];
     if (value && /[:\t\n]/.test(value)) return qboErrors.invalidString(name, value, now);
   }
-  const { CompanyName } = fields;
-  if (CompanyName && CompanyName.length > COMPANY_NAME_MAX_LENGTH) {
-    return qboErrors.stringTooLong("CompanyName", COMPANY_NAME_MAX_LENGTH, CompanyName.length, now);
-  }
-  return undefined;
+  return checkLengths(fields, MAX_LENGTHS, now);
 }
 
 /**

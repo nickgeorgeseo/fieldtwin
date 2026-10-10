@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks refuses text longer than the reference's documented maximum, with 2050 Invalid String Length: `DisplayName` (500), `GivenName` and `FamilyName` (100), `PrimaryPhone` (30), and `PrivateNote` on invoices and payments (4,000). Only `CompanyName` and `DocNumber` were checked, so a 5 MB `GivenName` was stored.
 - Reference integration: the webhook queue remembers the latest 10,000 invoices it synced, to count distinct ones, instead of every invoice it ever synced, so a server that runs for months doesn't grow without end.
 - Reference integration: when a lost connection stops the webhook queue, the invoice it was syncing stays first in line. It went to the back, so after `resume()` invoices were synced out of the order their news came in.
 

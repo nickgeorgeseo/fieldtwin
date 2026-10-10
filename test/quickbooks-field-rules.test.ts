@@ -40,6 +40,16 @@ describe("QuickBooks twin: text fields", () => {
 });
 
 describe("QuickBooks twin: invoice numbers", () => {
+  it("refuses a PrivateNote longer than its documented 4,000 characters on an invoice or a payment (2050)", async () => {
+    const harness = setup();
+    const note = "n".repeat(4001);
+    const onInvoice = await harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(40)], PrivateNote: note });
+    expect(await faultOf(onInvoice)).toMatchObject({ code: "2050", element: "PrivateNote" });
+    const onPayment = await harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 5, PrivateNote: note });
+    expect(await faultOf(onPayment)).toMatchObject({ code: "2050", element: "PrivateNote" });
+    expect((await invoice(harness, { PrivateNote: "n".repeat(4000) })).PrivateNote).toHaveLength(4000);
+  });
+
   it("keeps numbering from the last ordinary number, whatever odd DocNumbers have been sent", async () => {
     const harness = setup();
     const first = await invoice(harness);
