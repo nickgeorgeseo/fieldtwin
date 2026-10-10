@@ -9,23 +9,39 @@ import type { WebhookSubscription } from "../core/webhooks.ts";
  * it is, which faults are active, and a timeline of things that happen as twin time passes.
  * See "Scenario timelines" in ARCHITECTURE.md.
  */
-const FaultRuleSchema = z.object({
-  name: z.string(),
-  vendor: z.enum(["quickbooks", "jobber"]),
-  method: z.string().optional(),
-  pathIncludes: z.string().optional(),
-  rate: z.number().min(0).max(1),
-  effect: z
-    .object({
-      status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
-      latencyMs: z.number().int().nonnegative().optional(),
-      message: z.string().optional(),
-      lostResponse: z.boolean().optional(),
-    })
-    .refine((effect) => !effect.lostResponse || effect.status !== undefined, {
-      message: "lostResponse needs a status: the error the client sees instead of the real answer, like 504",
-    }),
-});
+const FaultRuleSchema = z
+  .object({
+    name: z.string(),
+    vendor: z.enum(["quickbooks", "jobber"]),
+    method: z.string().optional(),
+    pathIncludes: z.string().optional(),
+    webhook: z.string().optional(),
+    rate: z.number().min(0).max(1),
+    effect: z
+      .object({
+        status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
+        latencyMs: z.number().int().nonnegative().optional(),
+        message: z.string().optional(),
+        lostResponse: z.boolean().optional(),
+        duplicate: z.boolean().optional(),
+        delayMs: z.number().int().positive().optional(),
+      })
+      .refine((effect) => !effect.lostResponse || effect.status !== undefined, {
+        message: "lostResponse needs a status: the error the client sees instead of the real answer, like 504",
+      }),
+  })
+  .superRefine((rule, context) => {
+    const problem = (message: string) => context.addIssue({ code: z.ZodIssueCode.custom, message });
+    const { duplicate, delayMs, ...requestEffects } = rule.effect;
+    if (rule.webhook === undefined) {
+      if (duplicate !== undefined || delayMs !== undefined)
+        problem('duplicate and delayMs are for webhook rules (add webhook: "TOPIC" or "*")');
+    } else if (rule.method !== undefined || rule.pathIncludes !== undefined) {
+      problem("webhook rules match deliveries, not requests: drop method and pathIncludes");
+    } else if (Object.values(requestEffects).some((value) => value !== undefined) || (!duplicate && !delayMs)) {
+      problem("webhook rules take duplicate or delayMs, and nothing else");
+    }
+  });
 
 /** One timeline entry: when, and what each vendor should do then ({ jobber: { newClients: 15 } }). */
 const TimelineEntrySchema = z

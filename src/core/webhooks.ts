@@ -42,6 +42,16 @@ export interface VendorWebhooks<State = unknown> {
   ): { headers: Record<string, string>; body: string };
 }
 
+/**
+ * How a delivery should misbehave, if at all: sent twice, or late. Fault rules decide (faults/webhook-faults.ts);
+ * app.ts plugs them in, so core never needs to know faults exist.
+ */
+export type DeliveryFaults = (delivery: { vendor: VendorName; topic: string }) => {
+  delayMs: number;
+  delayedBy?: string; // the fault rule's name
+  duplicatedBy?: string;
+};
+
 export interface Delivery {
   id: number;
   vendor: VendorName;
@@ -52,6 +62,7 @@ export interface Delivery {
   attempts: number;
   status: "pending" | "delivered" | "failed";
   lastAnswer: string | null; // "HTTP 200", "HTTP 500", "no answer within 1 second", "network error"
+  fault: string | null; // the fault rule that delayed or duplicated it
 }
 
 const ANSWER_WITHIN_MS = 1000; // "Webhook requests must be responded to within 1 second of receipt."
@@ -66,6 +77,7 @@ interface Queued extends Delivery {
 
 export class WebhookDispatcher {
   subscriptions: WebhookSubscription[] = [];
+  faults: DeliveryFaults | undefined;
   private queue: Queued[] = [];
   private recent: Queued[] = [];
   private nextId = 1;
@@ -79,23 +91,29 @@ export class WebhookDispatcher {
     for (const notification of vendor.webhooks.notify(event, state)) {
       for (const subscription of this.subscriptions) {
         if (subscription.vendor !== vendor.name || !subscription.topics.includes(notification.topic)) continue;
-        const queued: Queued = {
-          id: this.nextId++,
-          vendor: vendor.name,
-          topic: notification.topic,
-          itemId: notification.itemId,
-          url: subscription.url,
-          dueMs: nowMs,
-          dueAt: new Date(nowMs).toISOString(),
-          attempts: 0,
-          status: "pending",
-          lastAnswer: null,
-          request: vendor.webhooks.request(notification, subscription, state),
-        };
-        this.queue.push(queued);
-        this.recent = [...this.recent, queued].slice(-KEEP_DELIVERIES);
+        const request = vendor.webhooks.request(notification, subscription, state);
+        const fault = this.faults?.({ vendor: vendor.name, topic: notification.topic }) ?? { delayMs: 0 };
+        const delivery = { vendor: vendor.name, topic: notification.topic, itemId: notification.itemId, url: subscription.url };
+        this.enqueue({ ...delivery, request, dueMs: nowMs + fault.delayMs, fault: fault.delayedBy ?? null });
+        if (fault.duplicatedBy) this.enqueue({ ...delivery, request, dueMs: nowMs + fault.delayMs, fault: fault.duplicatedBy });
       }
     }
+  }
+
+  private enqueue(delivery: Pick<Queued, "vendor" | "topic" | "itemId" | "url" | "request" | "dueMs" | "fault">): void {
+    const { request, fault } = delivery;
+    const queued: Queued = {
+      ...delivery,
+      id: this.nextId++,
+      dueAt: new Date(delivery.dueMs).toISOString(),
+      attempts: 0,
+      status: "pending",
+      lastAnswer: null,
+      // An injected fault says so, like X-Twin-Fault on API answers. The signature covers the body only.
+      request: fault ? { ...request, headers: { ...request.headers, "X-Twin-Fault": fault } } : request,
+    };
+    this.queue.push(queued);
+    this.recent = [...this.recent, queued].slice(-KEEP_DELIVERIES);
   }
 
   /** Send everything due by `nowMs`, in order. Rounds never overlap; failures are queued again for later. */

@@ -110,6 +110,22 @@ curl -X POST localhost:4010/_twin/actions/jobber/payInvoices -H "Content-Type: a
 
 Deliveries carry Jobber's documented payload (`{ "data": { "webHookEvent": { "topic", "appId", "accountId", "itemId", "occurredAt" } } }`) and an `X-Jobber-Hmac-SHA256` signature made with the subscription's client secret, so your verification code runs unchanged. Like Jobber, the twin delivers at least once: paying an invoice fires `INVOICE_UPDATE` twice, and a delivery your app doesn't accept within a second is sent again later in twin time. `CLIENT_CREATE` and `INVOICE_UPDATE` are modeled so far. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
+Fault rules with a `webhook` topic (or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
+
+```yaml
+faults:
+  - name: jobber-webhooks-twice
+    vendor: jobber
+    webhook: INVOICE_UPDATE
+    rate: 0.3
+    effect: { duplicate: true }
+  - name: jobber-webhooks-late
+    vendor: jobber
+    webhook: "*"
+    rate: 0.2
+    effect: { delayMs: 300000 }   # five minutes of twin time late
+```
+
 ## The control plane
 
 Everything under `/_twin` controls the fake world rather than imitating a vendor.

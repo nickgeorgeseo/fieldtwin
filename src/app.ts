@@ -5,6 +5,7 @@ import type { AuthMode } from "./core/types.ts";
 import type { VendorTwin } from "./core/vendor-twin.ts";
 import type { WebhookSender } from "./core/webhooks.ts";
 import { faultMiddleware } from "./faults/fault-middleware.ts";
+import { webhookFaults } from "./faults/webhook-faults.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
 import { quickbooksTwin } from "./vendors/quickbooks/index.ts";
 
@@ -30,6 +31,8 @@ export function createApp(options: AppOptions = {}) {
     vendors: ALL_VENDORS,
     sendWebhook: options.sendWebhook,
   });
+
+  twin.webhooks.faults = webhookFaults(twin); // fault rules with `webhook:` make deliveries misbehave
 
   const app = new Hono();
   app.route("/", controlRoutes(twin));

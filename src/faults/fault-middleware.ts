@@ -41,6 +41,7 @@ export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandl
 
 function matches(rule: FaultRule, vendor: string, method: string, path: string): boolean {
   return (
+    rule.webhook === undefined && // webhook rules are for deliveries; see webhook-faults.ts
     rule.vendor === vendor &&
     (!rule.method || rule.method.toUpperCase() === method.toUpperCase()) &&
     (!rule.pathIncludes || path.includes(rule.pathIncludes))

@@ -52,12 +52,15 @@ export interface FaultRule {
   vendor: VendorName;
   method?: string; // e.g. "POST". Omit to match any method.
   pathIncludes?: string; // e.g. "/customer". Omit to match any path.
-  rate: number; // share of matching requests affected, 0 to 1
+  webhook?: string; // a topic ("INVOICE_UPDATE") or "*": the rule matches webhook deliveries instead of requests
+  rate: number; // share of matching requests (or deliveries) affected, 0 to 1
   effect: {
     status?: FaultStatus; // respond with this HTTP error status instead of calling the twin
     latencyMs?: number; // wait this long before answering
     message?: string; // error message, rendered in the vendor's own error format
     lostResponse?: boolean; // do the work first, then answer with `status`: the real answer was lost on its way back
+    duplicate?: boolean; // webhook rules: deliver it twice
+    delayMs?: number; // webhook rules: deliver it this much twin time late, so later deliveries overtake it
   };
 }
 
