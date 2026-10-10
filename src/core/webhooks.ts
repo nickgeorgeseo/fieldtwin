@@ -9,8 +9,8 @@ import type { VendorTwin } from "./vendor-twin.ts";
  * bookkeeping too: each recorded event a vendor has a topic for becomes one delivery per subscription that wants
  * it, sent after the API call or clock advance that caused it. A reset or rewind drops the ones still pending.
  *
- * Twin time decides when a delivery is due and when a failed one is tried again; nothing waits on the wall
- * clock except the one second an app has to answer.
+ * Twin time decides when a delivery is due and when a failed one is tried again (each vendor's own policy); nothing
+ * waits on the wall clock except the few seconds at most an app has to answer.
  */
 
 /** Sends one delivery. Production: fetch. Tests: a function that answers like your app would. */
@@ -31,15 +31,24 @@ export interface WebhookNotification {
   occurredAtMs: number;
 }
 
-/** What a vendor contributes: its topics, which events announce what, and how a delivery looks and is signed. */
+/** What a vendor contributes: its topics, which events announce what, and how a delivery looks, is signed, and is sent. */
 export interface VendorWebhooks<State = unknown> {
   topics: readonly string[];
+  delivery: DeliveryPolicy;
   notify(event: TwinEvent, state: State): WebhookNotification[];
   request(
     notification: WebhookNotification,
     subscription: WebhookSubscription,
     state: State,
   ): { headers: Record<string, string>; body: string };
+}
+
+/** How a vendor delivers: how long an app has to answer, which answers count as accepted, and when to try again. */
+export interface DeliveryPolicy {
+  answerWithinMs: number;
+  accepts(status: number): boolean;
+  /** Twin time to wait after failed attempt number `attempt` (1 for the first), or null to give up. */
+  retryAfterMs(attempt: number): number | null;
 }
 
 /**
@@ -65,14 +74,12 @@ export interface Delivery {
   fault: string | null; // the fault rule that delayed or duplicated it
 }
 
-const ANSWER_WITHIN_MS = 1000; // "Webhook requests must be responded to within 1 second of receipt."
-const MAX_ATTEMPTS = 5; // not documented; see FIDELITY.md
-const RETRY_AFTER_MS = 60_000; // not documented: a minute of twin time, longer each attempt
 const KEEP_DELIVERIES = 200;
 
 interface Queued extends Delivery {
   dueMs: number;
   request: { headers: Record<string, string>; body: string };
+  policy: DeliveryPolicy;
 }
 
 export class WebhookDispatcher {
@@ -93,14 +100,15 @@ export class WebhookDispatcher {
         if (subscription.vendor !== vendor.name || !subscription.topics.includes(notification.topic)) continue;
         const request = vendor.webhooks.request(notification, subscription, state);
         const fault = this.faults?.({ vendor: vendor.name, topic: notification.topic }) ?? { delayMs: 0 };
-        const delivery = { vendor: vendor.name, topic: notification.topic, itemId: notification.itemId, url: subscription.url };
+        const { delivery: policy } = vendor.webhooks;
+        const delivery = { vendor: vendor.name, topic: notification.topic, itemId: notification.itemId, url: subscription.url, policy };
         this.enqueue({ ...delivery, request, dueMs: nowMs + fault.delayMs, fault: fault.delayedBy ?? null });
         if (fault.duplicatedBy) this.enqueue({ ...delivery, request, dueMs: nowMs + fault.delayMs, fault: fault.duplicatedBy });
       }
     }
   }
 
-  private enqueue(delivery: Pick<Queued, "vendor" | "topic" | "itemId" | "url" | "request" | "dueMs" | "fault">): void {
+  private enqueue(delivery: Pick<Queued, "vendor" | "topic" | "itemId" | "url" | "policy" | "request" | "dueMs" | "fault">): void {
     const { request, fault } = delivery;
     const queued: Queued = {
       ...delivery,
@@ -129,7 +137,7 @@ export class WebhookDispatcher {
 
   /** The latest deliveries, oldest first, without their payloads. */
   deliveries(): Delivery[] {
-    return this.recent.map(({ dueMs: _dueMs, request: _request, ...delivery }) => ({ ...delivery }));
+    return this.recent.map(({ dueMs: _dueMs, request: _request, policy: _policy, ...delivery }) => ({ ...delivery }));
   }
 
   /** Forget deliveries not yet made: the events behind them were reset or rewound away. */
@@ -144,11 +152,13 @@ export class WebhookDispatcher {
       if (!due) return;
       this.queue = this.queue.filter((delivery) => delivery !== due);
       due.attempts++;
-      due.lastAnswer = await this.attempt(due);
-      if (due.lastAnswer.startsWith("HTTP 2")) {
+      const { answer, accepted } = await this.attempt(due);
+      due.lastAnswer = answer;
+      const retryAfterMs = accepted ? null : due.policy.retryAfterMs(due.attempts);
+      if (accepted) {
         due.status = "delivered";
-      } else if (due.attempts < MAX_ATTEMPTS) {
-        due.dueMs = nowMs + RETRY_AFTER_MS * due.attempts;
+      } else if (retryAfterMs !== null) {
+        due.dueMs = nowMs + retryAfterMs;
         due.dueAt = new Date(due.dueMs).toISOString();
         this.queue.push(due);
       } else {
@@ -157,17 +167,20 @@ export class WebhookDispatcher {
     }
   }
 
-  private async attempt(delivery: Queued): Promise<string> {
+  private async attempt(delivery: Queued): Promise<{ answer: string; accepted: boolean }> {
+    const { answerWithinMs, accepts } = delivery.policy;
     try {
       const response = await this.send(delivery.url, {
         method: "POST",
         ...delivery.request,
-        signal: AbortSignal.timeout(ANSWER_WITHIN_MS),
+        signal: AbortSignal.timeout(answerWithinMs),
       });
       await response.body?.cancel();
-      return `HTTP ${response.status}`;
+      return { answer: `HTTP ${response.status}`, accepted: accepts(response.status) };
     } catch (error) {
-      return error instanceof Error && error.name === "TimeoutError" ? "no answer within 1 second" : "network error";
+      const seconds = answerWithinMs / 1000;
+      const timedOut = error instanceof Error && error.name === "TimeoutError";
+      return { answer: timedOut ? `no answer within ${seconds} second${seconds === 1 ? "" : "s"}` : "network error", accepted: false };
     }
   }
 }

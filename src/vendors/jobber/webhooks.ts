@@ -19,6 +19,14 @@ import type { JobberState } from "./types.ts";
 export const jobberWebhooks: VendorWebhooks<JobberState> = {
   topics: ["CLIENT_CREATE", "INVOICE_UPDATE"],
 
+  // "Webhook requests must be responded to within 1 second of receipt." Jobber promises at-least-once delivery but
+  // no retry schedule, so the twin tries five times, 1, 2, 3, then 4 minutes of twin time apart (see FIDELITY.md).
+  delivery: {
+    answerWithinMs: 1000,
+    accepts: (status) => status >= 200 && status < 300,
+    retryAfterMs: (attempt) => (attempt < 5 ? 60_000 * attempt : null),
+  },
+
   notify(event): WebhookNotification[] {
     const data = asJobberEvent(event);
     const at = Date.parse(event.at);
