@@ -87,6 +87,26 @@ describe("the webhook queue when the connection is lost", () => {
     expect(queue.connectionLost).toBeUndefined();
     expect(queue.totals.invoices).toBe(2);
   });
+
+  it("keeps the invoice it was syncing first in line, so news is still synced in the order it came", async () => {
+    let connected = false;
+    const tried: string[] = [];
+    const queue = new InvoiceQueue(
+      async (invoiceId) => {
+        tried.push(invoiceId);
+        if (!connected) throw new OAuthError("The refresh token was revoked. Reconnect the app.", 400, "invalid_grant");
+        return { ...emptyStats(), invoices: 1 };
+      },
+      () => {},
+    );
+    for (const id of ["A", "B", "C"]) queue.add(update(id));
+    await queue.idle();
+
+    connected = true;
+    queue.resume();
+    await queue.idle();
+    expect(tried).toEqual(["A", "A", "B", "C"]);
+  });
 });
 
 describe("the scheduled sync's cutoff", () => {

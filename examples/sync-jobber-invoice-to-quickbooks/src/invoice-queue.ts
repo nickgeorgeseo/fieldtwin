@@ -22,7 +22,7 @@ const MAX_TRIES = 3;
 export class InvoiceQueue {
   readonly totals: SyncStats = emptyStats(); // `invoices` counts distinct paid invoices, however often each was synced
   private synced = new Set<string>();
-  private waiting = new Map<string, number>(); // invoice id -> tries so far
+  private waiting = new Map<string, number>(); // invoice id -> tries so far, in the order the news came
   private draining: Promise<void> = Promise.resolve();
   /** Why the queue stopped, if it has: nothing is tried until resume(). */
   connectionLost: OAuthError | undefined;
@@ -64,8 +64,9 @@ export class InvoiceQueue {
         stats = await this.sync(invoiceId);
       } catch (error) {
         if (error instanceof OAuthError) {
-          // The connection is gone, so nothing else would work either: keep this invoice and stop until resume().
-          this.waiting.set(invoiceId, tries);
+          // The connection is gone, so nothing else would work either: keep this invoice, first in line, and stop
+          // until resume().
+          this.waiting = new Map([[invoiceId, tries], ...this.waiting]);
           this.connectionLost = error;
           this.log(`Webhook syncs paused until the app is connected again: ${error.message}`);
           return;
