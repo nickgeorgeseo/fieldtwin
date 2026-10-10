@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { caseId, quickbooks } from "./case.ts";
+import { caseId, quickbooks, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { readRecordings } from "./recordings.ts";
 import { compare, observeAll, report } from "./run.ts";
@@ -48,6 +48,35 @@ describe("a twin as a target", () => {
     await quickbooks(twin, "POST", "customer", { DisplayName: "Written Just Before" });
     const cdc = CASES.find((testCase) => caseId(testCase) === "quickbooks/cdc-nothing-changed")!;
     expect(await cdc.observe(twin)).toEqual({ status: 200, groupKeys: [] });
+  });
+});
+
+describe("the ORDERBY case", () => {
+  /** A company whose queries sort text the way a plain string comparison does, capitals first. */
+  function booksSortingByCharacterCode(): Target {
+    const names: string[] = [];
+    return {
+      kind: "sandbox",
+      fetch: async (url, init) => {
+        if (init?.method === "POST") {
+          const { DisplayName } = JSON.parse(String(init.body));
+          names.push(DisplayName);
+          return Response.json({ Customer: { Id: String(names.length), DisplayName } });
+        }
+        const statement = new URL(String(url)).searchParams.get("query") ?? "";
+        const prefix = /like '([^%']*)%'/i.exec(statement)?.[1] ?? "";
+        const sorted = names.filter((name) => name.startsWith(prefix)).sort();
+        return Response.json({ QueryResponse: { Customer: sorted.map((DisplayName) => ({ DisplayName })) } });
+      },
+      quickbooks: { apiBase: "https://books.test/v3", realmId: "1", accessToken: "t" },
+      jobber: { apiUrl: "https://jobber.test/api/graphql", accessToken: "t" },
+      now: async () => "2026-10-12T00:00:00Z",
+    };
+  }
+
+  it("tells a sort that puts capitals first from one that ignores case, whatever customers the company has", async () => {
+    const orderby = CASES.find((testCase) => caseId(testCase) === "quickbooks/orderby-text-case")!;
+    expect(await orderby.observe(booksSortingByCharacterCode())).not.toEqual(observed[caseId(orderby)]);
   });
 });
 

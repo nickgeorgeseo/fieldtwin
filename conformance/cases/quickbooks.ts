@@ -94,15 +94,17 @@ export const quickbooksCases: ConformanceCase[] = [
     vendor: "quickbooks",
     endpoint: "GET /query",
     fidelity: "How query values compare",
+    writes: true,
     async observe(target) {
-      // Every sandbox company has customers; whether their names sort without regard to case settles the row.
-      const answer = await quickbooksQuery(
-        target,
-        "select * from Customer where DisplayName like '%' orderby DisplayName desc maxresults 50",
-      );
+      // Two names of its own that sort one way ignoring case ("a" before "B") and the other by character code
+      // ("B" before "a"), so the answer doesn't depend on which customers the company already has.
+      const prefix = unique("orderby");
+      for (const ending of ["a", "B"]) {
+        expectOk(await quickbooks(target, "POST", "customer", { DisplayName: `${prefix} ${ending}` }), "create a customer");
+      }
+      const answer = await quickbooksQuery(target, `select * from Customer where DisplayName like '${prefix}%' orderby DisplayName`);
       const names: string[] = (answer.body?.QueryResponse?.Customer ?? []).map((customer: { DisplayName: string }) => customer.DisplayName);
-      const folded = names.map((name) => name.toLowerCase());
-      return { status: answer.status, sortedIgnoringCase: folded.every((name, i) => i === 0 || folded[i - 1]! >= name) };
+      return { status: answer.status, order: names.map((name) => name.slice(prefix.length + 1)) };
     },
   },
   {
