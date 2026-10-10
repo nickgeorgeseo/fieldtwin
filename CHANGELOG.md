@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: a Jobber line whose quantity times unit price isn't its total, to the cent, is booked at its total with the pricing in its description. Sending all three made QuickBooks refuse the invoice with 6070 on every run, which also held the scheduled sync's cutoff back.
+
 - QuickBooks paths the twin doesn't model (`/vendor/1`, `/estimate`, `/reports/...`) answer a Fault saying so, with what the twin serves, instead of a plain-text 404 an SDK can't parse.
 
 - QuickBooks amounts: an amount sent as a numeric string (`"93.00"`, as python-quickbooks sends decimals) is accepted instead of answering "Required parameter Line.Amount is missing". Fractions of a cent, and amounts too big to add up, answer 2140 Invalid Amount; they used to be stored as sent while totals were kept in rounded cents, so lines and totals disagreed, and a 1e307 line made `TotalAmt` null. Qty × UnitPrice is checked to the cent with decimal-correct rounding, so 2.5 × 33.33 = 83.33 is no longer refused with 6070.

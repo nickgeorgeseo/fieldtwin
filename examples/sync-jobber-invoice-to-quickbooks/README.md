@@ -54,6 +54,7 @@ The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, 
 | Running twice | [`sync.ts`](src/sync.ts) | Every step looks before it writes. A second run changes nothing; a run that died halfway is finished by the next |
 | Trusting a webhook | [`webhooks.ts`](src/webhooks.ts) | Verifies `X-Jobber-Hmac-SHA256` over the raw body in constant time before anything else, and refuses what doesn't verify |
 | Answering a webhook in time | [`webhooks.ts`](src/webhooks.ts), [`invoice-queue.ts`](src/invoice-queue.ts) | Jobber allows [one second](https://developer.getjobber.com/docs/using_jobbers_api/setting_up_webhooks/): the handler only verifies and queues, and the sync runs in the background |
+| Prices finer than a cent | [`sync.ts`](src/sync.ts) | QuickBooks refuses a line whose Amount isn't Qty × UnitPrice to the cent (6070). A Jobber line that doesn't add up is booked at its total, with the pricing in its description, rather than failing every run |
 | Repeated and out-of-order webhooks | [`invoice-queue.ts`](src/invoice-queue.ts) | Queues invoice ids, not events, so news about an invoice already waiting is folded in, and reads each invoice as it is when its turn comes. A payment's two `INVOICE_UPDATE`s, redeliveries, and late arrivals all end in one booking |
 
 [`twin.ts`](src/twin.ts) is the only twin-specific file: it connects without a browser, sleeps on twin time, subscribes to webhooks, and makes customers pay. Everything else is what you would ship.
