@@ -5,7 +5,10 @@ import type { JobberState } from "../../../src/vendors/jobber/types.ts";
 import type { QboState } from "../../../src/vendors/quickbooks/types.ts";
 import { EVER, syncHarness } from "./harness.ts";
 
-/** mismatched-books: three customers respelled in QuickBooks (same email), two only in Jobber, two only in QuickBooks. */
+/**
+ * mismatched-books: three customers respelled in QuickBooks (same email), two only in Jobber, two only in QuickBooks,
+ * and one QuickBooks made inactive who has paid for new work since.
+ */
 async function syncedMismatchedBooks() {
   const target = createApp({ seed: 42, auth: "oauth" });
   loadScenarioByName(target.twin, "mismatched-books");
@@ -60,6 +63,19 @@ describe("syncing books that have drifted from the field (mismatched-books)", ()
       expect(duplicates).toEqual([]);
       expect(created!.DisplayName).toBe(`${customer.firstName} ${customer.lastName}`);
       for (const invoice of paidInvoicesOf(customer.email)) expect(bookedTo(invoice.invoiceNumber)).toBe(created!.Id);
+    }
+  });
+
+  it("makes the customer the bookkeeper made inactive active again to book their new work, without a duplicate", async () => {
+    const { stats, world, person, customersWithEmail, paidInvoicesOf, bookedTo } = await syncedMismatchedBooks();
+    const retired = world.drift.inactiveInAccounting.map(person);
+    expect(retired.length).toBeGreaterThan(0);
+    expect(stats.customersReactivated).toBe(retired.length);
+    for (const customer of retired) {
+      const [inBooks, ...duplicates] = customersWithEmail(customer.email);
+      expect(duplicates).toEqual([]);
+      expect(inBooks!.Active).toBe(true);
+      for (const invoice of paidInvoicesOf(customer.email)) expect(bookedTo(invoice.invoiceNumber)).toBe(inBooks!.Id);
     }
   });
 

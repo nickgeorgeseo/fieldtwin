@@ -27,7 +27,7 @@ export function seedQuickBooks(world: World): NewEvent[] {
       PrimaryEmailAddr: { Address: person.email },
       PrimaryPhone: { FreeFormNumber: person.phone },
       BillAddr: { Line1: person.street, City: person.city, CountrySubDivisionCode: person.state, PostalCode: person.postalCode },
-      Active: true,
+      Active: !world.drift.inactiveInAccounting.includes(person.key), // made inactive by the bookkeeper (drift.ts)
       MetaData: { CreateTime: SEED_TIME, LastUpdatedTime: SEED_TIME },
     });
   });

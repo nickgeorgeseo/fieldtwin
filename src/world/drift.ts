@@ -8,6 +8,8 @@ import type { WorldCustomer } from "./generate-world.ts";
  *                        ("Lindqvist" vs "Lindquist"); the email address is the same in both systems
  *   fieldServiceOnly     new customers with jobs and invoices the books have never seen
  *   accountingOnly       customers the bookkeeper entered directly, with no field work at all
+ *   inactiveInAccounting customers the bookkeeper made inactive in the books, who have called again since: each has
+ *                        a job finished and paid in the last week, newer than the books
  *
  * Systems are named by role, not vendor: Jobber is the field-service system, QuickBooks the accounting one.
  * Drift picks customers by position, not by random draw, so a world without drift is exactly as before.
@@ -16,12 +18,14 @@ export interface DriftOptions {
   renamedInAccounting?: number;
   fieldServiceOnly?: number;
   accountingOnly?: number;
+  inactiveInAccounting?: number;
 }
 
 export interface WorldDrift {
   accountingSpellings: Record<string, { firstName: string; lastName: string }>;
   fieldServiceOnly: string[];
   accountingOnly: string[];
+  inactiveInAccounting: string[];
 }
 
 /** Plausible data-entry variants: alternate spellings and one-key typos. None is a name in the word lists. */
@@ -49,8 +53,8 @@ const ACCOUNTING_SPELLINGS: Record<string, string> = {
 };
 
 export function makeDrift(customers: WorldCustomer[], options: DriftOptions = {}): WorldDrift {
-  const { renamedInAccounting = 0, fieldServiceOnly = 0, accountingOnly = 0 } = options;
-  if (renamedInAccounting + fieldServiceOnly + accountingOnly > customers.length - 1) {
+  const { renamedInAccounting = 0, fieldServiceOnly = 0, accountingOnly = 0, inactiveInAccounting = 0 } = options;
+  if (renamedInAccounting + fieldServiceOnly + accountingOnly + inactiveInAccounting > customers.length - 1) {
     throw new Error(`World drift: ${customers.length} customers is too few for that much drift`);
   }
 
@@ -59,6 +63,8 @@ export function makeDrift(customers: WorldCustomer[], options: DriftOptions = {}
   const rest = customers.slice(0, customers.length - fromEnd.length);
   const step = renamedInAccounting ? Math.max(1, Math.floor(rest.length / renamedInAccounting)) : 1;
   const renamed = Array.from({ length: renamedInAccounting }, (_, i) => rest[(1 + i * step) % rest.length]!);
+  // The inactive ones are the last of the others, chosen after the rest so adding them changes no one else's drift.
+  const inactive = inactiveInAccounting ? rest.filter((customer) => !renamed.includes(customer)).slice(-inactiveInAccounting) : [];
 
   return {
     accountingSpellings: Object.fromEntries(
@@ -69,5 +75,6 @@ export function makeDrift(customers: WorldCustomer[], options: DriftOptions = {}
     ),
     fieldServiceOnly: fromEnd.slice(0, fieldServiceOnly).map((customer) => customer.key),
     accountingOnly: fromEnd.slice(fieldServiceOnly).map((customer) => customer.key),
+    inactiveInAccounting: inactive.map((customer) => customer.key),
   };
 }

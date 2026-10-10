@@ -3,8 +3,9 @@
 name: Mismatched books
 description: >
   An electrician whose books have drifted from the field. Three customers are spelled differently in QuickBooks
-  (same email address), two new customers exist only in Jobber with work QuickBooks has never seen, and two
-  customers exist only in QuickBooks.
+  (same email address), two new customers exist only in Jobber with work QuickBooks has never seen, two
+  customers exist only in QuickBooks, and one customer the bookkeeper made inactive has called again and paid
+  for new work.
 seed: 21
 startTime: "2026-07-13T12:00:00Z"
 world:
@@ -13,3 +14,4 @@ world:
     renamedInAccounting: 3 # "Lindqvist" in Jobber, "Lindquist" in QuickBooks
     fieldServiceOnly: 2 # jobs and invoices in Jobber, unknown to QuickBooks
     accountingOnly: 2 # in the books, never in the field
+    inactiveInAccounting: 1 # inactive in QuickBooks, but paid for a job in Jobber this week

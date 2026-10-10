@@ -6,7 +6,8 @@ import { generateWorld } from "../src/world/generate-world.ts";
 import { setup } from "./helpers.ts";
 
 const START = "2026-07-13T11:00:00.000Z";
-const drift = { renamedInAccounting: 3, fieldServiceOnly: 2, accountingOnly: 2 };
+const drift = { renamedInAccounting: 3, fieldServiceOnly: 2, accountingOnly: 2, inactiveInAccounting: 1 };
+const WEEK = 7 * 86_400_000;
 const driftedWorld = () => generateWorld(new SeededRandom(21), { startTime: START, size: { customers: 30 }, drift });
 
 /** A twin loaded with the mismatched-books scenario. */
@@ -23,7 +24,7 @@ const qboCustomersByEmail = async (harness: ReturnType<typeof setup>, email: str
 describe("drift between the field-service and accounting systems", () => {
   it("leaves worlds without drift exactly as they were", () => {
     const plain = generateWorld(new SeededRandom(21), { startTime: START, size: { customers: 30 } });
-    expect(plain.drift).toEqual({ accountingSpellings: {}, fieldServiceOnly: [], accountingOnly: [] });
+    expect(plain.drift).toEqual({ accountingSpellings: {}, fieldServiceOnly: [], accountingOnly: [], inactiveInAccounting: [] });
     expect(generateWorld(new SeededRandom(21), { startTime: START, size: { customers: 30 }, drift: {} })).toEqual(plain);
   });
 
@@ -43,13 +44,32 @@ describe("drift between the field-service and accounting systems", () => {
     }
   });
 
+  it("gives every customer the books made inactive a job paid in the last week, newer than the books, whatever the seed", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const world = generateWorld(new SeededRandom(seed), { startTime: START, size: { customers: 30 }, drift });
+      expect(world.drift.inactiveInAccounting).toHaveLength(1);
+      for (const key of world.drift.inactiveInAccounting) {
+        const recentlyPaid = world.history.invoices.filter(
+          (invoice) =>
+            invoice.customerKey === key &&
+            invoice.paidAt !== undefined &&
+            Date.parse(invoice.issuedAt) >= Date.parse(START) - WEEK &&
+            Date.parse(invoice.paidAt) <= Date.parse(START),
+        );
+        expect(recentlyPaid.length, `seed ${seed}: ${key} paid for work this week`).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("chooses distinct customers for each kind of drift, and respells names plausibly", () => {
     const world = driftedWorld();
     const renamed = Object.keys(world.drift.accountingSpellings);
     expect(renamed).toHaveLength(3);
     expect(world.drift.fieldServiceOnly).toHaveLength(2);
     expect(world.drift.accountingOnly).toHaveLength(2);
-    expect(new Set([...renamed, ...world.drift.fieldServiceOnly, ...world.drift.accountingOnly]).size).toBe(7);
+    expect(world.drift.inactiveInAccounting).toHaveLength(1);
+    const chosen = [...renamed, ...world.drift.fieldServiceOnly, ...world.drift.accountingOnly, ...world.drift.inactiveInAccounting];
+    expect(new Set(chosen).size).toBe(8);
 
     for (const [key, spelling] of Object.entries(world.drift.accountingSpellings)) {
       const customer = world.customers.find((candidate) => candidate.key === key)!;
@@ -95,6 +115,31 @@ describe("drift between the field-service and accounting systems", () => {
       const person = world.customers.find((customer) => customer.key === key)!;
       expect(body.data.clients.nodes.map((client: { email: string }) => client.email)).not.toContain(person.email);
       expect(await qboCustomersByEmail(harness, person.email)).toHaveLength(1);
+    }
+  });
+
+  it("has QuickBooks keep the customers it made inactive, out of default queries, without the work paid since", async () => {
+    const harness = mismatched();
+    const { world } = harness.twin;
+    expect(world.drift.inactiveInAccounting.length).toBeGreaterThan(0);
+    const qbo = harness.twin.state<{ invoices: Map<string, { DocNumber?: string }> }>("quickbooks");
+    const jobber = harness.twin.state<{
+      clients: Map<string, { id: string; emails: { address: string }[] }>;
+      invoices: Map<string, { clientId: string; invoiceNumber: string; paidAt?: string }>;
+    }>("jobber");
+    for (const key of world.drift.inactiveInAccounting) {
+      const person = world.customers.find((customer) => customer.key === key)!;
+      expect(await qboCustomersByEmail(harness, person.email)).toEqual([]); // left out unless a query asks for inactive ones
+      const query = `select * from Customer where PrimaryEmailAddr = '${person.email}' and Active = false`;
+      const [inactive] = (await (await harness.qboGet(`/query?query=${encodeURIComponent(query)}`)).json()).QueryResponse.Customer;
+      expect(inactive).toMatchObject({ Active: false });
+
+      const client = [...jobber.clients.values()].find((candidate) => candidate.emails[0]?.address === person.email)!;
+      const booked = new Set([...qbo.invoices.values()].map((invoice) => invoice.DocNumber));
+      const paidSince = [...jobber.invoices.values()].filter(
+        (invoice) => invoice.clientId === client.id && invoice.paidAt && !booked.has(invoice.invoiceNumber),
+      );
+      expect(paidSince.length).toBeGreaterThan(0);
     }
   });
 });

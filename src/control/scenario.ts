@@ -75,6 +75,7 @@ const ScenarioSchema = z
             renamedInAccounting: z.number().int().nonnegative(),
             fieldServiceOnly: z.number().int().nonnegative(),
             accountingOnly: z.number().int().nonnegative(),
+            inactiveInAccounting: z.number().int().nonnegative(),
           })
           .partial()
           .strict(),

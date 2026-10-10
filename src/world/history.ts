@@ -75,6 +75,7 @@ export interface HistoryContext {
   startMs: number;
   utcOffsetHours: number;
   needsWork?: string[]; // customers who must have an invoiced job: drift's field-service-only customers
+  needsRecentPaidWork?: string[]; // customers who must have a job paid in the last week: drift's inactive ones
 }
 
 const PAST_DAYS = 90;
@@ -103,6 +104,16 @@ export function makeHistory(context: HistoryContext): WorldHistory {
   for (const key of context.needsWork ?? []) {
     const invoiced = stories.some((story) => story.invoice && story.job.customerKey === key);
     if (!invoiced) stories.push(jobStory(context, random.int(-PAST_DAYS, -3), key));
+  }
+  // Customers the books made inactive (see drift.ts) have called again: a job three to six days back, finished,
+  // invoiced, and paid by now. Drawn last as well.
+  for (const key of context.needsRecentPaidWork ?? []) {
+    const story = jobStory(context, random.int(-6, -3), key);
+    const invoice = story.invoice!; // three days back or more, always invoiced
+    const issuedMs = Date.parse(invoice.issuedAt);
+    const halfwayToNow = issuedMs + Math.floor((context.startMs - issuedMs) / 2 / 60_000) * 60_000; // to the minute
+    invoice.paidAt ??= new Date(halfwayToNow).toISOString();
+    stories.push(story);
   }
 
   const jobs = numberInOrder(
