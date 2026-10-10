@@ -14,6 +14,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 - QuickBooks queries take the rest of the documented language: `AND`, `<`, `>`, `<=`, `>=`, `LIKE` with `%`, and `ORDERBY` with `ASC`/`DESC` on several properties. `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '2026-07-01T00:00:00-05:00' ORDERBY TxnDate DESC` now works instead of answering "Unsupported operation". Numbers compare by value, `MetaData` times as instants, and text without regard to case.
 - QuickBooks queries leave inactive customers and items out unless they filter on `Active`, as Intuit's docs imply. Code that looks a customer up before creating it now meets the inactive duplicate on the twin, as it would in production.
+- A conformance case for a QuickBooks `requestid` reused on another endpoint. The twin answers with the first write's answer (`{"Customer": ...}` for an invoice write), as the docs word it; FIDELITY.md marks it "check" until a sandbox recording settles it.
 - `npm start -- flaky-apis` starts a ready-made scenario by name; a path to a `.yaml` (or `.yml`) file still works.
 
 ### Changed

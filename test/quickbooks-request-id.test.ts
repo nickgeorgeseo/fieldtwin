@@ -84,6 +84,19 @@ describe("QuickBooks requestid", () => {
     expect(created(harness)).toHaveLength(1);
   });
 
+  it("answers a requestid already used on another endpoint with the first answer, since an id is one per company", async () => {
+    const harness = setup();
+    const first = await (await harness.qboPost("/customer?requestid=used-once", customer("Jo Example"))).json();
+    const invoice = {
+      CustomerRef: { value: first.Customer.Id },
+      Line: [{ Amount: 20, DetailType: "SalesItemLineDetail", SalesItemLineDetail: { ItemRef: { value: "1" } } }],
+    };
+
+    const reused = await harness.qboPost("/invoice?requestid=used-once", invoice);
+    expect(await reused.json()).toEqual(first);
+    expect(created(harness).map((event) => event.type)).toEqual(["CustomerCreated"]);
+  });
+
   it("rejects a requestid longer than the documented 50 characters", async () => {
     const harness = setup();
     const response = await harness.qboPost(`/customer?requestid=${"x".repeat(51)}`, customer("Ivy Example"));

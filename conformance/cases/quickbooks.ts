@@ -197,6 +197,20 @@ export const quickbooksCases: ConformanceCase[] = [
     },
   },
   {
+    name: "requestid-on-another-endpoint",
+    vendor: "quickbooks",
+    endpoint: "POST /invoice?requestid",
+    fidelity: "requestid details the docs don't give",
+    writes: true,
+    async observe(target) {
+      const requestId = randomUUID();
+      const body = { DisplayName: unique("requestid reused") };
+      const customer = expectOk(await quickbooks(target, "POST", `customer?requestid=${requestId}`, body), "create the customer");
+      const reused = await quickbooks(target, "POST", `invoice?requestid=${requestId}`, await invoiceFor(target, customer.Customer.Id));
+      return { status: reused.status, answerKeys: Object.keys(reused.body ?? {}).sort() };
+    },
+  },
+  {
     name: "requestid-too-long",
     vendor: "quickbooks",
     endpoint: "POST /customer?requestid",
@@ -207,19 +221,23 @@ export const quickbooksCases: ConformanceCase[] = [
   },
 ];
 
-/** A new customer, and the answer to creating an invoice for them priced with the company's first Service item. */
+/** A new customer, and the answer to creating an invoice for them. */
 async function newInvoice(target: Target, fields: object = {}): Promise<Answer> {
   const customer = expectOk(await quickbooks(target, "POST", "customer", { DisplayName: unique("customer") }), "create a customer");
+  return quickbooks(target, "POST", "invoice", { ...(await invoiceFor(target, customer.Customer.Id)), ...fields });
+}
+
+/** An invoice body for a customer: one line priced with the company's first Service item. */
+async function invoiceFor(target: Target, customerId: string) {
   const items = expectOk(await quickbooksQuery(target, "SELECT * FROM Item WHERE Type = 'Service' MAXRESULTS 1"), "find a Service item");
   const item = items.QueryResponse?.Item?.[0];
   if (!item) throw new Error("The company has no Service item to put on an invoice.");
-  return quickbooks(target, "POST", "invoice", {
-    CustomerRef: { value: customer.Customer.Id },
+  return {
+    CustomerRef: { value: customerId },
     Line: [
       { DetailType: "SalesItemLineDetail", Amount: 100, SalesItemLineDetail: { ItemRef: { value: item.Id }, Qty: 1, UnitPrice: 100 } },
     ],
-    ...fields,
-  });
+  };
 }
 
 /** The body of a 2xx answer; anything else stops the case with what went wrong. */
