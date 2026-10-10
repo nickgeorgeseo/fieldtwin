@@ -1,9 +1,10 @@
 import type { DriftOptions } from "../world/drift.ts";
 import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
+import { Bookkeeping } from "./bookkeeping.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
-import { type BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
-import { type OAuthPolicy, OAuthServer } from "./oauth.ts";
+import type { BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
+import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { SeededRandom } from "./random.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
@@ -38,14 +39,11 @@ export class Twin {
   private states = new Map<VendorName, unknown>();
   private checkpoints = new Map<string, Checkpoint>();
 
-  // Request bookkeeping, deliberately outside the event log: nothing about the fake business changes when
-  // a rate-limit budget is spent, so it is not replayed. reset() and rewind() clear it, because the spending
-  // it remembers belongs to a history that no longer exists.
-  private rateLimits = new Map<string, LeakyBucket>();
-
-  // OAuth connections are bookkeeping too, but they belong to your app rather than to the business data,
-  // so they survive reset() and rewind(), the way a real app stays connected while its data changes.
-  private oauthServers = new Map<VendorName, OAuthServer>();
+  // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
+  // Each vendor's OAuth server draws from its own stream, so issuing tokens never changes the world or the faults.
+  private readonly bookkeeping = new Bookkeeping(
+    (vendor) => new SeededRandom(this.options.seed + 2 + [...this.vendors.keys()].indexOf(vendor)),
+  );
 
   // A loaded scenario's schedule. See schedule() and advance().
   private timeline = new Timeline();
@@ -134,7 +132,7 @@ export class Twin {
     this.faultRandom = new SeededRandom(seed + 1);
     this.faultRules = [];
     this.checkpoints.clear();
-    this.rateLimits.clear();
+    this.bookkeeping.clearRateLimits();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
 
     for (const vendor of this.vendors.values()) {
@@ -146,24 +144,12 @@ export class Twin {
 
   /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
   oauthServer(vendor: VendorName, policy: OAuthPolicy): OAuthServer {
-    let server = this.oauthServers.get(vendor);
-    if (!server) {
-      // Its own random stream, so issuing tokens never changes the world or the faults.
-      const stream = this.options.seed + 2 + [...this.vendors.keys()].indexOf(vendor);
-      server = new OAuthServer(policy, new SeededRandom(stream));
-      this.oauthServers.set(vendor, server);
-    }
-    return server;
+    return this.bookkeeping.oauthServer(vendor, policy);
   }
 
   /** The rate-limit budget for a key (e.g. one vendor app), created full on first use. */
   rateLimitBucket(key: string, limits: BucketLimits): LeakyBucket {
-    let bucket = this.rateLimits.get(key);
-    if (!bucket) {
-      bucket = new LeakyBucket(limits);
-      this.rateLimits.set(key, bucket);
-    }
-    return bucket;
+    return this.bookkeeping.rateLimitBucket(key, limits);
   }
 
   checkpoint(name: string): Checkpoint {
@@ -195,7 +181,7 @@ export class Twin {
       this.vendor(event.vendor).apply(this.state(event.vendor), replayed);
     }
     this.clock = new TwinClock(checkpoint.time);
-    this.rateLimits.clear();
+    this.bookkeeping.clearRateLimits();
     this.timeline.rearmAfter(this.clock.nowMs());
 
     // Checkpoints taken after this one point at history that no longer exists.
