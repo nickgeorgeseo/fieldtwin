@@ -2,9 +2,15 @@ import {
   type DocumentNode,
   type FieldNode,
   type FragmentDefinitionNode,
+  type FragmentSpreadNode,
+  GraphQLIncludeDirective,
   type GraphQLNamedType,
   type GraphQLSchema,
+  GraphQLSkipDirective,
+  getDirectiveValues,
   getNamedType,
+  getVariableValues,
+  type InlineFragmentNode,
   isInterfaceType,
   isObjectType,
   Kind,
@@ -12,6 +18,7 @@ import {
   type SelectionSetNode,
   type ValueNode,
 } from "graphql";
+import { MAX_PAGE_SIZE } from "./resolvers/connection.ts";
 
 /**
  * Jobber's query cost, exactly as documented:
@@ -20,15 +27,15 @@ import {
  *   - Every field costs 1 point, except `edges`, `nodes`, `node`, and the connection field itself, which cost 0.
  *   - Fields under `nodes` or `edges` are charged once per node: multiplied by the connection's `first` or
  *     `last` argument, or by 100 when neither is given ("the maximum number of fields will be returned").
+ *     A negative page size counts as 0, as it does when the connection is resolved, so it can't lower the cost.
  *   - Nested connections multiply, which is why deep nesting gets expensive fast.
  *
  * requestedQueryCost applies these rules to the query; actualQueryCost applies them to the data that came
  * back, so asking for 50 quotes when only 2 exist costs the 2. Jobber deducts the actual cost.
  * Where the docs are silent (connection-level fields like pageInfo, plain lists, fragments on abstract
- * types) the twin charges each field once; FIDELITY.md marks those as approximate.
+ * types) the twin charges each field once; FIDELITY.md marks those as approximate. Like any GraphQL server, it
+ * reads variables with their declared defaults and leaves out what `@skip` and `@include` leave out.
  */
-
-export const ASSUMED_PAGE_SIZE = 100; // "All connection fields are configured to return a maximum of 100 nodes"
 
 /** The published budget: 10,000 points per app and account, restoring at 500 points per second. */
 export const COST_LIMITS = { capacity: 10_000, restorePerSecond: 500 };
@@ -95,9 +102,9 @@ function requestedPageSize(field: FieldNode, context: Context): number {
   for (const name of ["first", "last"]) {
     const argument = field.arguments?.find((candidate) => candidate.name.value === name);
     const size = argument && readInt(argument.value, context.variables);
-    if (size !== undefined) return size;
+    if (size !== undefined) return Math.max(0, size);
   }
-  return ASSUMED_PAGE_SIZE;
+  return MAX_PAGE_SIZE;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -151,7 +158,9 @@ function start(schema: GraphQLSchema, document: DocumentNode, variables: Record<
       operation ??= definition;
     }
   }
-  return { operation, context: { schema, variables, fragments } };
+  // The variables as execution will see them: declared defaults filled in. If they don't coerce, execution reports it.
+  const coerced = getVariableValues(schema, operation?.variableDefinitions ?? [], variables);
+  return { operation, context: { schema, variables: coerced.coerced ?? variables, fragments } };
 }
 
 function rootType(schema: GraphQLSchema, operation: OperationDefinitionNode): GraphQLNamedType {
@@ -160,10 +169,11 @@ function rootType(schema: GraphQLSchema, operation: OperationDefinitionNode): Gr
   return root;
 }
 
-/** The fields of a selection set, with fragments and inline fragments flattened in. */
+/** The fields of a selection set, with fragments and inline fragments flattened in and skipped selections left out. */
 function collectFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
   const fields: FieldNode[] = [];
   for (const selection of selectionSet.selections) {
+    if (!included(selection, context)) continue;
     if (selection.kind === Kind.FIELD) fields.push(selection);
     else if (selection.kind === Kind.INLINE_FRAGMENT) fields.push(...collectFields(selection.selectionSet, parentType, context));
     else {
@@ -172,6 +182,12 @@ function collectFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedT
     }
   }
   return fields;
+}
+
+/** Whether `@skip(if: ...)` and `@include(if: ...)` keep a selection in the query. */
+function included(selection: FieldNode | InlineFragmentNode | FragmentSpreadNode, context: Context): boolean {
+  if (getDirectiveValues(GraphQLSkipDirective, selection, context.variables)?.if === true) return false;
+  return getDirectiveValues(GraphQLIncludeDirective, selection, context.variables)?.if !== false;
 }
 
 function fieldType(parentType: GraphQLNamedType, field: FieldNode): GraphQLNamedType | undefined {

@@ -12,6 +12,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Jobber connections return at most 100 nodes, as documented. `clients(first: 500)` returned every client, so code that never pages passed against the twin and would miss records in production.
+- Jobber query cost: a negative `first` or `last` made the requested cost negative, which let any query past the throttle (and answered `hasNextPage: true` with no cursor). It now counts as 0. Variables' declared defaults (`$n: Int = 10`) and `@skip`/`@include` now count, so a cheap query that relies on them is no longer priced as if every page held 100 nodes and throttled forever.
+
 - QuickBooks: `POST /customer?operation=delete` was ignored and the body applied as a full update, wiping the customer's other fields. Operations the twin doesn't model now answer "Unsupported operation" and change nothing, for every entity. `?operation=update`, which Intuit's SDKs send on every update, now works for invoices as it did for customers.
 - QuickBooks: a write whose body was still uploading when its retry arrived could be made twice despite its `requestid`. The requestid is now checked after the body is read.
 
