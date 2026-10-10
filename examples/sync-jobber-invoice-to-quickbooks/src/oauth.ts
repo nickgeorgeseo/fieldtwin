@@ -18,8 +18,9 @@ import { REQUEST_TIMEOUT_MS, type Runtime } from "./runtime.ts";
  *     Jobber's old refresh token stops working the moment a new one is issued. QuickBooks' documented sample
  *     returns the same one, but storing whatever comes back costs nothing;
  *   - with loadTokens, works alongside other processes sharing the connection (a webhook server and a scheduled
- *     job): before refreshing, and once more if the refresh token turns out to be dead, it reads the saved set, and
- *     uses the one another process already rotated to instead of asking the person to reconnect.
+ *     job): before refreshing, and again if the refresh token turns out to be dead (a few times, a second apart, in
+ *     case the other process is still saving), it reads the saved set, and uses the one another process already
+ *     rotated to instead of asking the person to reconnect.
  */
 
 export interface VendorOAuth {
@@ -57,6 +58,7 @@ export class OAuthError extends Error {
 
 const TOKEN_RETRY: RetryPolicy = { maxAttempts: 4, baseDelayMs: 1000, maxDelayMs: 10_000 };
 const DOCUMENTED_LIFETIME_SECONDS = 3600; // used only if a response ever leaves out expires_in
+const SAVED_TOKEN_READS = 3; // after an invalid_grant, how often to look for another process's save, a second apart
 
 /** Step two of connecting: trade the code your redirect URI received for the first set of tokens. */
 export function exchangeCode(oauth: VendorOAuth, code: string, redirectUri: string, runtime: Runtime): Promise<Tokens> {
@@ -108,10 +110,20 @@ export class TokenManager {
     try {
       return await this.refreshWith(this.tokens.refreshToken);
     } catch (error) {
-      // Dead refresh token: another process may have rotated it a moment ago. Try its saved set once, then give up.
-      const rotated = error instanceof OAuthError && error.code === "invalid_grant" ? await this.newerSavedTokens() : undefined;
+      // Dead refresh token: another process may have rotated it a moment ago, and be saving the new set right now.
+      if (!(error instanceof OAuthError && error.code === "invalid_grant" && this.options.loadTokens)) throw error;
+      const rotated = await this.rotatedElsewhere();
       if (!rotated) throw error;
       return this.fresh(rotated) ? rotated : this.refreshWith(rotated.refreshToken);
+    }
+  }
+
+  /** The set another process rotated to, looked for a few times, a second apart, so a save on its way can land. */
+  private async rotatedElsewhere(): Promise<Tokens | undefined> {
+    for (let read = 1; ; read++) {
+      const rotated = await this.newerSavedTokens();
+      if (rotated || read >= SAVED_TOKEN_READS) return rotated;
+      await this.runtime.sleep(1000);
     }
   }
 

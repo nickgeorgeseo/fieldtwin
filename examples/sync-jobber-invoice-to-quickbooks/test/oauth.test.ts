@@ -151,6 +151,39 @@ describe("several processes sharing one connection", () => {
     expect(saved).toBe(manager.current); // and the set that works is saved now
   });
 
+  it("waits a moment for the other process's save when both refresh at once, instead of reporting the connection lost", async () => {
+    const { target, jobberTokens } = await connected();
+    let saved = jobberTokens.current;
+    let saveLands = () => {};
+    const savedLater = new Promise<void>((resolve) => {
+      saveLands = resolve;
+    });
+    const jobberOAuth = { ...JOBBER_APP, tokenUrl: ENDPOINTS.jobber.tokenUrl };
+    const store = {
+      onTokens: (tokens: typeof saved) => {
+        saved = tokens;
+      },
+      loadTokens: () => saved,
+    };
+    const processA = new TokenManager(jobberOAuth, saved, inProcessRuntime(target), {
+      ...store,
+      onTokens: async (tokens) => {
+        await savedLater; // a database write still on its way when B looks
+        store.onTokens(tokens);
+      },
+    });
+    // B's waits are when time passes for A's write to land.
+    const sleep = async (ms: number) => {
+      saveLands();
+      target.twin.advance(ms);
+    };
+    const processB = new TokenManager(jobberOAuth, saved, { ...inProcessRuntime(target), sleep }, store);
+    target.twin.advance(60 * MINUTE);
+
+    const [, tokenB] = await Promise.all([processA.accessToken(), processB.accessToken()]);
+    expect(tokenB).toBe(saved.accessToken);
+  });
+
   it("can't recover without a way to read the saved tokens: the stale refresh token is dead", async () => {
     const { processB } = await twoProcesses({ sharedStore: false });
     await expect(processB.accessToken()).rejects.toThrow(OAuthError);

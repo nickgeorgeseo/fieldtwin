@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: when two processes sharing a connection refresh at the same moment, the one Jobber turns away looks for the other's saved tokens three times, a second apart, before reporting the connection lost. It looked once, at once, which could be before the other process had finished saving.
+
 - Reference integration: with `loadTokens`, a `TokenManager` takes the saved tokens only when they are newer than its own. It took any saved set that differed, so after a save that failed it swapped its working tokens for the old saved ones, whose refresh token Jobber had already killed, and reported the connection lost.
 
 - With `FIELDTWIN_PORT=0` the startup line says which port the system picked, instead of `http://localhost:0`.
