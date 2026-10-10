@@ -24,6 +24,15 @@ export interface TwinOptions {
 }
 
 /**
+ * The dice fault rules roll: one stream for requests, one for webhook deliveries, so subscribing an app (which adds
+ * deliveries to roll for) never changes which requests fail. Neither is the world's, so faults never change it.
+ */
+export interface FaultRandom {
+  requests: SeededRandom;
+  webhooks: SeededRandom;
+}
+
+/**
  * The running twin: one fake business, seen through several vendor APIs.
  *
  * Three rules keep this easy to reason about:
@@ -38,11 +47,11 @@ export class Twin {
   faultRules: FaultRule[] = [];
   authMode: AuthMode;
   readonly defaultAuthMode: AuthMode; // what the twin started with (FIELDTWIN_AUTH); a scenario without `auth` returns to it
-  faultRandom!: SeededRandom; // separate stream, so faults never change the generated world
+  faultRandom!: FaultRandom;
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
-  private checkpoints = new Checkpoints();
+  private checkpoints = new Checkpoints<FaultRandom>(); // each saves where the fault dice were, to roll the same again
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   // Each vendor's OAuth server draws from its own stream, so issuing tokens never changes the world or the faults.
@@ -170,7 +179,7 @@ export class Twin {
     this.clock = clock;
     this.log = new EventLog();
     this.world = world;
-    this.faultRandom = new SeededRandom(seed + 1);
+    this.faultRandom = { requests: new SeededRandom(seed + 1), webhooks: new SeededRandom(seed * 7919 + 500) };
     this.faultRules = this.options.faults ?? [];
     this.checkpoints.clear();
     this.bookkeeping.clearRateLimits();
@@ -212,7 +221,7 @@ export class Twin {
   }
 
   checkpoint(name: string): Checkpoint {
-    return this.checkpoints.take(name, this.log.length, this.clock.nowIso());
+    return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), copyOf(this.faultRandom));
   }
 
   checkpointList(): Checkpoint[] {
@@ -228,7 +237,7 @@ export class Twin {
     return this.log.after(this.getCheckpoint(name).seq);
   }
 
-  /** Go back to a checkpoint by replaying the log up to that point. */
+  /** Go back to a checkpoint by replaying the log up to that point. The same requests then meet the same faults. */
   rewind(name: string): void {
     const checkpoint = this.getCheckpoint(name);
     const kept = this.log.all().slice(0, checkpoint.seq);
@@ -240,9 +249,14 @@ export class Twin {
       this.vendor(event.vendor).apply(this.state(event.vendor), replayed);
     }
     this.clock = new TwinClock(checkpoint.time);
+    this.faultRandom = copyOf(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
     this.bookkeeping.clearRateLimits();
     this.webhooks.dropPending();
     this.timeline.rearmAfter(this.clock.nowMs());
     this.checkpoints.forgetAfter(checkpoint.seq);
   }
+}
+
+function copyOf({ requests, webhooks }: FaultRandom): FaultRandom {
+  return { requests: requests.copy(), webhooks: webhooks.copy() };
 }

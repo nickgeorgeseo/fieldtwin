@@ -30,6 +30,13 @@ export class SeededRandom {
     return this.next() < probability;
   }
 
+  /** A copy that goes on from where this one is. Rolling either leaves the other alone. */
+  copy(): SeededRandom {
+    const copy = new SeededRandom(0);
+    copy.state = this.state;
+    return copy;
+  }
+
   pick<T>(items: readonly T[]): T {
     if (items.length === 0) throw new Error("SeededRandom.pick: cannot pick from an empty list");
     return items[this.int(0, items.length - 1)]!;

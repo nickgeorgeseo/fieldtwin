@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadScenario } from "../src/control/operations.ts";
 import type { FaultRule } from "../src/core/types.ts";
+import type { WebhookSender, WebhookSubscription } from "../src/core/webhooks.ts";
 import type { QboState } from "../src/vendors/quickbooks/types.ts";
 import { setup } from "./helpers.ts";
 
@@ -112,6 +113,59 @@ describe("lost responses", () => {
     const response = await putFaults(app, [{ name: "x", vendor: "quickbooks", rate: 1, effect: { lostResponse: true } }]);
     expect(response.status).toBe(400);
     expect((await response.json()).error).toMatch(/0\.effect: .*lostResponse needs a status/);
+  });
+});
+
+describe("which requests and deliveries a fault rule picks", () => {
+  const coinFlip: FaultRule = { name: "coin", vendor: "quickbooks", method: "POST", rate: 0.5, effect: { status: 503 } };
+  const twice: FaultRule = { name: "twice", vendor: "quickbooks", webhook: "*", rate: 0.5, effect: { duplicate: true } };
+  const subscription: WebhookSubscription = {
+    vendor: "quickbooks",
+    url: "https://app.example.com/qbo",
+    topics: ["qbo.customer.created.v1"],
+    clientId: "a",
+    clientSecret: "b",
+  };
+
+  /** A twin whose webhook deliveries are noted (with the fault that marked them) instead of sent. */
+  function recordingTwin() {
+    const faults: (string | null)[] = [];
+    const sendWebhook: WebhookSender = async (_url, init) => {
+      faults.push(new Headers(init.headers).get("X-Twin-Fault"));
+      return new Response(null, { status: 200 });
+    };
+    return { ...setup(42, { sendWebhook }), faults };
+  }
+
+  /** Twenty customer creates, and how each was answered. */
+  async function createCustomers(twin: ReturnType<typeof setup>["twin"], qboPost: ReturnType<typeof setup>["qboPost"]) {
+    const statuses: number[] = [];
+    for (let i = 0; i < 20; i++) statuses.push((await qboPost("/customer", { DisplayName: `Coin Flip ${i}` })).status);
+    await twin.webhooks.idle();
+    return statuses;
+  }
+
+  it("picks the same ones again when the same requests are made after a rewind", async () => {
+    const { twin, qboPost, faults } = recordingTwin();
+    twin.webhooks.subscriptions = [subscription];
+    twin.faultRules = [coinFlip, twice];
+    twin.checkpoint("before");
+    const first = { statuses: await createCustomers(twin, qboPost), faults: faults.splice(0) };
+    expect(first.statuses).toContain(503);
+    expect(first.faults).toContain("twice");
+
+    twin.rewind("before");
+    expect({ statuses: await createCustomers(twin, qboPost), faults: faults.splice(0) }).toEqual(first);
+  });
+
+  it("picks the same requests whether or not webhook faults are rolling for a subscription", async () => {
+    const plain = recordingTwin();
+    plain.twin.faultRules = [coinFlip];
+    const subscribed = recordingTwin();
+    subscribed.twin.webhooks.subscriptions = [subscription];
+    subscribed.twin.faultRules = [coinFlip, twice];
+
+    expect(await createCustomers(subscribed.twin, subscribed.qboPost)).toEqual(await createCustomers(plain.twin, plain.qboPost));
   });
 });
 

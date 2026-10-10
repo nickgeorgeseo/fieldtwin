@@ -19,7 +19,7 @@ import type { VendorTwin } from "../core/vendor-twin.ts";
 export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandler {
   return async (c, next) => {
     for (const rule of twin.faultRules) {
-      if (!matches(rule, vendor.name, c.req.method, c.req.path) || !twin.faultRandom.chance(rule.rate)) continue;
+      if (!matches(rule, vendor.name, c.req.method, c.req.path) || !twin.faultRandom.requests.chance(rule.rate)) continue;
       if (rule.effect.latencyMs) await sleep(rule.effect.latencyMs);
       if (rule.effect.status) {
         const message = rule.effect.message ?? `Injected by fault rule "${rule.name}"`;
