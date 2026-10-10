@@ -1,13 +1,10 @@
 import type { Context, Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
-import { qboDate, qboDateTimeMs } from "../dates.ts";
 import { qboErrors } from "../errors.ts";
-import { parseQboQuery, type QboQuery, type QueryCondition, type QueryOperator, type QueryValue } from "../query-language.ts";
+import { parseQboQuery, type QboQuery, type QueryCondition, type QueryValue } from "../query-language.ts";
+import { bySortKeys, comparable, holds, METADATA, unreadableValue } from "../query-values.ts";
 import type { QboEntityName, QboState } from "../types.ts";
 import { asResponse, COMPANY, ENTITY_RECORDS, entityNamed } from "./entity.ts";
-
-const METADATA = ["MetaData.CreateTime", "MetaData.LastUpdatedTime"]; // compared as instants
-const DATES = ["TxnDate", "DueDate"]; // compared as YYYY-MM-DD
 
 /**
  * The query endpoint: https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
@@ -76,7 +73,7 @@ function runQuery(state: QboState, query: QboQuery): { response: object } | { in
   const matching = [...ENTITY_RECORDS[entity](state).values()].filter((record: object) =>
     conditions.every((condition) => holds(condition, comparable(condition.property, valueAt(record, condition.property)))),
   );
-  if (sortKeys.length) matching.sort(bySortKeys(sortKeys));
+  if (sortKeys.length) matching.sort(bySortKeys(sortKeys, valueAt));
 
   // "The number of entities is returned as the value of the totalCount field ... data objects ... aren't in the response."
   if (query.select === "count") return { response: { totalCount: matching.length } };
@@ -97,73 +94,3 @@ function valueAt(record: object, path: string): unknown {
   }
   return value;
 }
-
-/** A value as it compares: MetaData times as instants, transaction dates as YYYY-MM-DD. undefined if unreadable. */
-function comparable(property: string, value: unknown): unknown {
-  if (value === undefined || value === null) return undefined;
-  if (METADATA.includes(property)) return qboDateTimeMs(String(value));
-  if (DATES.includes(property)) return qboDate(value);
-  return value;
-}
-
-function unreadableValue(property: string, value: QueryValue): string {
-  return METADATA.includes(property)
-    ? `'${value}' isn't a date-time the twin can read for ${property}. Use a form like '2026-07-13T11:00:00-05:00'`
-    : `'${value}' isn't a date the twin can read for ${property}. Use a form like '2026-07-13'`;
-}
-
-const ORDER_TESTS: Record<Exclude<QueryOperator, "like">, (order: number) => boolean> = {
-  "=": (order) => order === 0,
-  in: (order) => order === 0,
-  "<": (order) => order < 0,
-  ">": (order) => order > 0,
-  "<=": (order) => order <= 0,
-  ">=": (order) => order >= 0,
-};
-
-function holds({ operator, values }: QueryCondition, actual: unknown): boolean {
-  if (actual === undefined) return false;
-  if (operator === "like") return likePattern(String(values[0])).test(String(actual));
-  return values.some((wanted) => {
-    const order = compareValues(actual, wanted);
-    return order !== undefined && ORDER_TESTS[operator](order);
-  });
-}
-
-/** "Wildcard character support for LIKE clauses is limited to '%'": every other character matches itself. */
-function likePattern(pattern: string): RegExp {
-  const literal = pattern.split("%").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return new RegExp(`^${literal.join(".*")}$`, "is");
-}
-
-/** Records without a property sort before those with it; ties keep the default order. */
-function bySortKeys(keys: QboQuery["orderBy"]) {
-  return (a: object, b: object): number => {
-    for (const { property, descending } of keys) {
-      const x = comparable(property, valueAt(a, property));
-      const y = comparable(property, valueAt(b, property));
-      const order = x === undefined ? (y === undefined ? 0 : -1) : y === undefined ? 1 : (compareValues(x, y) ?? 0);
-      if (order !== 0) return descending ? -order : order;
-    }
-    return 0;
-  };
-}
-
-/**
- * How two values of a property order: numbers by value (queries quote them too: TotalAmt > '1000.0'), and text
- * without regard to case ("Attribute values are also not case sensitive"), comparing digits-only text such as
- * Ids as numbers. Booleans put false first. undefined when a number meets something that isn't one.
- */
-function compareValues(a: unknown, b: unknown): number | undefined {
-  const x = asNumber(a);
-  const y = asNumber(b);
-  if (x !== undefined && y !== undefined) return Math.sign(x - y);
-  if (typeof a === "number" || typeof b === "number") return undefined;
-  if (typeof a === "boolean" || typeof b === "boolean") return asBoolean(a) - asBoolean(b);
-  const [s, t] = [String(a).toLowerCase(), String(b).toLowerCase()];
-  return s < t ? -1 : s > t ? 1 : 0;
-}
-
-const asNumber = (value: unknown) =>
-  typeof value === "number" ? value : typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value) ? Number(value) : undefined;
-const asBoolean = (value: unknown) => (String(value).toLowerCase() === "true" ? 1 : 0);
