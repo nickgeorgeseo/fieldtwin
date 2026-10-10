@@ -23,6 +23,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: a customer the bookkeeper made inactive in QuickBooks is found instead of created again. QuickBooks queries leave inactive customers out unless asked, so the sync made a "Name (email)" duplicate and then reported the customer's own invoices as conflicts. It now looks among inactive customers too, and makes one active again (QuickBooks refuses invoices and payments for an inactive customer) only when there is new work to book, saying so in the log; the run's report counts them.
+
 - The `twin_load_scenario` MCP tool refuses a call that gives both `name` and `yaml`. It loaded the named scenario and ignored the YAML without saying so.
 
 - After a rewind, the same requests meet the same faults they did the first time. Fault rules kept rolling on from where they were, so a run repeated from a checkpoint failed different requests. Webhook fault rules also roll dice of their own now: subscribing an app to webhooks used to change which API requests failed.

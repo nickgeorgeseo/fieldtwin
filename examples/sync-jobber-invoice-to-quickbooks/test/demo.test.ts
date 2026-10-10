@@ -21,7 +21,7 @@ describe("the demo (npm run example:sync)", () => {
     expect(target.twin.webhooks.subscriptions).toEqual([]); // it cleaned up after itself
     expect(lines[0]).toBe(`Connected to QuickBooks (company 9341000000000001) and Jobber at ${TWIN_URL}.`);
     expect(lines).toContain(
-      "  26 paid invoices: 2 booked, 8 payments recorded, 26 stamped, 0 customers created, 0 matched despite a different spelling, 8 stale SyncTokens recovered, 0 conflicts, 0 failed.",
+      "  26 paid invoices: 2 booked, 8 payments recorded, 26 stamped, 0 customers created, 0 made active again, 0 matched despite a different spelling, 8 stale SyncTokens recovered, 0 conflicts, 0 failed.",
     );
   });
 });

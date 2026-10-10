@@ -100,7 +100,7 @@ function listen(handler: (request: Request) => Promise<Response>): Promise<{ url
 function report(stats: SyncStats, log: (line: string) => void): void {
   log(
     `  ${stats.invoices} paid invoices: ${stats.invoicesCreated} booked, ${stats.paymentsCreated} payments recorded, ` +
-      `${stats.invoicesStamped} stamped, ${stats.customersCreated} customers created, ` +
+      `${stats.invoicesStamped} stamped, ${stats.customersCreated} customers created, ${stats.customersReactivated} made active again, ` +
       `${stats.customersSpelledDifferently} matched despite a different spelling, ${stats.staleRetries} stale SyncTokens recovered, ` +
       `${stats.conflicts} conflicts, ${stats.failed} failed.`,
   );

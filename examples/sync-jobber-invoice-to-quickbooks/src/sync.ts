@@ -3,14 +3,14 @@ import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice, type Jobb
 import { OAuthError } from "./oauth.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
 import * as books from "./quickbooks-entities.ts";
-import { ensureCustomer } from "./sync-customers.ts";
+import { ensureActive, ensureCustomer } from "./sync-customers.ts";
 
 /**
  * Sync paid Jobber invoices into QuickBooks: the customer, the invoice, and the payment that settled it.
  *
  * Jobber is where the work is done and paid for; QuickBooks is the books. For every Jobber invoice that is paid
  * and has changed since `since`:
- *   1. ensure the customer (sync-customers.ts: matched by email, created if missing);
+ *   1. ensure the customer (sync-customers.ts: matched by email, created if missing, made active if a write needs it);
  *   2. ensure the invoice: DocNumber is Jobber's invoice number, the usual way businesses keep the two matched;
  *   3. ensure the payment: pay what's still open, up to what Jobber says was paid, once (PaymentRefNum JOBBER-<n>);
  *   4. stamp the invoice's PrivateNote, so whoever reads the books can see where it came from.
@@ -30,6 +30,7 @@ export interface SyncStats {
   invoices: number; // paid Jobber invoices changed since `since`
   customersCreated: number;
   customersSpelledDifferently: number; // matched by email, with a different name in the books; left as is
+  customersReactivated: number; // inactive in the books, made active again to book new work
   invoicesCreated: number;
   paymentsCreated: number;
   invoicesStamped: number;
@@ -63,6 +64,7 @@ export function emptyStats(): SyncStats {
     invoices: 0,
     customersCreated: 0,
     customersSpelledDifferently: 0,
+    customersReactivated: 0,
     invoicesCreated: 0,
     paymentsCreated: 0,
     invoicesStamped: 0,
@@ -115,6 +117,7 @@ async function ensureInvoice(invoice: JobberInvoice, customer: books.Customer, c
     Line.push(salesLineFor(line, item.Id));
   }
 
+  await ensureActive(invoice.client, invoice.invoiceNumber, context);
   const created = await books.createInvoice(quickbooks, {
     CustomerRef: { value: customer.Id },
     DocNumber: invoice.invoiceNumber,
@@ -156,6 +159,7 @@ async function ensurePayment(invoice: JobberInvoice, booked: books.Invoice, cont
   const PaymentRefNum = `JOBBER-${invoice.invoiceNumber}`;
   if (await books.findPaymentByRef(quickbooks, PaymentRefNum)) return; // recorded by an earlier run
 
+  await ensureActive(invoice.client, invoice.invoiceNumber, context);
   await books.createPayment(quickbooks, {
     CustomerRef: { value: booked.CustomerRef.value },
     TotalAmt: amount,

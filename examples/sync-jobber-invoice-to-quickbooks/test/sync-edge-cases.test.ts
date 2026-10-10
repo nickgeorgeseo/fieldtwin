@@ -36,6 +36,44 @@ describe("syncing, where the books need a person's judgment", () => {
     expect(warning).toContain("check it by hand");
   });
 
+  it("books new work for a customer the bookkeeper made inactive by making them active again, not by creating a duplicate", async () => {
+    const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
+    const harness = await syncHarness(target);
+    const invoice = firstPaidMissingFromBooks();
+    const email = jobber().clients.get(invoice.clientId)!.emails[0]!.address;
+    const customer = [...qbo().customers.values()].find((candidate) => candidate.PrimaryEmailAddr?.Address === email)!;
+    await harness.quickbooks.write("Customer", { Id: customer.Id, SyncToken: customer.SyncToken, sparse: true, Active: false });
+    const customersBefore = qbo().customers.size;
+
+    const stats = await harness.sync(EVER);
+    expect(stats).toMatchObject({ customersCreated: 0, customersReactivated: 1, conflicts: 0, failed: 0 });
+    expect(qbo().customers.size).toBe(customersBefore);
+    expect(booked(invoice.invoiceNumber)).toEqual([
+      expect.objectContaining({ CustomerRef: expect.objectContaining({ value: customer.Id }) }),
+    ]);
+    expect(qbo().customers.get(customer.Id)!.Active).toBe(true);
+    const reactivated = `Customer "${customer.DisplayName}" was inactive in QuickBooks; made active again to book Jobber invoice #`;
+    expect(harness.lines.filter((line) => line.startsWith(reactivated))).toHaveLength(1); // once, for their first new work
+  });
+
+  it("leaves a customer the bookkeeper made inactive as they are when all their work is already in the books", async () => {
+    const { target, jobber, qbo, booked } = twinWithBooks();
+    const harness = await syncHarness(target);
+    const settledInBooks = (clientId: string) => {
+      const paid = [...jobber().invoices.values()].filter((invoice) => invoice.clientId === clientId && invoice.paidAt);
+      return paid.length > 0 && paid.every((invoice) => booked(invoice.invoiceNumber).some((entry) => entry.Balance === 0));
+    };
+    const client = [...jobber().clients.values()].find((candidate) => settledInBooks(candidate.id))!;
+    const customer = [...qbo().customers.values()].find((candidate) => candidate.PrimaryEmailAddr?.Address === client.emails[0]!.address)!;
+    await harness.quickbooks.write("Customer", { Id: customer.Id, SyncToken: customer.SyncToken, sparse: true, Active: false });
+    const customersBefore = qbo().customers.size;
+
+    const stats = await harness.sync(EVER);
+    expect(stats).toMatchObject({ customersCreated: 0, customersReactivated: 0, conflicts: 0, failed: 0 });
+    expect(qbo().customers.size).toBe(customersBefore);
+    expect(qbo().customers.get(customer.Id)!.Active).toBe(false);
+  });
+
   it("matches a client Jobber has no email for by exact name", async () => {
     const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
     const invoice = firstPaidMissingFromBooks();

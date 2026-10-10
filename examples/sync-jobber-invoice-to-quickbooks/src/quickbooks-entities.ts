@@ -17,6 +17,7 @@ export interface Customer {
   Id: string;
   SyncToken: string;
   DisplayName: string;
+  Active?: boolean; // false once the bookkeeper makes the customer inactive, QuickBooks' way of deleting one
   PrimaryEmailAddr?: { Address: string };
 }
 
@@ -73,14 +74,27 @@ export interface NewPayment {
   Line: { Amount: number; LinkedTxn: { TxnId: string; TxnType: "Invoice" }[] }[];
 }
 
+/**
+ * Queries leave inactive customers out unless they filter on Active, "To get all active and inactive customers"
+ * (https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries). An
+ * inactive customer still has its email and holds its name, so look among both: otherwise the sync creates the
+ * customer again. An active one wins if there are both.
+ */
 export async function findCustomerByEmail(qbo: QuickBooksClient, email: string): Promise<Customer | undefined> {
-  const [customer] = await qbo.query<Customer>("Customer", `WHERE PrimaryEmailAddr = ${quoted(email)}`);
-  return customer;
+  return activeFirst(await qbo.query<Customer>("Customer", `WHERE PrimaryEmailAddr = ${quoted(email)} AND Active IN (true, false)`));
 }
 
 export async function findCustomerByName(qbo: QuickBooksClient, displayName: string): Promise<Customer | undefined> {
-  const [customer] = await qbo.query<Customer>("Customer", `WHERE DisplayName = ${quoted(displayName)}`);
-  return customer;
+  return activeFirst(await qbo.query<Customer>("Customer", `WHERE DisplayName = ${quoted(displayName)} AND Active IN (true, false)`));
+}
+
+function activeFirst(customers: Customer[]): Customer | undefined {
+  return customers.find((customer) => customer.Active !== false) ?? customers[0];
+}
+
+/** Makes an inactive customer active again, with a sparse update: only Active changes. */
+export function reactivateCustomer(qbo: QuickBooksClient, customer: Pick<Customer, "Id" | "SyncToken">): Promise<Customer> {
+  return qbo.write<Customer>("Customer", { Id: customer.Id, SyncToken: customer.SyncToken, sparse: true, Active: true });
 }
 
 /**
