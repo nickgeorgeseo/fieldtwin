@@ -60,8 +60,13 @@ export function jobberRoutes(twin: Twin): Hono {
     });
 
     if (requested > available) {
+      // Same code either way, but a query bigger than the whole bucket would wait forever: say so, so no one retries it.
+      const message =
+        requested > COST_LIMITS.capacity
+          ? `Throttled: this query's requested cost (${requested}) is more than the whole budget (${COST_LIMITS.capacity}), so it can never run. Ask for fewer nodes with first or last.`
+          : "Throttled";
       return c.json({
-        ...graphQLError("Throttled", "THROTTLED", "https://developer.getjobber.com/docs/using_jobbers_api/api_rate_limits"),
+        ...graphQLError(message, "THROTTLED", "https://developer.getjobber.com/docs/using_jobbers_api/api_rate_limits"),
         extensions: {
           cost: { requestedQueryCost: requested, actualQueryCost: 0, throttleStatus: throttleStatus(available) },
           versioning: { version },

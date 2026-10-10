@@ -96,13 +96,14 @@ describe("Jobber twin: the cost bucket", () => {
     expect(body.errors).toBeUndefined();
   });
 
-  it("never runs a query that costs more than the whole bucket", async () => {
+  it("never runs a query that costs more than the whole bucket, and says that waiting won't help", async () => {
     const { twin, jobber } = setup();
     const huge = `{ clients(first: 5000) { nodes { id firstName lastName } } }`;
     twin.clock.advance(3_600_000);
     const body = await (await jobber(huge)).json();
     expect(body.extensions.cost.requestedQueryCost).toBe(15000);
     expect(body.errors[0].extensions.code).toBe("THROTTLED");
+    expect(body.errors[0].message).toContain("can never run");
   });
 });
 

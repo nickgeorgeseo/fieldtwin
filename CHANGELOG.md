@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Jobber: a query that costs more than the whole 10,000-point budget still answers `THROTTLED`, but its message now says it can never run and to ask for fewer nodes. It looked like a temporary limit, so retry loops retried it forever.
+
 - `POST /_twin/clock/advance` counts only the scenario events it recorded. An API write that arrived while its webhooks were going out was counted too.
 
 - Control-plane mistakes say what to send: an empty or malformed body used to answer "Unexpected end of JSON input" or "Cannot read properties of null", and an action's error suggested `{ newClients: 5 }`, which fails over HTTP. A bug in the twin behind the control plane is now a 500, logged with its stack, instead of a 400 blaming the request.
