@@ -1,4 +1,5 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { stableUuid } from "../../core/ids.ts";
 import type { VendorWebhooks, WebhookNotification } from "../../core/webhooks.ts";
 import { asJobberEvent } from "./events.ts";
 import type { JobberState } from "./types.ts";
@@ -40,7 +41,7 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
   request(notification, subscription, state) {
     const webHookEvent = {
       topic: notification.topic,
-      appId: appIdFor(subscription.clientId),
+      appId: stableUuid(subscription.clientId), // Jobber gives each app a UUID; the twin has no app registry (FIDELITY.md)
       accountId: state.account.id,
       itemId: notification.itemId,
       occurredAt: localTime(notification.occurredAtMs, state.account.utcOffsetHours),
@@ -50,15 +51,6 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
     return { headers: { "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }, body };
   },
 };
-
-/**
- * Jobber's appId is a UUID it gives each app. The twin has no app registry, so it derives a stable one from the
- * app's client_id (see FIDELITY.md).
- */
-function appIdFor(clientId: string): string {
-  const hex = createHash("sha256").update(clientId).digest("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
 
 /** "2026-07-16T16:31:31-06:00": the business's local time with its offset, like the documented sample. */
 function localTime(ms: number, utcOffsetHours: number): string {
