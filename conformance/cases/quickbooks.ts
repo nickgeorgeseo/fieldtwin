@@ -166,6 +166,7 @@ export const quickbooksCases: ConformanceCase[] = [
     endpoint: "POST /invoice",
     fidelity: "DocNumber",
     writes: true,
+    // Whether QuickBooks refuses a duplicate depends on the company's settings: record a sandbox as it was created.
     async observe(target) {
       const DocNumber = `FT-${randomUUID().slice(0, 8)}`;
       expectOk(await newInvoice(target, { DocNumber }), "create the first invoice");
@@ -179,6 +180,7 @@ export const quickbooksCases: ConformanceCase[] = [
     endpoint: "POST /invoice",
     fidelity: "DueDate default",
     writes: true,
+    // The default comes from the company's default sales terms: record a sandbox as it was created.
     async observe(target) {
       const invoice = expectOk(await newInvoice(target), "create the invoice").Invoice;
       return { dueDateEqualsTxnDate: invoice.DueDate === invoice.TxnDate };

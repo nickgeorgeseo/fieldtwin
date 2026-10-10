@@ -41,6 +41,8 @@ JOBBER_ACCESS_TOKEN=... \
 npm run conformance:record
 ```
 
+Record a sandbox company as it was created: two cases, `duplicate-docnumber` and `default-due-date`, depend on its settings (custom transaction numbers, default sales terms) as well as on the API.
+
 Leave out a vendor's variables to record only the other one. `QBO_API_BASE` (default `https://sandbox-quickbooks.api.intuit.com/v3`) and `JOBBER_API_URL` override the endpoints. `npm run conformance:record -- --dry-run` prints what it would save instead of saving it; the cases still run, so the ones that write still create their test records. Before recording anything, the recorder checks that each token is accepted, so an expired one can't produce a recording of 401s. An answer that says nothing about the API (a 429, a 502 to 504, Jobber's `THROTTLED`, or a 401 once the token expires part way) is never recorded: that case keeps what it observed last time, and the recorder exits with an error so you know to run it again.
 
 Then run `npm test`. Every case that doesn't match is a failing test, which leaves two honest choices:

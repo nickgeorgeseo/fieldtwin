@@ -54,6 +54,12 @@ describe("recording against a sandbox", () => {
     const encodedIds = CASES.find((testCase) => caseId(testCase) === "jobber/encoded-id-format")!;
     await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [] } } }))).rejects.toThrow("no clients");
   });
+
+  it("doesn't record the padding of ids when none of them needs any, which the twin's never do", async () => {
+    const encodedIds = CASES.find((testCase) => caseId(testCase) === "jobber/encoded-id-format")!;
+    const id = Buffer.from("gid://Jobber/Client/1234567").toString("base64"); // 27 bytes: base64 without padding
+    await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [{ id }] } } }))).rejects.toThrow("can't tell");
+  });
 });
 
 describe("answers that are never evidence", () => {

@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Conformance: `encoded-id-format` won't record a Jobber account whose first ids need no base64 padding, an answer the twin could never match, as it already wouldn't record an account with no clients. The README says which QuickBooks cases depend on the sandbox company's settings.
+
 - `npm run conformance` scores a fresh twin when run from outside the checkout (`npx tsx /path/to/fieldtwin/conformance/cli.ts score`). The twin it started looked for tsx in the current folder and never started.
 
 - The conformance score compares observations the way the test does. It ignored observations only the twin made and counted a recorded `null` as matching one the twin didn't make, so a case could read "matches" in the score while failing `npm test`.

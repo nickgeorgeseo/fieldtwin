@@ -113,7 +113,8 @@ export const jobberCases: ConformanceCase[] = [
         const padded = Buffer.from(Buffer.from(id, "base64").toString()).toString("base64");
         if (padded.endsWith("=")) return { decodedPrefix, padding: id === padded ? "padded" : "unpadded" };
       }
-      return { decodedPrefix, padding: "not needed by any id seen" };
+      // Like an empty account, an answer the twin could never match: its first ids always include one that needs padding.
+      throw new Error("None of the first 20 client ids needs padding, so this case can't tell. Try an account with fewer clients.");
     },
   },
   {
