@@ -68,7 +68,7 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
     }
   }
 
-  lines.push("", "By endpoint:");
+  if (byEndpoint.size) lines.push("", "By endpoint:");
   for (const [endpoint, score] of byEndpoint) lines.push(`  ${endpoint.padEnd(34)} ${percent(score)}`);
   lines.push("", `Fidelity: ${total ? percent({ matched, total }) : "nothing recorded yet. Run npm run conformance:record."}`);
   return lines.join("\n");

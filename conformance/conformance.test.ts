@@ -109,6 +109,12 @@ describe("the conformance score", () => {
     cases: { "read-missing-entity": observations },
   });
 
+  it("leaves out the per-endpoint scores, heading and all, while nothing is recorded", () => {
+    const text = report([readMissing], { [caseId(readMissing)]: { status: 404 } }, {});
+    expect(text).not.toContain("By endpoint");
+    expect(text).toContain("Fidelity: nothing recorded yet");
+  });
+
   it("counts a recorded case the twin couldn't run as nothing matched, rather than leaving it out", () => {
     const text = report(
       [readMissing],
