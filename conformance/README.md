@@ -3,7 +3,7 @@
 The twins are built from public documentation, and the docs leave gaps. FIDELITY.md marks every behavior the twin had to guess with `check`. This suite closes those gaps with evidence: it runs the same short scripted sessions against a real vendor sandbox and against the twin, and compares what each one did.
 
 ```bash
-npm run conformance           # score a running twin against the recordings
+npm run conformance           # score a fresh twin against the recordings (FIELDTWIN_URL scores a running one)
 npm run conformance:record    # record the real sandboxes (needs your tokens, below)
 ```
 
@@ -41,7 +41,7 @@ JOBBER_ACCESS_TOKEN=... \
 npm run conformance:record
 ```
 
-Leave out a vendor's variables to record only the other one. `QBO_API_BASE` (default `https://sandbox-quickbooks.api.intuit.com/v3`) and `JOBBER_API_URL` override the endpoints. `npm run conformance:record -- --dry-run` prints what it would save.
+Leave out a vendor's variables to record only the other one. `QBO_API_BASE` (default `https://sandbox-quickbooks.api.intuit.com/v3`) and `JOBBER_API_URL` override the endpoints. `npm run conformance:record -- --dry-run` prints what it would save instead of saving it; the cases still run, so the ones that write still create their test records. Before recording anything, the recorder checks that each token is accepted, so an expired one can't produce a recording of 401s.
 
 Then run `npm test`. Every case that doesn't match is a failing test, which leaves two honest choices:
 

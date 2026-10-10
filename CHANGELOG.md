@@ -14,6 +14,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Conformance recorder: before recording anything, it checks that each sandbox accepts its token and that its URL is right. An expired token (they last an hour) or a base URL missing `/v3` used to produce a recording of 401s or 404s that failed every case as if the twin were wrong. A Jobber testing account with no clients is no longer recorded as an observation the twin could never match.
+- `npm run conformance` scores a fresh twin of its own instead of whatever twin is running, which it used to write records into and whose faults skewed the score. `FIELDTWIN_URL` still scores a running twin, and says how to start one if none answers.
+
 - Conformance score: a recorded case the twin couldn't run now counts as nothing matched. It was left out, so one match and one crash read "4/4 observations match (100%)". Percentages round down, so nothing short of every observation reads as 100%.
 
 - Reference integration: two syncs at once (the scheduled one and a webhook's) booked an invoice and its payment twice. Each QuickBooks write's `requestid` is now a hash of the write, so the identical write from either sync carries the same id and QuickBooks books it once.

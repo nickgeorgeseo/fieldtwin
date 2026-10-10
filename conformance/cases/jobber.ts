@@ -101,8 +101,12 @@ export const jobberCases: ConformanceCase[] = [
       // Whether an id is padded only shows when its length needs padding, so look at the first id that does.
       const answer = await jobber(target, "{ clients(first: 20) { nodes { id } } }");
       const ids: string[] = (answer.body?.data?.clients?.nodes ?? []).map((node: { id: string }) => node.id);
-      if (!ids.length) return { ...answerOf(answer), ids: 0 }; // a testing account with no clients yet
+      // An empty account has no ids to look at, and an observation of that could never match the twin's.
+      if (!ids.length) throw new Error("The account has no clients, so there are no ids to look at. Create a client in it first.");
       const decodedPrefix = Buffer.from(ids[0]!, "base64").toString().replace(/\d+$/, "");
+      // Recordings hold no account data: record the prefix only if it is the documented gid://Jobber/Type/ form.
+      if (!/^gid:\/\/Jobber\/\w+\/$/.test(decodedPrefix))
+        throw new Error("Ids don't decode to gid://Jobber/Type/n, so this case can't tell.");
       for (const id of ids) {
         const padded = Buffer.from(Buffer.from(id, "base64").toString()).toString("base64");
         if (padded.endsWith("=")) return { decodedPrefix, padding: id === padded ? "padded" : "unpadded" };
