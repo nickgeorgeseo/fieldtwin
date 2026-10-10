@@ -19,6 +19,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- The README's first example prints the change list it shows: the endpoint answers JSON, and the lines shown are each change's `summary`, so the example now picks them out with `jq`.
 - The quick start installs with `npm ci`. With `npm install`, the npm that comes with Node 22 rewrote `package-lock.json`, so a fresh clone started out with a change to commit.
 - The README leads with what fieldtwin is for: a checkpoint, change list, and rewind in the first screen; how it compares with live accounts, vendor sandboxes, and mocks; what each twin models; a configuration table; a section on testing AI agents; and what common errors mean. Every `curl` in it now runs in the tests, in order, and the scenarios and settings it names are checked against the code.
 
