@@ -14,6 +14,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Control-plane mistakes say what to send: an empty or malformed body used to answer "Unexpected end of JSON input" or "Cannot read properties of null", and an action's error suggested `{ newClients: 5 }`, which fails over HTTP. A bug in the twin behind the control plane is now a 500, logged with its stack, instead of a 400 blaming the request.
+
 - `POST /_twin/reset` after loading a scenario restores the scenario's faults along with its world and timeline. It used to drop them, so a test harness that reset between cases lost its faults after the first. Loading a scenario without `auth` returns to the twin's own auth mode (`FIELDTWIN_AUTH`) instead of keeping the previous scenario's.
 
 - Conformance recorder: before recording anything, it checks that each sandbox accepts its token and that its URL is right. An expired token (they last an hour) or a base URL missing `/v3` used to produce a recording of 401s or 404s that failed every case as if the twin were wrong. A Jobber testing account with no clients is no longer recorded as an observation the twin could never match.

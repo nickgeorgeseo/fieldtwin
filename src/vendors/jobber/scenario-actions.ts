@@ -50,6 +50,6 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
 
 function checkCount(action: string, value: unknown): void {
   if (!Number.isInteger(value) || (value as number) < 1) {
-    throw new Error(`jobber ${action} needs a whole number of 1 or more, like { ${action}: 5 }. Got: ${JSON.stringify(value)}`);
+    throw new Error(`jobber ${action} takes how many: a whole number of 1 or more, not ${JSON.stringify(value)}`);
   }
 }
