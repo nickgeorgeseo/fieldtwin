@@ -20,8 +20,8 @@ export interface WebhookSubscription {
   vendor: VendorName;
   url: string;
   topics: string[];
-  clientId: string; // the app, as the vendor knows it (Jobber: its OAuth client_id)
-  clientSecret: string; // what deliveries are signed with (Jobber: the app's OAuth client secret)
+  clientId: string; // the app, as the vendor knows it (its OAuth client_id)
+  clientSecret: string; // what deliveries are signed with (Jobber: the app's OAuth client secret; QuickBooks: its verifier token)
 }
 
 /** Something that happened, as a vendor announces it: a topic and the record it is about. */
@@ -31,13 +31,21 @@ export interface WebhookNotification {
   occurredAtMs: number;
 }
 
+/**
+ * A notification as request() is given it: numbered once, for every subscription and every redelivery. Numbers are
+ * never reused, resets and rewinds included, so a vendor can make each event's id from one.
+ */
+export interface NumberedNotification extends WebhookNotification {
+  number: number;
+}
+
 /** What a vendor contributes: its topics, which events announce what, and how a delivery looks, is signed, and is sent. */
 export interface VendorWebhooks<State = unknown> {
   topics: readonly string[];
   delivery: DeliveryPolicy;
   notify(event: TwinEvent, state: State): WebhookNotification[];
   request(
-    notification: WebhookNotification,
+    notification: NumberedNotification,
     subscription: WebhookSubscription,
     state: State,
   ): { headers: Record<string, string>; body: string };
@@ -88,6 +96,7 @@ export class WebhookDispatcher {
   private queue: Queued[] = [];
   private recent: Queued[] = [];
   private nextId = 1;
+  private nextNumber = 1;
   private running: Promise<void> = Promise.resolve();
 
   constructor(private readonly send: WebhookSender) {}
@@ -95,7 +104,8 @@ export class WebhookDispatcher {
   /** Queue a delivery to every subscription that wants what this event announces. */
   notice(event: TwinEvent, vendor: VendorTwin, state: unknown, nowMs: number): void {
     if (!vendor.webhooks) return;
-    for (const notification of vendor.webhooks.notify(event, state)) {
+    for (const announced of vendor.webhooks.notify(event, state)) {
+      const notification = { ...announced, number: this.nextNumber++ };
       for (const subscription of this.subscriptions) {
         if (subscription.vendor !== vendor.name || !subscription.topics.includes(notification.topic)) continue;
         const request = vendor.webhooks.request(notification, subscription, state);

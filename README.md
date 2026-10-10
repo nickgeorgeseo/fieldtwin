@@ -100,17 +100,23 @@ curl -s -X POST http://localhost:4010/api/oauth/token \
 
 ## Webhooks
 
-The Jobber twin sends webhooks the way Jobber does. Jobber sets them up per app in its Developer Center; the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
+Both twins send webhooks the way the vendors do. Each vendor sets them up per app in its developer portal; the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
 
 ```bash
-curl -X PUT localhost:4010/_twin/webhooks -H "Content-Type: application/json" \
-  -d '[{"vendor":"jobber","url":"http://localhost:3000/webhooks/jobber","topics":["INVOICE_UPDATE"],"clientId":"my-app","clientSecret":"dev"}]'
+curl -X PUT localhost:4010/_twin/webhooks -H "Content-Type: application/json" -d '[
+  {"vendor":"jobber","url":"http://localhost:3000/webhooks/jobber","topics":["INVOICE_UPDATE"],"clientId":"my-app","clientSecret":"dev"},
+  {"vendor":"quickbooks","url":"http://localhost:3000/webhooks/qbo","topics":["qbo.payment.created.v1"],"clientId":"my-app","clientSecret":"my-verifier-token"}
+]'
 curl -X POST localhost:4010/_twin/actions/jobber/payInvoices -H "Content-Type: application/json" -d '2'
 ```
 
-Deliveries carry Jobber's documented payload (`{ "data": { "webHookEvent": { "topic", "appId", "accountId", "itemId", "occurredAt" } } }`) and an `X-Jobber-Hmac-SHA256` signature made with the subscription's client secret, so your verification code runs unchanged. Like Jobber, the twin delivers at least once: paying an invoice fires `INVOICE_UPDATE` twice, and a delivery your app doesn't accept within a second is sent again later in twin time. `CLIENT_CREATE` and `INVOICE_UPDATE` are modeled so far. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
+Jobber deliveries carry Jobber's documented payload (`{ "data": { "webHookEvent": { "topic", "appId", "accountId", "itemId", "occurredAt" } } }`) and an `X-Jobber-Hmac-SHA256` signature made with the subscription's client secret, so your verification code runs unchanged. Like Jobber, the twin delivers at least once: paying an invoice fires `INVOICE_UPDATE` twice, and a delivery your app doesn't accept within a second is sent again later in twin time. `CLIENT_CREATE` and `INVOICE_UPDATE` are modeled so far.
 
-Fault rules with a `webhook` topic (or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
+QuickBooks deliveries are CloudEvents, the format Intuit sends today: a JSON array of events like `{ "specversion": "1.0", "type": "qbo.invoice.updated.v1", "intuitentityid": "130", "intuitaccountid": "9341000000000001", ... }`, signed in `intuit-signature` with the subscription's `clientSecret` standing in for your app's verifier token. Customers, invoices, and payments created or updated through the API are announced (`qbo.customer.created.v1`, `qbo.customer.updated.v1`, `qbo.invoice.created.v1`, `qbo.invoice.updated.v1`, `qbo.payment.created.v1`), and a payment also announces each invoice it pays. Your app has 3 seconds to answer HTTP 200; otherwise the twin tries again on Intuit's schedule, from 10 seconds up to every 6 hours of twin time.
+
+`GET /_twin/webhooks` shows every recent delivery and how your app answered it.
+
+Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
 
 ```yaml
 faults:
