@@ -43,6 +43,8 @@ export const jobberCases: ConformanceCase[] = [
     fidelity: "Expired or unknown token on the API",
     async observe(target) {
       const answer = await jobber(target, "{ account { id } }", { token: "fieldtwin-not-a-token" });
+      // Cases never observe wording, but this message is the error's documented name, "Invalid Token Error", not
+      // the twin's own words: clients match on it to know a refresh is due, so it has to be the same.
       return { status: answer.status, bodyKeys: Object.keys(answer.body ?? {}).sort(), message: answer.body?.message ?? null };
     },
   },
