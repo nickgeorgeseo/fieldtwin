@@ -6,6 +6,7 @@ import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording } from "./recordings.ts";
 import type { Results } from "./run.ts";
+import { sandboxTarget } from "./targets.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
@@ -135,4 +136,13 @@ describe("what the conformance command was asked to do", () => {
     expect(run.stderr).toContain('conformance: unknown command "recrod"');
     expect(run.status).toBe(1);
   }, 20_000);
+});
+
+describe("which QuickBooks company a recording may write to", () => {
+  it.each(["https://quickbooks.api.intuit.com/v3", "https://QuickBooks.api.intuit.com/v3", "https://u@quickbooks.api.intuit.com/v3"])(
+    "never production, however its URL is written: %s",
+    (QBO_API_BASE) => {
+      expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", QBO_REALM_ID: "1", QBO_API_BASE })).toThrow("production QuickBooks");
+    },
+  );
 });

@@ -84,13 +84,18 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
       "Set QBO_ACCESS_TOKEN and QBO_REALM_ID (a QuickBooks sandbox company), JOBBER_ACCESS_TOKEN (a Jobber testing account), or both.",
     );
   }
+  const quickbooksApiBase = env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase;
+  // Cases write test records. URL hostnames ignore case and anything before an @, so compare the parsed hostname.
+  if (vendors.includes("quickbooks") && hostnameOf(quickbooksApiBase) === "quickbooks.api.intuit.com") {
+    throw new Error("QBO_API_BASE points at production QuickBooks. Cases write test records: record against a sandbox company only.");
+  }
   return {
     vendors,
     target: {
       kind: "sandbox",
       fetch: (url, init) => fetch(url, init),
       quickbooks: {
-        apiBase: env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase,
+        apiBase: quickbooksApiBase,
         realmId: env.QBO_REALM_ID ?? "",
         accessToken: env.QBO_ACCESS_TOKEN ?? "",
       },
@@ -98,4 +103,12 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
       now: async () => new Date().toISOString(),
     },
   };
+}
+
+function hostnameOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
 }

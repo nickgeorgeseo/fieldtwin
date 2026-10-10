@@ -49,9 +49,6 @@ async function scoreTwinAt(baseUrl: string): Promise<void> {
 
 async function record(dryRun: boolean): Promise<void> {
   const { target, vendors } = sandboxTarget(process.env);
-  if (/(^|\/\/)quickbooks\.api\.intuit\.com/.test(target.quickbooks.apiBase)) {
-    throw new Error("QBO_API_BASE points at production QuickBooks. Cases write test records: record against a sandbox company only.");
-  }
   await checkTokens(target, vendors);
   const cases = CASES.filter((testCase) => vendors.includes(testCase.vendor));
   const writes = cases.filter((testCase) => testCase.writes).map(caseId);
