@@ -110,15 +110,27 @@ function makeCustomers(random: SeededRandom, count: number, home: Home): WorldCu
 /**
  * Someone new to the business, for scenario timelines ("15 new clients by 9 a.m."): local to the world's
  * city, with a name nobody in `takenNames` has ("First Last"), numbered `n` so their email is unique.
+ * Once the word lists' names are all taken, newcomers get a middle initial ("Avery J. Brooks"), so a timeline
+ * that runs for weeks of twin time never fails for want of a name.
  */
 export function newCustomer(random: SeededRandom, world: World, n: number, takenNames: Set<string>): WorldCustomer {
   const home = CITIES.find((city) => city.city === world.company.city)!;
-  for (let attempt = 0; attempt < 1000; attempt++) {
+  for (let attempt = 0; attempt < 50; attempt++) {
     const firstName = random.pick(FIRST_NAMES);
     const lastName = random.pick(LAST_NAMES);
     if (!takenNames.has(`${firstName} ${lastName}`)) return makeCustomer(random, n, firstName, lastName, home);
   }
-  throw new Error("The word lists have no unused names left for a new customer");
+  // The names left are few: look through them in order, from a random place, before adding initials.
+  const start = random.int(0, FIRST_NAMES.length * LAST_NAMES.length - 1);
+  for (const initial of ["", ..."ABCDEFGHJKLMNPRSTW"]) {
+    for (let offset = 0; offset < FIRST_NAMES.length * LAST_NAMES.length; offset++) {
+      const index = (start + offset) % (FIRST_NAMES.length * LAST_NAMES.length);
+      const firstName = `${FIRST_NAMES[index % FIRST_NAMES.length]}${initial && ` ${initial}.`}`;
+      const lastName = LAST_NAMES[Math.floor(index / FIRST_NAMES.length)]!;
+      if (!takenNames.has(`${firstName} ${lastName}`)) return makeCustomer(random, n, firstName, lastName, home);
+    }
+  }
+  throw new Error(`Every name the twin can make is taken (${takenNames.size} people)`);
 }
 
 function makeCustomer(random: SeededRandom, n: number, firstName: string, lastName: string, home: Home): WorldCustomer {
@@ -126,13 +138,18 @@ function makeCustomer(random: SeededRandom, n: number, firstName: string, lastNa
     key: `cust-${pad(n)}`,
     firstName,
     lastName,
-    email: `${firstName}.${lastName}${n}@example.com`.toLowerCase(),
+    email: `${emailPart(firstName)}.${emailPart(lastName)}${n}@example.com`,
     phone: `555-${random.int(200, 999)}-${random.int(1000, 9999)}`,
     street: `${random.int(100, 9999)} ${random.pick(STREET_NAMES)}`,
     city: home.city,
     state: home.state,
     postalCode: `${home.zipPrefix}${random.int(10, 99)}`,
   };
+}
+
+/** A name as the local part of an email address: "Avery J." is "averyj". */
+function emailPart(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function pad(n: number): string {

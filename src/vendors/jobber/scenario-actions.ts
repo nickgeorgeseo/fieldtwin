@@ -14,7 +14,9 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
   newClients: {
     check: (count) => checkCount("newClients", count),
     run: (count, { state, world, random, nowIso }) => {
+      // Customers the books have and Jobber doesn't (drift's accountingOnly) are taken too, so emails never clash.
       const taken = new Set([...state.clients.values()].map(clientName));
+      for (const person of world.customers) taken.add(`${person.firstName} ${person.lastName}`);
       const firstNumber = nextIdNumber(state.clients.keys(), "Client");
       return Array.from({ length: count as number }, (_, index) => {
         const person = newCustomer(random, world, firstNumber + index, taken);
