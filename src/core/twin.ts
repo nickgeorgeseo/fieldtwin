@@ -13,6 +13,7 @@ import { WebhookDispatcher, type WebhookSender } from "./webhooks.ts";
 
 export interface TwinOptions {
   seed: number;
+  scenario?: string; // the loaded scenario's name, for status displays
   startTime: string;
   worldSize?: Partial<WorldSize>;
   drift?: DriftOptions;
@@ -89,6 +90,16 @@ export class Twin {
     const vendor = this.vendors.get(name);
     if (!vendor) throw new Error(`No vendor twin named "${name}" is loaded`);
     return vendor;
+  }
+
+  /** The seed this world was generated from: with the same requests, the same seed gives the same run. */
+  get seed(): number {
+    return this.options.seed;
+  }
+
+  /** The name of the loaded scenario, if any. */
+  get scenario(): string | undefined {
+    return this.options.scenario;
   }
 
   vendorNames(): VendorName[] {
@@ -202,6 +213,10 @@ export class Twin {
 
   checkpoint(name: string): Checkpoint {
     return this.checkpoints.take(name, this.log.length, this.clock.nowIso());
+  }
+
+  checkpointList(): Checkpoint[] {
+    return this.checkpoints.all();
   }
 
   getCheckpoint(name: string): Checkpoint {

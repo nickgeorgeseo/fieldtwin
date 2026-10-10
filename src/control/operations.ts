@@ -1,7 +1,7 @@
 import { parseTwinTime } from "../core/clock.ts";
 import { SeededRandom } from "../core/random.ts";
 import type { Twin } from "../core/twin.ts";
-import type { AuthMode, FaultRule, TwinEvent, VendorName } from "../core/types.ts";
+import type { AuthMode, EventSource, FaultRule, TwinEvent, VendorName } from "../core/types.ts";
 import { scenarioActionOf } from "../core/vendor-twin.ts";
 import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscriptions, readScenarioFile, resolveAt } from "./scenario.ts";
 
@@ -15,12 +15,15 @@ import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscrip
 export function describeTwin(twin: Twin) {
   return {
     company: twin.world.company,
+    seed: twin.seed,
+    scenario: twin.scenario ?? null,
     twinTime: twin.clock.nowIso(),
     eventCount: twin.log.length,
     vendors: twin.vendorNames(),
     authMode: twin.authMode,
     activeFaults: twin.faultRules.map((rule) => rule.name),
     webhookSubscriptions: twin.webhooks.subscriptions.length,
+    checkpoints: twin.checkpointList().map(({ name, time }) => ({ name, time })),
     upcoming: twin.upcoming().map(({ atMs, vendor, action, params }) => ({ at: new Date(atMs).toISOString(), vendor, action, params })),
   };
 }
@@ -42,8 +45,9 @@ export async function advanceClock(twin: Twin, minutes: number) {
   }
   const before = twin.log.length;
   twin.advance(minutes * 60_000);
+  const scenarioEvents = twin.log.length - before; // counted now: API writes may arrive while webhooks go out
   await twin.deliverWebhooks();
-  return { twinTime: twin.clock.nowIso(), scenarioEvents: twin.log.length - before };
+  return { twinTime: twin.clock.nowIso(), scenarioEvents };
 }
 
 /**
@@ -101,9 +105,15 @@ export function createCheckpoint(twin: Twin, name: string) {
   return twin.checkpoint(name);
 }
 
-/** Plain-language list of what changed since a checkpoint, newest last. */
-export function listChanges(twin: Twin, checkpointName: string, options: { onlyFromApi?: boolean } = {}) {
-  const changes = twin.changesSince(checkpointName).filter((event) => !options.onlyFromApi || event.source === "api");
+const SOURCES: readonly EventSource[] = ["seed", "scenario", "api", "control"];
+
+/** Plain-language list of what changed since a checkpoint, newest last: everything, or what one source did. */
+export function listChanges(twin: Twin, checkpointName: string, options: { onlyFromApi?: boolean; source?: string } = {}) {
+  const source = options.onlyFromApi ? "api" : options.source;
+  if (source !== undefined && !SOURCES.includes(source as EventSource)) {
+    throw new Error(`source must be one of ${SOURCES.join(", ")}, not "${source}"`);
+  }
+  const changes = twin.changesSince(checkpointName).filter((event) => source === undefined || event.source === source);
   return changes.map((event) => ({ ...event, summary: summarize(twin, event) }));
 }
 
@@ -166,11 +176,11 @@ export function loadScenario(twin: Twin, yamlText: string) {
   for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
 
   const { drift, ...worldSize } = scenario.world ?? {};
-  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift, faults });
+  twin.reconfigure({ seed: scenario.seed, scenario: scenario.name, startTime: scenario.startTime, worldSize, drift, faults });
   twin.authMode = scenario.auth ?? twin.defaultAuthMode;
   const utcOffsetHours = twin.world.company.utcOffsetHours;
   twin.schedule(entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, utcOffsetHours), ...entry })));
-  return { scenario: scenario.name, ...describeTwin(twin) };
+  return describeTwin(twin); // its `scenario` is the name just loaded
 }
 
 /** The ready-made scenarios, with what each one is for. */

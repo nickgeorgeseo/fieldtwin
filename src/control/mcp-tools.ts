@@ -14,8 +14,10 @@ import * as ops from "./operations.ts";
 export function createMcpServer(twin: Twin, version: string): McpServer {
   const server = new McpServer({ name: "fieldtwin", version });
 
-  server.registerTool("twin_status", { description: "Company, twin time, event count, and active faults." }, () =>
-    asText(ops.describeTwin(twin)),
+  server.registerTool(
+    "twin_status",
+    { description: "Company, seed, scenario, twin time, event count, auth mode, faults, checkpoints, and what is scheduled next." },
+    () => asText(ops.describeTwin(twin)),
   );
 
   server.registerTool(

@@ -142,12 +142,12 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 
 | Request | What it does |
 |---|---|
-| `GET /_twin` | Company, twin time, event count, auth mode, active faults, webhook subscriptions, what's scheduled next |
+| `GET /_twin` | Company, seed, loaded scenario, twin time, event count, auth mode, active faults, webhook subscriptions, checkpoints, what's scheduled next |
 | `POST /_twin/reset` | Back to the start: the seeded world (the loaded scenario's, if any), with its timeline and faults |
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move, scheduled events and their webhooks happen) |
 | `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2` |
 | `POST /_twin/checkpoints/:name` | Name this moment |
-| `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then |
+| `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then (or `seed`, `scenario`, `control`; everything without `source`) |
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint |
 | `PUT /_twin/faults` | Replace the active fault rules |
 | `PUT /_twin/auth` `{"mode": "oauth"}` | Check bearer tokens for real (`oauth`) or accept any (`any-token`) |
@@ -173,7 +173,7 @@ curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 
 | Tool | What it does |
 |---|---|
-| `twin_status` | Company, twin time, auth mode, active faults, what's scheduled next |
+| `twin_status` | Company, seed, scenario, twin time, auth mode, active faults, checkpoints, what's scheduled next |
 | `twin_reset` | Back to the start of the loaded scenario (or the default world) |
 | `twin_advance_clock` | Move time forward; scheduled scenario events happen on the way |
 | `twin_checkpoint`, `twin_changes`, `twin_rewind` | Mark a moment, list what changed since (optionally only your API calls), undo it |

@@ -23,6 +23,10 @@ export class Checkpoints {
     }
   }
 
+  all(): Checkpoint[] {
+    return [...this.named.values()];
+  }
+
   clear(): void {
     this.named.clear();
   }
