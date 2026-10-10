@@ -134,9 +134,16 @@ export class WebhookDispatcher {
     this.recent = [...this.recent, queued].slice(-KEEP_DELIVERIES);
   }
 
-  /** Send everything due by `nowMs`, in order. Rounds never overlap; failures are queued again for later. */
+  /**
+   * Send everything due by `nowMs`, in order. Rounds never overlap; failed deliveries are queued again for later.
+   * This never rejects: a round that throws (a bug) is logged, and the next round runs as usual.
+   */
   deliverDue(nowMs: number): Promise<void> {
-    this.running = this.running.then(() => this.sendDue(nowMs));
+    this.running = this.running.then(() =>
+      this.sendDue(nowMs).catch((error: Error) =>
+        console.error(`fieldtwin: a round of webhook deliveries failed: ${error.stack ?? error}`),
+      ),
+    );
     return this.running;
   }
 

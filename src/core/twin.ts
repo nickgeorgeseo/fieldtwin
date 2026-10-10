@@ -66,7 +66,14 @@ export class Twin {
     const recorded = this.log.append({ ...event, at: this.clock.nowIso(), source });
     const vendor = this.vendor(event.vendor);
     vendor.apply(this.state(event.vendor), recorded);
-    if (!this.rebuilding) this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
+    if (!this.rebuilding) {
+      // Webhooks are bookkeeping: a bug there must never turn a write that happened into an error.
+      try {
+        this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
+      } catch (error) {
+        console.error(`fieldtwin: couldn't queue webhooks for event ${recorded.seq}: ${(error as Error).stack ?? error}`);
+      }
+    }
     return recorded;
   }
 

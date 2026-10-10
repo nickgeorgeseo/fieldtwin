@@ -10,6 +10,8 @@ import type { WebhookSubscription } from "../core/webhooks.ts";
  * it is, which faults are active, and a timeline of things that happen as twin time passes.
  * See "Scenario timelines" in ARCHITECTURE.md.
  */
+const WEEK_MS = 7 * 86_400_000;
+
 const FaultRuleSchema = z
   .object({
     name: z.string(),
@@ -25,7 +27,7 @@ const FaultRuleSchema = z
         message: z.string().optional(),
         lostResponse: z.boolean().optional(),
         duplicate: z.boolean().optional(),
-        delayMs: z.number().int().positive().optional(),
+        delayMs: z.number().int().positive().max(WEEK_MS, { message: "can be at most a week (604800000)" }).optional(),
       })
       .strict()
       .refine((effect) => !effect.lostResponse || effect.status !== undefined, {

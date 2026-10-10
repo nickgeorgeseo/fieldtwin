@@ -12,6 +12,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Twin time can't be pushed past what a date can hold. `POST /_twin/clock/advance {"minutes": 1e12}` used to leave the twin answering "Invalid time value" until a reset, and with a webhook retry pending it crashed the process. Advances are capped at ten years and webhook `delayMs` faults at a week. `twin_advance_clock` accepts 0, as the control plane does, to send the deliveries already due.
+- Webhooks can't break anything else: a failure while queueing one no longer turns a write that succeeded into a 500, and a delivery round that fails is logged instead of failing every round after it.
+
 - A scenario that fails to load leaves the twin as it was. A bad start time, an unreadable timeline time, or a world too big to name used to fail part way: the twin kept the new company and faults but no timeline, or emptied its log while still serving old data, and `POST /_twin/reset` failed until another scenario loaded.
 - Scenario and fault-rule keys the twin doesn't know are errors. `path` instead of `pathIncludes` used to be dropped silently, so the rule faulted every request; a misspelled effect or webhook topic did nothing. A request rule with neither `status` nor `latencyMs` is refused too.
 - Scenario times need a UTC offset (`2026-07-13T08:00:00-05:00` or `...Z`). Without one, a start time meant a different moment on every machine.

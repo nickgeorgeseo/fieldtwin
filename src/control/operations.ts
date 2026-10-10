@@ -34,8 +34,12 @@ export function resetTwin(twin: Twin) {
  * Move twin time forward. Scheduled scenario events happen on the way, each at its own time, and the webhook
  * deliveries they cause (and any retries now due) have been answered by the time this resolves.
  */
+const MAX_ADVANCE_MINUTES = 10 * 365 * 24 * 60; // ten years: far beyond any test, and far inside what a date can hold
+
 export async function advanceClock(twin: Twin, minutes: number) {
-  if (typeof minutes !== "number" || !(minutes >= 0)) throw new Error("minutes must be a number, 0 or more");
+  if (typeof minutes !== "number" || !(minutes >= 0 && minutes <= MAX_ADVANCE_MINUTES)) {
+    throw new Error(`minutes must be a number from 0 to ${MAX_ADVANCE_MINUTES.toLocaleString("en-US")} (ten years)`);
+  }
   const before = twin.log.length;
   twin.advance(minutes * 60_000);
   await twin.deliverWebhooks();

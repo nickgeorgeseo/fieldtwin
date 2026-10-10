@@ -22,7 +22,10 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
 
   server.registerTool(
     "twin_advance_clock",
-    { description: "Move twin time forward.", inputSchema: { minutes: z.number().positive() } },
+    {
+      description: "Move twin time forward, up to ten years. 0 sends the webhook deliveries already due.",
+      inputSchema: { minutes: z.number().nonnegative() },
+    },
     async ({ minutes }) => asText(await ops.advanceClock(twin, minutes)),
   );
 
