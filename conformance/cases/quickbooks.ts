@@ -68,6 +68,29 @@ export const quickbooksCases: ConformanceCase[] = [
     },
   },
   {
+    name: "range-operator-on-id",
+    vendor: "quickbooks",
+    endpoint: "GET /query",
+    fidelity: "Range operators and LIKE on Id",
+    observe: async (target) => faultOf(await quickbooksQuery(target, "select count(*) from Customer where Id > '0'")),
+  },
+  {
+    name: "orderby-text-case",
+    vendor: "quickbooks",
+    endpoint: "GET /query",
+    fidelity: "How query values compare",
+    async observe(target) {
+      // Every sandbox company has customers; whether their names sort without regard to case settles the row.
+      const answer = await quickbooksQuery(
+        target,
+        "select * from Customer where DisplayName like '%' orderby DisplayName desc maxresults 50",
+      );
+      const names: string[] = (answer.body?.QueryResponse?.Customer ?? []).map((customer: { DisplayName: string }) => customer.DisplayName);
+      const folded = names.map((name) => name.toLowerCase());
+      return { status: answer.status, sortedIgnoringCase: folded.every((name, i) => i === 0 || folded[i - 1]! >= name) };
+    },
+  },
+  {
     name: "payment-moves-invoice-synctoken",
     vendor: "quickbooks",
     endpoint: "POST /payment",

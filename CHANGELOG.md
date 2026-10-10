@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- QuickBooks queries take the rest of the documented language: `AND`, `<`, `>`, `<=`, `>=`, `LIKE` with `%`, and `ORDERBY` with `ASC`/`DESC` on several properties. `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '2026-07-01T00:00:00-05:00' ORDERBY TxnDate DESC` now works instead of answering "Unsupported operation". Numbers compare by value, `MetaData` times as instants, and text without regard to case.
 - `npm start -- flaky-apis` starts a ready-made scenario by name; a path to a `.yaml` (or `.yml`) file still works.
 
 ### Fixed

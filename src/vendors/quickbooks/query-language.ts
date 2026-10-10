@@ -2,20 +2,36 @@
  * A deliberately small parser for the QuickBooks query language.
  * https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries
  *
- *   SELECT * | COUNT(*) FROM Entity [WHERE Property = value | Property IN (value, ...)] [STARTPOSITION n] [MAXRESULTS n]
+ *   SELECT * | COUNT(*) FROM Entity
+ *     [WHERE Property Operator Value [AND Property Operator Value ...]]
+ *     [ORDERBY Property [ASC | DESC] [, Property [ASC | DESC] ...]]
+ *     [STARTPOSITION n] [MAXRESULTS n]
  *
+ * Operators are =, <, >, <=, >=, LIKE (with % as the only wildcard), and IN (value, ...). There is no OR.
  * Reserved words, entity names, and property names are case-insensitive. Values are 'quoted strings'
- * (with \' for an apostrophe), numbers, true, or false. The rest of the language (AND, LIKE, <, >,
- * ORDERBY) is valid QuickBooks, so the parser reports it as "unsupported" rather than as a syntax error.
- * Extend it one clause at a time, with a test for each, rather than reaching for a general SQL parser.
+ * (with \' for an apostrophe), numbers, true, or false. What the parser doesn't model yet (!=, CURRENT_DATE)
+ * it reports as "unsupported" rather than as a syntax error. Which properties an entity can filter and sort
+ * on, and how values compare, is up to the query route. Extend this one clause at a time, with a test for
+ * each, rather than reaching for a general SQL parser.
  */
 
+import { type Token, tokenize } from "./query-tokens.ts";
+
 export type QueryValue = string | number | boolean;
+
+export type QueryOperator = "=" | "<" | ">" | "<=" | ">=" | "like" | "in";
+
+export interface QueryCondition {
+  property: string;
+  operator: QueryOperator;
+  values: QueryValue[]; // one value, or IN's list
+}
 
 export interface QboQuery {
   select: "*" | "count";
   entity: string;
-  where?: { property: string; operator: "=" | "in"; values: QueryValue[] };
+  where: QueryCondition[]; // every one must hold: conditions are joined by AND
+  orderBy: { property: string; descending: boolean }[];
   startPosition: number; // 1-based, like QuickBooks
   maxResults: number;
 }
@@ -30,7 +46,7 @@ const MAX_RESULTS_LIMIT = 1000; // "The maximum number of entities that can be r
 
 export function parseQboQuery(text: string): QboQuery | QueryError {
   const tokens = tokenize(text);
-  if (!Array.isArray(tokens)) return tokens;
+  if (!Array.isArray(tokens)) return { kind: "syntax", error: tokens.error };
   try {
     return new Parser(tokens).statement();
   } catch (error) {
@@ -38,52 +54,6 @@ export function parseQboQuery(text: string): QboQuery | QueryError {
     throw error;
   }
 }
-
-// ---------------------------------------------------------------------------------------------------
-// tokens
-
-type Token = { kind: "word" | "number" | "string" | "symbol"; text: string };
-
-function tokenize(text: string): Token[] | QueryError {
-  const tokens: Token[] = [];
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === "'") {
-      // A quoted value. A backslash escapes the next character: 'Adam\'s Candy Shop'.
-      let value = "";
-      i++;
-      while (i < text.length && text[i] !== "'") {
-        if (text[i] === "\\" && i + 1 < text.length) i++;
-        value += text[i++];
-      }
-      if (i >= text.length) return { kind: "syntax", error: "A quoted value is missing its closing quote" };
-      tokens.push({ kind: "string", text: value });
-      i++;
-      continue;
-    }
-
-    const rest = text.slice(i);
-    const space = /^\s+/.exec(rest)?.[0];
-    if (space) {
-      i += space.length;
-      continue;
-    }
-    const match = SIMPLE_TOKENS.map(({ kind, pattern }) => ({ kind, text: pattern.exec(rest)?.[0] })).find((token) => token.text);
-    if (!match?.text) return { kind: "syntax", error: `Unexpected character "${text[i]}" at position ${i + 1}` };
-    tokens.push({ kind: match.kind, text: match.text });
-    i += match.text.length;
-  }
-  return tokens;
-}
-
-const SIMPLE_TOKENS: { kind: Token["kind"]; pattern: RegExp }[] = [
-  { kind: "word", pattern: /^[A-Za-z_][A-Za-z0-9_.]*/ }, // keywords, entities, properties (MetaData.CreateTime)
-  { kind: "number", pattern: /^\d+(\.\d+)?/ },
-  { kind: "symbol", pattern: /^(<=|>=|!=|[()*,=<>])/ },
-];
-
-// ---------------------------------------------------------------------------------------------------
-// statement
 
 class ParseFailure extends Error {
   constructor(
@@ -105,10 +75,19 @@ class Parser {
     this.expectWord("FROM");
     const entity = this.expect("word", "an entity name after FROM").text;
 
-    const query: QboQuery = { select, entity, startPosition: 1, maxResults: DEFAULT_MAX_RESULTS };
-    if (this.acceptWord("WHERE")) query.where = this.condition();
-    if (this.peekWord("AND")) throw new ParseFailure("unsupported", "The twin supports one WHERE condition so far, not AND");
-    if (this.peekWord("ORDERBY")) throw new ParseFailure("unsupported", "The twin does not support ORDERBY yet");
+    const query: QboQuery = { select, entity, where: [], orderBy: [], startPosition: 1, maxResults: DEFAULT_MAX_RESULTS };
+    if (this.acceptWord("WHERE")) {
+      do query.where.push(this.condition());
+      while (this.acceptWord("AND"));
+    }
+    // "Query operations don't support ... OR operations in WHERE clauses."
+    if (this.peekWord("OR"))
+      throw new ParseFailure("syntax", "The query language has no OR. Use IN (value, ...) for several values of one property");
+    if (this.peekWord("ORDER")) throw new ParseFailure("syntax", "Write ORDERBY as one word, the way Intuit's docs do");
+    if (this.acceptWord("ORDERBY")) {
+      do query.orderBy.push(this.sortKey());
+      while (this.acceptSymbol(","));
+    }
     if (this.acceptWord("STARTPOSITION")) query.startPosition = this.positiveInteger("STARTPOSITION");
     if (this.acceptWord("MAXRESULTS")) query.maxResults = Math.min(this.positiveInteger("MAXRESULTS"), MAX_RESULTS_LIMIT);
 
@@ -129,26 +108,38 @@ class Parser {
     throw new ParseFailure("syntax", "Expected * after SELECT. Projections (SELECT Field, ...) are not part of the query language");
   }
 
-  private condition(): NonNullable<QboQuery["where"]> {
+  private condition(): QueryCondition {
     const property = this.expect("word", "a property name after WHERE").text;
-    const operator = this.tokens[this.position];
-    if (operator?.text === "=") {
-      this.position++;
-      return { property, operator: "=", values: [this.value()] };
-    }
-    if (operator?.kind === "word" && operator.text.toUpperCase() === "IN") {
-      this.position++;
+    const operator = this.operator(property);
+    if (operator === "in") {
       this.expectSymbol("(");
       const values = [this.value()];
       while (this.acceptSymbol(",")) values.push(this.value());
       this.expectSymbol(")");
-      return { property, operator: "in", values };
+      return { property, operator, values };
     }
-    // Valid QuickBooks, but not modeled yet. (On Id, QuickBooks itself allows only = and IN.)
-    if (operator && /^(like|<|>|<=|>=|!=)$/i.test(operator.text)) {
-      throw new ParseFailure("unsupported", `The twin supports = and IN in WHERE so far, not ${operator.text.toUpperCase()}`);
+    const value = this.value();
+    if (operator === "like" && typeof value !== "string") throw new ParseFailure("syntax", "LIKE needs a quoted pattern, like 'Palm%'");
+    return { property, operator, values: [value] };
+  }
+
+  private operator(property: string): QueryOperator {
+    const text = this.tokens[this.position]?.text.toLowerCase();
+    if (text === "=" || text === "<" || text === ">" || text === "<=" || text === ">=" || text === "like" || text === "in") {
+      this.position++;
+      return text;
     }
-    throw new ParseFailure("syntax", `Expected an operator after ${property}`);
+    if (text === "!=")
+      throw new ParseFailure("unsupported", "The twin doesn't support != (it isn't among the operators Intuit's docs list)");
+    throw new ParseFailure("syntax", `Expected an operator (=, <, >, <=, >=, LIKE, or IN) after ${property}`);
+  }
+
+  private sortKey(): QboQuery["orderBy"][number] {
+    const property = this.expect("word", "a property name after ORDERBY").text;
+    // "The default sort order is ascending. To indicate descending sort order, include DESC."
+    const descending = this.acceptWord("DESC");
+    if (!descending) this.acceptWord("ASC");
+    return { property, descending };
   }
 
   private value(): QueryValue {
@@ -156,6 +147,9 @@ class Parser {
     if (token?.kind === "string") return token.text;
     if (token?.kind === "number") return Number(token.text);
     if (token?.kind === "word" && /^(true|false)$/i.test(token.text)) return token.text.toLowerCase() === "true";
+    if (token?.kind === "word" && token.text.toUpperCase() === "CURRENT_DATE") {
+      throw new ParseFailure("unsupported", "The twin doesn't support CURRENT_DATE yet. Send the date instead, like '2026-07-13'");
+    }
     throw new ParseFailure("syntax", `Expected a value like 'text', 42, true, or false${token ? `, got "${token.text}"` : ""}`);
   }
 
