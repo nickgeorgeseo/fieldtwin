@@ -143,6 +143,12 @@ describe("Jobber webhooks", () => {
     expect(JSON.stringify(subscriptions)).not.toContain(SECRET);
   });
 
+  it("refuse a subscription to every topic with *, which only fault rules take: a subscription names its topics", async () => {
+    const { app } = twinWithEndpoint();
+    const response = await app.request("/_twin/webhooks", { method: "PUT", body: JSON.stringify([{ ...APP, topics: ["*"] }]) });
+    expect(response.status).toBe(400);
+  });
+
   it("refuse a topic the twin can't send, naming the ones it can", async () => {
     const { app } = twinWithEndpoint();
     const response = await app.request("/_twin/webhooks", { method: "PUT", body: JSON.stringify([{ ...APP, topics: ["JOB_CREATE"] }]) });

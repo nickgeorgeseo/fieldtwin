@@ -76,13 +76,7 @@ export async function runAction(twin: Twin, vendorName: string, action: string, 
  */
 export function setWebhooks(twin: Twin, value: unknown) {
   const subscriptions = parseWebhookSubscriptions(value);
-  for (const subscription of subscriptions) {
-    const topics = topicsOf(twin, subscription.vendor);
-    const unknown = subscription.topics.filter((topic) => !topics.includes(topic));
-    if (unknown.length) {
-      throw new Error(`${subscription.vendor} can't send ${unknown.join(", ")}. Topics the twin sends: ${topics.join(", ") || "none yet"}`);
-    }
-  }
+  for (const { vendor, topics } of subscriptions) checkTopics(twin, vendor, topics, "");
   twin.webhooks.subscriptions = subscriptions;
   return describeWebhooks(twin);
 }
@@ -130,19 +124,19 @@ export function setFaults(twin: Twin, rules: unknown) {
 
 /** Fault rules whose webhook topics the vendor really sends; a misspelled topic would otherwise never fire. */
 function checkWebhookTopics(twin: Twin, rules: FaultRule[]): FaultRule[] {
-  for (const rule of rules) {
-    const topics = topicsOf(twin, rule.vendor);
-    if (rule.webhook !== undefined && rule.webhook !== "*" && !topics.includes(rule.webhook)) {
-      throw new Error(
-        `Fault rule "${rule.name}": ${rule.vendor} never sends ${rule.webhook}. Topics the twin sends: ${topics.join(", ") || "none yet"}`,
-      );
-    }
+  for (const { name, vendor, webhook } of rules) {
+    if (webhook !== undefined && webhook !== "*") checkTopics(twin, vendor, [webhook], `Fault rule "${name}": `); // "*": any topic
   }
   return rules;
 }
 
-function topicsOf(twin: Twin, vendor: string): readonly string[] {
-  return twin.vendor(knownVendor(twin, vendor)).webhooks?.topics ?? [];
+/** Throws, naming the topics the vendor does send, unless it sends every one of `topics`. */
+function checkTopics(twin: Twin, vendor: string, topics: readonly string[], context: string): void {
+  const sent = twin.vendor(knownVendor(twin, vendor)).webhooks?.topics ?? [];
+  const unknown = topics.filter((topic) => !sent.includes(topic));
+  if (unknown.length) {
+    throw new Error(`${context}${vendor} never sends ${unknown.join(", ")}. Topics the twin sends: ${sent.join(", ") || "none yet"}`);
+  }
 }
 
 /**
