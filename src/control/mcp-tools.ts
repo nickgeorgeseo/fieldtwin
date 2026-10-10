@@ -80,8 +80,11 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
       inputSchema: { name: z.string().optional(), yaml: z.string().optional() },
     },
     ({ name, yaml }) => {
-      if (name) return asText(ops.loadScenarioByName(twin, name));
-      if (yaml) return asText(ops.loadScenario(twin, yaml));
+      if (name !== undefined && yaml !== undefined) {
+        throw new Error("Give the name of a ready-made scenario or scenario YAML, not both.");
+      }
+      if (name !== undefined) return asText(ops.loadScenarioByName(twin, name));
+      if (yaml !== undefined) return asText(ops.loadScenario(twin, yaml));
       throw new Error("Give either the name of a ready-made scenario or scenario YAML.");
     },
   );

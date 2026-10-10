@@ -73,6 +73,17 @@ describe("MCP server: scenarios, faults, auth, and the log", () => {
     expect(twin.world.customers).toHaveLength(5);
   });
 
+  it("refuses a scenario given both by name and as YAML, instead of quietly loading one of them", async () => {
+    const { client, twin } = await connectAgent();
+    const result = await client.callTool({
+      name: "twin_load_scenario",
+      arguments: { name: "heat-wave-monday", yaml: "name: Tiny\nseed: 3\nstartTime: '2026-07-13T11:00:00Z'\n" },
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("not both");
+    expect(twin.scenario).toBeUndefined();
+  });
+
   it("refuses scenario names that could reach outside the scenarios folder", async () => {
     const { client } = await connectAgent();
     const result = await client.callTool({ name: "twin_load_scenario", arguments: { name: "../package" } });

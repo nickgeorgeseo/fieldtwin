@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- The `twin_load_scenario` MCP tool refuses a call that gives both `name` and `yaml`. It loaded the named scenario and ignored the YAML without saying so.
+
 - After a rewind, the same requests meet the same faults they did the first time. Fault rules kept rolling on from where they were, so a run repeated from a checkpoint failed different requests. Webhook fault rules also roll dice of their own now: subscribing an app to webhooks used to change which API requests failed.
 
 - An app slow to answer webhooks no longer holds up deliveries to other URLs. Deliveries went out one at a time across every subscription, so with two apps subscribed, one that stalled delayed the other's by a second (Jobber) or three (QuickBooks) per delivery, and `POST /_twin/clock/advance` and `/_twin/actions` with them. Each URL still gets its own deliveries in order.
