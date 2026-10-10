@@ -2,7 +2,9 @@
 
 All notable changes to fieldtwin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.2.1 - 2026-10-09
+
+Ready to be public: the twin listens on this machine only unless you open it up, there is a policy for reporting vulnerabilities privately, and npm won't publish the package by accident.
 
 ### Changed
 
@@ -10,8 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Security
 
-- `SECURITY.md`: how to use the twin safely, and how to report a vulnerability privately.
 - The twin listens on 127.0.0.1 by default instead of every network interface. It accepts any token by default, its control plane has no auth, and a webhook subscription makes it POST to any URL, so on a shared network anyone could control it or use it to reach addresses inside yours. `FIELDTWIN_HOST` (`0.0.0.0` in a container) opens it up again, with a warning at startup.
+- `SECURITY.md`: how to use the twin safely, and how to report a vulnerability privately.
 
 ## 0.2.0 - 2026-10-09
 
