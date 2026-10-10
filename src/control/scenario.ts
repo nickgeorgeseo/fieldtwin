@@ -14,11 +14,16 @@ const FaultRuleSchema = z.object({
   method: z.string().optional(),
   pathIncludes: z.string().optional(),
   rate: z.number().min(0).max(1),
-  effect: z.object({
-    status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
-    latencyMs: z.number().int().nonnegative().optional(),
-    message: z.string().optional(),
-  }),
+  effect: z
+    .object({
+      status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
+      latencyMs: z.number().int().nonnegative().optional(),
+      message: z.string().optional(),
+      lostResponse: z.boolean().optional(),
+    })
+    .refine((effect) => !effect.lostResponse || effect.status !== undefined, {
+      message: "lostResponse needs a status: the error the client sees instead of the real answer, like 504",
+    }),
 });
 
 /** One timeline entry: when, and what each vendor should do then ({ jobber: { newClients: 15 } }). */

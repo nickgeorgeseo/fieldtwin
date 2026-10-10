@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- A `lostResponse` fault effect: the twin does the work, then answers with the rule's error anyway, the way a gateway timeout hides a write that succeeded. It is the failure that makes a retried write happen twice unless it is idempotent.
 - QuickBooks honors `requestid` on customer, invoice, and payment writes, as documented: a repeated request gets the first answer again, word for word, and writes nothing. The answer travels on the write's event, so rewinding forgets it along with the write.
 
 ## 0.1.0 - 2026-10-09

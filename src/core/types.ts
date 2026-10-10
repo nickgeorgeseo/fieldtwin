@@ -57,6 +57,7 @@ export interface FaultRule {
     status?: FaultStatus; // respond with this HTTP error status instead of calling the twin
     latencyMs?: number; // wait this long before answering
     message?: string; // error message, rendered in the vendor's own error format
+    lostResponse?: boolean; // do the work first, then answer with `status`: the real answer was lost on its way back
   };
 }
 

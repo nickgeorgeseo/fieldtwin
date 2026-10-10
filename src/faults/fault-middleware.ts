@@ -11,6 +11,10 @@ import type { VendorTwin } from "../core/vendor-twin.ts";
  *
  * Rules layer: every rule that matches the request gets its own roll of the dice, in order.
  * Latencies add up, and the first error that fires answers the request.
+ *
+ * Most errors answer before the twin does anything, like a throttle or an outage. A `lostResponse` rule lets the
+ * twin do the work first and answers with the error anyway, the way a gateway timeout or a dropped connection
+ * hides a write that succeeded. That is the failure a retried write has to survive without happening twice.
  */
 export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandler {
   return async (c, next) => {
@@ -19,8 +23,16 @@ export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandl
       if (rule.effect.latencyMs) await sleep(rule.effect.latencyMs);
       if (rule.effect.status) {
         const message = rule.effect.message ?? `Injected by fault rule "${rule.name}"`;
-        c.header("X-Twin-Fault", rule.name); // so you can tell injected failures from real bugs
-        return c.json(vendor.errorBody(rule.effect.status, message, twin), rule.effect.status);
+        const answer = new Response(JSON.stringify(vendor.errorBody(rule.effect.status, message, twin)), {
+          status: rule.effect.status,
+          // X-Twin-Fault, so you can tell injected failures from real bugs
+          headers: { "Content-Type": "application/json", "X-Twin-Fault": rule.name },
+        });
+        if (!rule.effect.lostResponse) return answer;
+        await next(); // the work happens, events and all
+        c.res = undefined; // then the real answer is dropped (assigning undefined first stops Hono merging its headers in)
+        c.res = answer;
+        return;
       }
     }
     return next();

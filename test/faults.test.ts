@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadScenario } from "../src/control/operations.ts";
+import type { FaultRule } from "../src/core/types.ts";
+import type { QboState } from "../src/vendors/quickbooks/types.ts";
 import { setup } from "./helpers.ts";
 
 const putFaults = (app: ReturnType<typeof setup>["app"], body: unknown) =>
@@ -66,6 +68,50 @@ describe("layered fault rules", () => {
     const response = await qboGet("/customer/1");
     expect(performance.now() - started).toBeGreaterThanOrEqual(15);
     expect(response.headers.get("X-Twin-Fault")).toBe("down");
+  });
+});
+
+describe("lost responses", () => {
+  const LOST: FaultRule = { name: "lost", vendor: "quickbooks", method: "POST", rate: 1, effect: { status: 504, lostResponse: true } };
+  const ada = { DisplayName: "Ada Lost", PrimaryEmailAddr: { Address: "ada.lost@example.com" } };
+  const adas = (twin: ReturnType<typeof setup>["twin"]) =>
+    [...twin.state<QboState>("quickbooks").customers.values()].filter((customer) => customer.DisplayName === "Ada Lost");
+
+  it("do the work, then answer with the error, as if the answer was lost on its way back", async () => {
+    const { twin, qboPost } = setup();
+    twin.faultRules = [LOST];
+    const response = await qboPost("/customer", ada);
+    expect(response.status).toBe(504);
+    expect(response.headers.get("X-Twin-Fault")).toBe("lost");
+    expect((await response.json()).Fault.type).toBe("SystemFault");
+    expect(adas(twin)).toHaveLength(1); // the write happened
+  });
+
+  it("show why a retried write needs a requestid: with one it happens once, without one it happens twice", async () => {
+    const { twin, qboPost } = setup();
+    twin.faultRules = [LOST];
+    await qboPost("/customer?requestid=ada-1", ada);
+    twin.faultRules = [];
+    const retried = await qboPost("/customer?requestid=ada-1", ada);
+    expect(retried.status).toBe(200);
+    expect((await retried.json()).Customer.Id).toBe(adas(twin)[0]!.Id);
+    expect(adas(twin)).toHaveLength(1);
+
+    twin.faultRules = [LOST];
+    await qboPost("/payment", { CustomerRef: { value: adas(twin)[0]!.Id }, TotalAmt: 10 });
+    twin.faultRules = [];
+    await qboPost("/payment", { CustomerRef: { value: adas(twin)[0]!.Id }, TotalAmt: 10 });
+    const credits = [...twin.state<QboState>("quickbooks").payments.values()].filter(
+      (payment) => payment.CustomerRef.value === adas(twin)[0]!.Id,
+    );
+    expect(credits).toHaveLength(2); // the same $10 credit, recorded twice
+  });
+
+  it("need a status to answer with", async () => {
+    const { app } = setup();
+    const response = await putFaults(app, [{ name: "x", vendor: "quickbooks", rate: 1, effect: { lostResponse: true } }]);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/0\.effect: .*lostResponse needs a status/);
   });
 });
 

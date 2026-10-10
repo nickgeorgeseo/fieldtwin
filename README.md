@@ -168,6 +168,16 @@ faults:
 
 Injected failures come back in the vendor's own error format and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs.
 
+An `effect` can also slow a request down (`latencyMs`), or lose its answer: with `lostResponse: true` the twin does the work first and then answers with the error anyway, the way a gateway timeout hides a write that succeeded. That is the failure a retried write has to survive without happening twice (for QuickBooks, send a `requestid`):
+
+```yaml
+  - name: qbo-lost-answers
+    vendor: quickbooks
+    method: POST
+    rate: 0.1
+    effect: { status: 504, lostResponse: true }
+```
+
 Ready-made scenarios in `scenarios/`:
 
 | Scenario | What it tests |
