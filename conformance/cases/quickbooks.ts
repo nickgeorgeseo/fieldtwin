@@ -88,4 +88,11 @@ export const quickbooksCases: ConformanceCase[] = [
     fidelity: "Range operators and LIKE on Id",
     observe: async (target) => faultOf(await quickbooksQuery(target, "select count(*) from Customer where Id > '0'")),
   },
+  {
+    name: "negative-number-unquoted",
+    vendor: "quickbooks",
+    endpoint: "GET /query",
+    fidelity: "Unquoted negative numbers in queries",
+    observe: async (target) => faultOf(await quickbooksQuery(target, "select count(*) from Invoice where TotalAmt > -1")),
+  },
 ];

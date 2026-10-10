@@ -49,6 +49,15 @@ describe("QuickBooks query values", () => {
     expect(body.QueryResponse.Customer.map((customer: { Id: string }) => customer.Id)).toEqual(["2", "9", "10"]);
   });
 
+  it("take a negative number only in quotes, as the docs write every value: TotalAmt > '-1', not TotalAmt > -1", async () => {
+    const harness = setup();
+    const unquoted = await query(harness, "SELECT COUNT(*) FROM Invoice WHERE TotalAmt > -1");
+    expect(unquoted.status).toBe(400);
+    expect(unquoted.body.Fault.Error[0].code).toBe("4000");
+    const quoted = await query(harness, "SELECT COUNT(*) FROM Invoice WHERE TotalAmt > '-1'");
+    expect(quoted.body.QueryResponse.totalCount).toBeGreaterThan(0);
+  });
+
   it("match no text against true or false", async () => {
     const { body } = await query(setup(), "SELECT COUNT(*) FROM Customer WHERE DisplayName = false");
     expect(body.QueryResponse.totalCount).toBe(0);

@@ -11,6 +11,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- A conformance case and a FIDELITY.md "check" row for an unquoted negative number in a QuickBooks query (`TotalAmt > -1`). The twin answers 4000, since the docs quote every value; quoted, `'-1'` works on both.
 - Worlds can have customers the bookkeeper made inactive in QuickBooks who have called again since (`world.drift.inactiveInAccounting`): each is inactive in the books and has a job paid in Jobber in the last week, newer than the books. `mismatched-books` has one, so a sync that looks up active customers only creates a duplicate there, as it would in production.
 
 ## 0.3.0 - 2026-10-10
