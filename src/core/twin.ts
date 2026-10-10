@@ -4,7 +4,6 @@ import { Bookkeeping } from "./bookkeeping.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
-import type { BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
 import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { SeededRandom } from "./random.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
@@ -163,9 +162,9 @@ export class Twin {
     return this.bookkeeping.oauthServer(vendor, policy);
   }
 
-  /** The rate-limit budget for a key (e.g. one vendor app), created full on first use. */
-  rateLimitBucket(key: string, limits: BucketLimits): LeakyBucket {
-    return this.bookkeeping.rateLimitBucket(key, limits);
+  /** The rate limit kept under a key (e.g. one vendor app), made by `create` on first use. See bookkeeping.ts. */
+  rateLimit<Limit>(key: string, create: () => Limit): Limit {
+    return this.bookkeeping.rateLimit(key, create);
   }
 
   checkpoint(name: string): Checkpoint {

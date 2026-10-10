@@ -1,6 +1,7 @@
 import { execute } from "graphql";
 import { Hono } from "hono";
 import { checkBearer } from "../../core/auth.ts";
+import { LeakyBucket } from "../../core/leaky-bucket.ts";
 import type { Twin } from "../../core/twin.ts";
 import { actualQueryCost, COST_LIMITS, requestedQueryCost } from "./cost.ts";
 import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
@@ -48,7 +49,7 @@ export function jobberRoutes(twin: Twin): Hono {
     const requested = requestedQueryCost(schema, document, request.variables, request.operationName);
     // Jobber budgets per app and account. The twin has one account, so the budget is the app's: every token
     // the OAuth twin issued to one client_id shares it (in any-token mode, an unknown token is its own app).
-    const bucket = twin.rateLimitBucket(`jobber:${auth.app}`, COST_LIMITS);
+    const bucket = twin.rateLimit(`jobber:${auth.app}`, () => new LeakyBucket(COST_LIMITS));
     const available = bucket.check(twin.clock.nowMs());
     const throttleStatus = (currentlyAvailable: number) => ({
       maximumAvailable: COST_LIMITS.capacity,

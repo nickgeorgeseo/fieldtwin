@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../../src/app.ts";
+import { LeakyBucket } from "../../../src/core/leaky-bucket.ts";
 import { COST_LIMITS } from "../../../src/vendors/jobber/cost.ts";
 import type { JobberState } from "../../../src/vendors/jobber/types.ts";
 import { createJobberClient, JobberError } from "../src/jobber.ts";
@@ -48,7 +49,7 @@ describe("the Jobber client", () => {
 
   it("waits out a THROTTLED answer for exactly the points the query needs, then succeeds", async () => {
     const { target, jobber, lines } = await connected();
-    const bucket = target.twin.rateLimitBucket(`jobber:client:${JOBBER_APP.clientId}`, COST_LIMITS);
+    const bucket = target.twin.rateLimit(`jobber:client:${JOBBER_APP.clientId}`, () => new LeakyBucket(COST_LIMITS));
     bucket.check(target.twin.clock.nowMs());
     bucket.spend(COST_LIMITS.capacity); // the app's budget is empty
 

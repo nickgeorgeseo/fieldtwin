@@ -1,4 +1,3 @@
-import { type BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
 import { type OAuthPolicy, OAuthServer } from "./oauth.ts";
 import type { SeededRandom } from "./random.ts";
 import type { VendorName } from "./types.ts";
@@ -14,7 +13,7 @@ import type { VendorName } from "./types.ts";
  *     the way a real app stays connected while its data changes.
  */
 export class Bookkeeping {
-  private rateLimits = new Map<string, LeakyBucket>();
+  private rateLimits = new Map<string, unknown>();
   private oauthServers = new Map<VendorName, OAuthServer>();
 
   /** `oauthRandom` gives each vendor's OAuth server its own seeded stream, so issuing tokens never changes the world. */
@@ -30,14 +29,13 @@ export class Bookkeeping {
     return server;
   }
 
-  /** The rate-limit budget for a key (e.g. one vendor app), created full on first use. */
-  rateLimitBucket(key: string, limits: BucketLimits): LeakyBucket {
-    let bucket = this.rateLimits.get(key);
-    if (!bucket) {
-      bucket = new LeakyBucket(limits);
-      this.rateLimits.set(key, bucket);
-    }
-    return bucket;
+  /**
+   * The rate limit kept under a key (one vendor app, one company), made by `create` on first use: a LeakyBucket,
+   * a SlidingWindowLimit, or whatever the vendor's documented limit needs. Prefix keys with the vendor's name.
+   */
+  rateLimit<Limit>(key: string, create: () => Limit): Limit {
+    if (!this.rateLimits.has(key)) this.rateLimits.set(key, create());
+    return this.rateLimits.get(key) as Limit;
   }
 
   clearRateLimits(): void {
