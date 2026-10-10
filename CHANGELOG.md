@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Changed
+
+- `package.json` is marked `private`, so `npm publish` refuses it. fieldtwin runs from a clone (`npm start` uses `tsx`, a dev dependency) and isn't packaged for npm yet.
+
 ### Security
 
 - `SECURITY.md`: how to use the twin safely, and how to report a vulnerability privately.
