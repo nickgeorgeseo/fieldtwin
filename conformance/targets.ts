@@ -5,6 +5,9 @@ type Fetch = Target["fetch"];
 /**
  * A twin at baseUrl, reached over HTTP like any client. It is switched to real token checks (so the cases about
  * bad tokens mean something) and connected through its own OAuth endpoints, with no browser.
+ *
+ * Twin time stands still between requests, where a sandbox's moves on, so asking for now moves it a second first:
+ * otherwise a record written just before would count as changed since "now".
  */
 export async function twinTarget(baseUrl: string, fetchImpl: Fetch = (url, init) => fetch(url, init)): Promise<Target> {
   const json = { "Content-Type": "application/json" };
@@ -46,7 +49,14 @@ export async function twinTarget(baseUrl: string, fetchImpl: Fetch = (url, init)
     fetch: fetchImpl,
     quickbooks: { apiBase: `${baseUrl}/v3`, realmId: qbo.get("realmId") ?? "", accessToken: qboToken },
     jobber: { apiUrl: `${baseUrl}/api/graphql`, accessToken: jobberToken },
-    now: async () => ((await (await fetchImpl(`${baseUrl}/_twin`)).json()) as { twinTime: string }).twinTime,
+    now: async () => {
+      const advanced = await fetchImpl(`${baseUrl}/_twin/clock/advance`, {
+        method: "POST",
+        headers: json,
+        body: JSON.stringify({ minutes: 1 / 60 }),
+      });
+      return ((await advanced.json()) as { twinTime: string }).twinTime;
+    },
   };
 }
 

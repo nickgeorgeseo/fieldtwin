@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { caseId } from "./case.ts";
+import { caseId, quickbooks } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { readRecordings } from "./recordings.ts";
 import { compare, observeAll, report } from "./run.ts";
@@ -38,6 +38,16 @@ describe("conformance cases", () => {
         .map((line) => line.split("|")[1]!.trim().replaceAll("`", "")),
     );
     for (const testCase of CASES) expect(rows, caseId(testCase)).toContain(testCase.fidelity);
+  });
+});
+
+describe("a twin as a target", () => {
+  it("lets time pass when asked for now, as it does for a sandbox, so nothing written before then has changed since", async () => {
+    const { app: written } = createApp({ seed: 42 });
+    const twin = await twinTarget("http://twin.test", async (url, init) => written.request(url, init));
+    await quickbooks(twin, "POST", "customer", { DisplayName: "Written Just Before" });
+    const cdc = CASES.find((testCase) => caseId(testCase) === "quickbooks/cdc-nothing-changed")!;
+    expect(await cdc.observe(twin)).toEqual({ status: 200, groupKeys: [] });
   });
 });
 
