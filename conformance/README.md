@@ -62,4 +62,4 @@ Not covered: QuickBooks' 429 body (provoking a real throttle means flooding the 
 
 ## Adding a case
 
-Add it to [`cases/quickbooks.ts`](cases/quickbooks.ts) or [`cases/jobber.ts`](cases/jobber.ts) with the FIDELITY.md row it checks. Observe as little as settles the question, and nothing that varies between runs or accounts. Mark it `writes: true` if it creates anything. Like `examples/`, this folder reaches the twin over HTTP only and never imports `src/` (its test may, to run a twin in process).
+Add it to [`cases/quickbooks.ts`](cases/quickbooks.ts) (or [`cases/quickbooks-writes.ts`](cases/quickbooks-writes.ts) if it creates records) or [`cases/jobber.ts`](cases/jobber.ts), with the FIDELITY.md row it checks. Observe as little as settles the question, and nothing that varies between runs or accounts. Mark it `writes: true` if it creates anything. Like `examples/`, this folder reaches the twin over HTTP only and never imports `src/` (its test may, to run a twin in process).
