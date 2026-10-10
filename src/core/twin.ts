@@ -5,7 +5,7 @@ import { Checkpoints } from "./checkpoints.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
 import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
-import { SeededRandom } from "./random.ts";
+import { copyFaultRandom, type FaultRandom, streams } from "./streams.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import { scenarioActionOf, type VendorTwin } from "./vendor-twin.ts";
@@ -24,20 +24,11 @@ export interface TwinOptions {
 }
 
 /**
- * The dice fault rules roll: one stream for requests, one for webhook deliveries, so subscribing an app (which adds
- * deliveries to roll for) never changes which requests fail. Neither is the world's, so faults never change it.
- */
-export interface FaultRandom {
-  requests: SeededRandom;
-  webhooks: SeededRandom;
-}
-
-/**
  * The running twin: one fake business, seen through several vendor APIs.
  *
  * Three rules keep this easy to reason about:
  *   1. All state changes go through record(). Nothing else writes vendor state.
- *   2. All time comes from this.clock. All randomness comes from a SeededRandom.
+ *   2. All time comes from this.clock. All randomness comes from a SeededRandom, made in streams.ts.
  *   3. Vendor state can always be rebuilt by replaying the event log.
  */
 export class Twin {
@@ -47,17 +38,14 @@ export class Twin {
   faultRules: FaultRule[] = [];
   authMode: AuthMode;
   readonly defaultAuthMode: AuthMode; // what the twin started with (FIELDTWIN_AUTH); a scenario without `auth` returns to it
-  faultRandom!: FaultRandom;
+  faultRandom!: FaultRandom; // see streams.ts
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
   private checkpoints = new Checkpoints<FaultRandom>(); // each saves where the fault dice were, to roll the same again
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
-  // Each vendor's OAuth server draws from its own stream, so issuing tokens never changes the world or the faults.
-  private readonly bookkeeping = new Bookkeeping(
-    (vendor) => new SeededRandom(this.options.seed + 2 + [...this.vendors.keys()].indexOf(vendor)),
-  );
+  private readonly bookkeeping = new Bookkeeping((vendor) => streams.oauth(this.options.seed, [...this.vendors.keys()].indexOf(vendor)));
 
   // A loaded scenario's schedule. See schedule() and advance().
   private timeline = new Timeline();
@@ -157,7 +145,7 @@ export class Twin {
 
   private runDue(nowMs: number): void {
     for (const { entry, position } of this.timeline.takeDue(nowMs)) {
-      const random = new SeededRandom(this.options.seed * 7919 + 1000 + position);
+      const random = streams.timelineEntry(this.options.seed, position);
       const context = { state: this.state(entry.vendor), world: this.world, random, nowIso: this.clock.nowIso() };
       const action = scenarioActionOf(this.vendor(entry.vendor), entry.action);
       for (const event of action.run(entry.params, context)) this.record(event, "scenario");
@@ -171,15 +159,14 @@ export class Twin {
 
   /** The clock and world a twin with these options starts from. Building them is all that can fail. */
   private startOf({ seed, startTime, worldSize, drift }: TwinOptions): { clock: TwinClock; world: World } {
-    return { clock: new TwinClock(startTime), world: generateWorld(new SeededRandom(seed), { startTime, size: worldSize, drift }) };
+    return { clock: new TwinClock(startTime), world: generateWorld(streams.world(seed), { startTime, size: worldSize, drift }) };
   }
 
   private rebuild({ clock, world }: { clock: TwinClock; world: World }): void {
-    const { seed } = this.options;
     this.clock = clock;
     this.log = new EventLog();
     this.world = world;
-    this.faultRandom = { requests: new SeededRandom(seed + 1), webhooks: new SeededRandom(seed * 7919 + 500) };
+    this.faultRandom = streams.faults(this.options.seed);
     this.faultRules = this.options.faults ?? [];
     this.checkpoints.clear();
     this.bookkeeping.clearRateLimits();
@@ -221,7 +208,7 @@ export class Twin {
   }
 
   checkpoint(name: string): Checkpoint {
-    return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), copyOf(this.faultRandom));
+    return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), copyFaultRandom(this.faultRandom));
   }
 
   checkpointList(): Checkpoint[] {
@@ -249,14 +236,10 @@ export class Twin {
       this.vendor(event.vendor).apply(this.state(event.vendor), replayed);
     }
     this.clock = new TwinClock(checkpoint.time);
-    this.faultRandom = copyOf(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
+    this.faultRandom = copyFaultRandom(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
     this.bookkeeping.clearRateLimits();
     this.webhooks.dropPending();
     this.timeline.rearmAfter(this.clock.nowMs());
     this.checkpoints.forgetAfter(checkpoint.seq);
   }
-}
-
-function copyOf({ requests, webhooks }: FaultRandom): FaultRandom {
-  return { requests: requests.copy(), webhooks: webhooks.copy() };
 }
