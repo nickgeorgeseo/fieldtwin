@@ -1,15 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../../src/app.ts";
 import type { JobberState } from "../../../src/vendors/jobber/types.ts";
+import type { QboState } from "../../../src/vendors/quickbooks/types.ts";
 import { InvoiceQueue } from "../src/invoice-queue.ts";
 import { fetchPaidInvoicesSince } from "../src/jobber-invoices.ts";
 import { OAuthError } from "../src/oauth.ts";
-import { emptyStats, salesLineFor } from "../src/sync.ts";
-import { syncHarness } from "./harness.ts";
+import { emptyStats, salesLineFor, syncPaidInvoices } from "../src/sync.ts";
+import { EVER, syncHarness } from "./harness.ts";
 
 /**
- * What happens in production that a single clean run never shows: a connection lost while webhooks keep coming, clocks that disagree, and line items whose arithmetic QuickBooks would refuse.
+ * What happens in production that a single clean run never shows: two syncs at once, a connection lost while
+ * webhooks keep coming, clocks that disagree, and line items whose arithmetic QuickBooks would refuse.
  */
+
+describe("two syncs at the same moment", () => {
+  it("book each invoice and its payment once, as the scheduled sync and a webhook's sync may", async () => {
+    const target = createApp({ seed: 42, auth: "oauth" });
+    const harness = await syncHarness(target);
+    const clients = { jobber: harness.jobber, quickbooks: harness.quickbooks, log: harness.runtime.log };
+    await Promise.all([syncPaidInvoices(clients, EVER), syncPaidInvoices(clients, EVER)]);
+
+    const qbo = target.twin.state<QboState>("quickbooks");
+    const docNumbers = [...qbo.invoices.values()].map((invoice) => invoice.DocNumber);
+    expect(docNumbers.length).toBe(new Set(docNumbers).size);
+    const refs = [...qbo.payments.values()].map((payment) => payment.PaymentRefNum).filter(Boolean);
+    expect(refs.length).toBe(new Set(refs).size);
+  });
+});
 
 describe("the webhook queue when the connection is lost", () => {
   const update = (itemId: string) => ({ topic: "INVOICE_UPDATE", appId: "app", accountId: "account", itemId, occurredAt: "now" });

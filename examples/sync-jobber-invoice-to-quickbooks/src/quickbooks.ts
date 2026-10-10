@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { TokenManager } from "./oauth.ts";
 import { type RetryPolicy, withRetries } from "./retry.ts";
 import { REQUEST_TIMEOUT_MS, type Runtime } from "./runtime.ts";
@@ -10,9 +10,10 @@ import { REQUEST_TIMEOUT_MS, type Runtime } from "./runtime.ts";
  *   - A 429 waits 60 seconds, as Intuit's limits page says to before retrying
  *     (https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles). 5xx answers back off
  *     with jitter.
- *   - Every write carries a requestid, the same one on every retry of that write: "If our service receives
+ *   - Every write carries a requestid made from the write itself (see requestIdFor): "If our service receives
  *     another request with the same request ID ... it can recognize and send the same response for the original
- *     request. This prevents duplication." That makes it safe to retry a create whose answer was lost.
+ *     request. This prevents duplication." That makes it safe to retry a create whose answer was lost, and to
+ *     run two syncs at once.
  *     https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions (Request ID)
  *   - A 401 refreshes the token once and tries again.
  *   - Anything else that isn't 2xx becomes a QuickBooksError carrying the Fault's code and Detail.
@@ -42,6 +43,16 @@ export class QuickBooksError extends Error {
   }
 }
 
+/**
+ * A write's requestid: a hash of what it writes. Its retries carry the same one, and so does the identical write made
+ * by a second sync at the same moment (the scheduled sync and a webhook's sync can both reach one invoice), so
+ * QuickBooks answers the repeat with the first answer and books it once. A write whose body changed, after a failure
+ * say, is a different write with a different id. 40 hex characters: QuickBooks allows up to 50.
+ */
+export function requestIdFor(entity: string, body: string): string {
+  return createHash("sha256").update(`${entity}\n${body}`).digest("hex").slice(0, 40);
+}
+
 /** A query value in quotes, with apostrophes escaped as the query docs show: 'Adam\'s Candy Shop'. */
 export function quoted(value: string): string {
   return `'${value.replaceAll("'", "\\'")}'`;
@@ -52,10 +63,10 @@ export function createQuickBooksClient(options: {
   realmId: string;
   tokens: TokenManager;
   runtime: Runtime;
-  newRequestId?: () => string | undefined; // undefined sends none: only to show what goes wrong without them
+  newRequestId?: (entity: string, body: string) => string | undefined; // undefined sends none: only to show what goes wrong
 }): QuickBooksClient {
   const { apiBase, realmId, tokens, runtime } = options;
-  const newRequestId = options.newRequestId ?? (() => randomUUID());
+  const newRequestId = options.newRequestId ?? requestIdFor;
 
   async function send(method: string, path: string, body: string | undefined) {
     let token = "";
@@ -89,7 +100,7 @@ export function createQuickBooksClient(options: {
       return (await request("GET", `${entity.toLowerCase()}/${encodeURIComponent(id)}`))[entity] as T;
     },
     async write<T>(entity: string, body: object) {
-      const requestId = newRequestId(); // once per write, so every retry of it carries the same one
+      const requestId = newRequestId(entity, JSON.stringify(body)); // every retry of this write carries the same one
       const path = requestId === undefined ? entity.toLowerCase() : `${entity.toLowerCase()}?requestid=${encodeURIComponent(requestId)}`;
       return (await request("POST", path, body))[entity] as T;
     },

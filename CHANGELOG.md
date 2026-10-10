@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: two syncs at once (the scheduled one and a webhook's) booked an invoice and its payment twice. Each QuickBooks write's `requestid` is now a hash of the write, so the identical write from either sync carries the same id and QuickBooks books it once.
+
 - Reference integration: a lost connection (`OAuthError`) pauses the webhook queue instead of leaving it permanently rejected, which crashed a web server with an unhandled rejection or silently dropped every later webhook while still answering Jobber 200. What hadn't synced stays queued; `queue.connectionLost` says why, and `queue.resume()` carries on after the person reconnects.
 
 - Reference integration: the scheduled sync reads again what changed in the ten minutes before its cutoff. With a strict `>` and no overlap, an invoice paid as a run started, or stamped by a server whose clock ran behind Jobber's, was never synced.

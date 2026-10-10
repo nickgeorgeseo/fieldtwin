@@ -127,7 +127,7 @@ describe("the QuickBooks client", () => {
     expect(lines).toContain("QuickBooks GET /query: HTTP 429, retrying in 60s (attempt 2 of 8)");
   });
 
-  it("sends a requestid with every write, and the same one when it retries that write", async () => {
+  it("sends a requestid made from the write with every write, and the same one when it retries that write", async () => {
     const unavailable = once(
       (_, init) => init?.method === "POST",
       () => fault(503, "10000", "Service unavailable"),
@@ -137,7 +137,7 @@ describe("the QuickBooks client", () => {
     const writes = urls.filter((url) => url.startsWith("POST") && url.includes("/customer"));
     expect(writes).toHaveLength(2);
     const ids = writes.map((url) => new URL(url.slice("POST ".length)).searchParams.get("requestid"));
-    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(ids[0]).toMatch(/^[0-9a-f]{40}$/);
     expect(ids[1]).toBe(ids[0]);
   });
 
