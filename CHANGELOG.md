@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks amounts: an amount sent as a numeric string (`"93.00"`, as python-quickbooks sends decimals) is accepted instead of answering "Required parameter Line.Amount is missing". Fractions of a cent, and amounts too big to add up, answer 2140 Invalid Amount; they used to be stored as sent while totals were kept in rounded cents, so lines and totals disagreed, and a 1e307 line made `TotalAmt` null. Qty × UnitPrice is checked to the cent with decimal-correct rounding, so 2.5 × 33.33 = 83.33 is no longer refused with 6070.
+
 - A webhook delivery on its way during a reset or rewind is forgotten. If it failed, it used to be queued again, and the next clock advance sent news about an invoice the reset had erased.
 
 - Twin time can't be pushed past what a date can hold. `POST /_twin/clock/advance {"minutes": 1e12}` used to leave the twin answering "Invalid time value" until a reset, and with a webhook retry pending it crashed the process. Advances are capped at ten years and webhook `delayMs` faults at a week. `twin_advance_clock` accepts 0, as the control plane does, to send the deliveries already due.

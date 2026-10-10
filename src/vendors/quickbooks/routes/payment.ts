@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { formatMoney, fromCents, toCents } from "../../../core/money.ts";
 import { isObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
+import { readAmount } from "../amounts.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
@@ -43,8 +44,8 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_PAYMENT_FIELDS);
 
-  if (typeof fields.TotalAmt !== "number") return qboErrors.missingField("TotalAmt", now);
-  if (fields.TotalAmt < 0) return qboErrors.negativeAmount("TotalAmt", now);
+  const TotalAmt = readAmount(fields.TotalAmt, "TotalAmt", now);
+  if (typeof TotalAmt !== "number") return TotalAmt;
   if (!fields.CustomerRef?.value) return qboErrors.missingField("CustomerRef", now);
   const customer = state.customers.get(String(fields.CustomerRef.value));
   if (!customer?.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
@@ -59,8 +60,8 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
     return qboErrors.invalidProperty("Line", 'Line must be a list of lines, like [{"Amount": 25, "LinkedTxn": [...]}].', now);
   }
   for (const line of requested as Partial<QboPaymentLine>[]) {
-    if (typeof line.Amount !== "number") return qboErrors.missingField("Line.Amount", now);
-    if (line.Amount < 0) return qboErrors.negativeAmount("Line.Amount", now);
+    const Amount = readAmount(line.Amount, "Line.Amount", now);
+    if (typeof Amount !== "number") return Amount;
     if (line.LinkedTxn !== undefined && !Array.isArray(line.LinkedTxn)) {
       return qboErrors.invalidProperty("Line.LinkedTxn", 'LinkedTxn must be a list, like [{"TxnId": "130", "TxnType": "Invoice"}].', now);
     }
@@ -78,20 +79,20 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
         now,
       );
     }
-    const balance = (balances.get(invoice.Id) ?? toCents(invoice.Balance)) - toCents(line.Amount);
+    const balance = (balances.get(invoice.Id) ?? toCents(invoice.Balance)) - toCents(Amount);
     if (balance < 0) {
       return qboErrors.businessValidation(
-        `Invoice ${invoice.Id} has a balance of ${formatMoney(invoice.Balance)}, less than the ${formatMoney(line.Amount)} applied to it.`,
+        `Invoice ${invoice.Id} has a balance of ${formatMoney(invoice.Balance)}, less than the ${formatMoney(Amount)} applied to it.`,
         now,
       );
     }
     balances.set(invoice.Id, balance);
-    lines.push({ Amount: line.Amount, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] });
+    lines.push({ Amount, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] });
   }
 
-  const unappliedCents = toCents(fields.TotalAmt) - lines.reduce((total, line) => total + toCents(line.Amount), 0);
+  const unappliedCents = toCents(TotalAmt) - lines.reduce((total, line) => total + toCents(line.Amount), 0);
   if (unappliedCents < 0) {
-    return qboErrors.businessValidation(`The lines apply more than the payment's TotalAmt of ${formatMoney(fields.TotalAmt)}.`, now);
+    return qboErrors.businessValidation(`The lines apply more than the payment's TotalAmt of ${formatMoney(TotalAmt)}.`, now);
   }
 
   const payment: QboPayment = {
@@ -100,7 +101,7 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
     SyncToken: "0",
     TxnDate,
     CustomerRef: { value: customer.Id, name: customer.DisplayName },
-    TotalAmt: fields.TotalAmt,
+    TotalAmt,
     UnappliedAmt: fromCents(unappliedCents),
     Line: lines,
     ProcessPayment: false,

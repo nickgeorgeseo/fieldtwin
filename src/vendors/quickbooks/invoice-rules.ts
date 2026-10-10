@@ -1,5 +1,6 @@
-import { sameMoney, sumMoney } from "../../core/money.ts";
+import { multiplyMoney, sameMoney, sumMoney } from "../../core/money.ts";
 import { isObject } from "../../core/request-body.ts";
+import { readAmount, readOptionalNumber } from "./amounts.ts";
 import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
@@ -84,16 +85,20 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
         now,
       );
     }
-    if (typeof line.Amount !== "number") return qboErrors.missingField("Line.Amount", now);
-    if (line.Amount < 0) return qboErrors.negativeAmount("Line.Amount", now);
+    const Amount = readAmount(line.Amount, "Line.Amount", now);
+    if (typeof Amount !== "number") return Amount;
 
     const detail = line.SalesItemLineDetail ?? {};
     if (!detail.ItemRef?.value) return qboErrors.missingField("Line.SalesItemLineDetail.ItemRef", now);
     const item = state.items.get(String(detail.ItemRef.value));
     if (!item?.Active) return qboErrors.invalidReference("Line.SalesItemLineDetail.ItemRef", `Item ${detail.ItemRef.value}`, now);
 
-    if (typeof detail.Qty === "number" && typeof detail.UnitPrice === "number" && !sameMoney(detail.Qty * detail.UnitPrice, line.Amount)) {
-      return qboErrors.amountMismatch(line.Amount, now);
+    const Qty = readOptionalNumber(detail.Qty, "Line.SalesItemLineDetail.Qty", "quantity", now);
+    if (typeof Qty === "object") return Qty;
+    const UnitPrice = readOptionalNumber(detail.UnitPrice, "Line.SalesItemLineDetail.UnitPrice", "price", now);
+    if (typeof UnitPrice === "object") return UnitPrice;
+    if (Qty !== undefined && UnitPrice !== undefined && !sameMoney(multiplyMoney(Qty, UnitPrice), Amount)) {
+      return qboErrors.amountMismatch(Amount, now);
     }
 
     // An update keeps the Id of a line it sends back; new lines get new Ids.
@@ -102,12 +107,12 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
       Id,
       LineNum: index + 1,
       ...(line.Description !== undefined && { Description: line.Description }),
-      Amount: line.Amount,
+      Amount,
       DetailType: "SalesItemLineDetail",
       SalesItemLineDetail: {
         ItemRef: { value: item.Id, name: item.Name },
-        ...(detail.Qty !== undefined && { Qty: detail.Qty }),
-        ...(detail.UnitPrice !== undefined && { UnitPrice: detail.UnitPrice }),
+        ...(Qty !== undefined && { Qty }),
+        ...(UnitPrice !== undefined && { UnitPrice }),
         ...(detail.ServiceDate !== undefined && { ServiceDate: detail.ServiceDate }),
       },
     });
@@ -118,9 +123,9 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 interface LineInput {
   Id?: string;
   Description?: string;
-  Amount?: number;
+  Amount?: unknown; // a number or a numeric string, checked by readAmount
   DetailType?: string;
-  SalesItemLineDetail?: { ItemRef?: QboRef; Qty?: number; UnitPrice?: number; ServiceDate?: string };
+  SalesItemLineDetail?: { ItemRef?: QboRef; Qty?: unknown; UnitPrice?: unknown; ServiceDate?: string };
 }
 
 function nextDocNumber(state: QboState): string {
