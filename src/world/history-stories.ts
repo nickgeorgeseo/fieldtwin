@@ -18,7 +18,8 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const BIG_JOB_PRICE = 500; // a service at least this price is quoted first and takes two visits
 const NET_DAYS = 30;
-const LAST_START_HOUR = 15; // local time; visits start between 8:00 and 15:30
+const FIRST_START_HOUR = 8; // local time; visits start between 8:00 and 15:30
+const LAST_START_HOUR = 15;
 
 export function jobStory(context: HistoryContext, requestedDay: number): JobStory {
   const { random, customers, technicians } = context;
@@ -31,7 +32,7 @@ export function jobStory(context: HistoryContext, requestedDay: number): JobStor
   if (big && day === -1) day = -2;
   if (day === 0 && localHourNow(context) >= LAST_START_HOUR - 1) day = 1;
 
-  const firstStart = businessHour(context, day, day === 0 ? localHourNow(context) + 1 : 8);
+  const firstStart = businessHour(context, day, day === 0 ? Math.max(FIRST_START_HOUR, localHourNow(context) + 1) : FIRST_START_HOUR);
   const crew = big && technicians.length > 1 ? pickDistinct(random, technicians, 2) : [random.pick(technicians)];
   const visits: WorldVisit[] = Array.from({ length: big ? 2 : 1 }, (_, index) => {
     const startMs = firstStart + index * DAY;

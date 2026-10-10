@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Today's visits in the generated world start at 8:00 or later, as every other day's do. With the default 6 a.m. start, some started at 7:00, and a world starting at midnight booked visits at 2:30 a.m.
+
 - Jobber: an id sent without its base64 padding finds the same record as the padded id. It resolved to `null`, though Jobber's own examples show ids both ways.
 
 - QuickBooks: an invoice or payment shows its customer's current name in `CustomerRef.name` after the customer is renamed, instead of the name it had when the invoice was written.

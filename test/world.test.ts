@@ -92,11 +92,17 @@ describe("the world's history", () => {
     }
   });
 
-  it("books visits during business hours in the company's time zone", () => {
-    for (const visit of allVisits) {
-      const localHour = (new Date(visit.startAt).getUTCHours() + 24 + world(42).company.utcOffsetHours) % 24;
-      expect(localHour).toBeGreaterThanOrEqual(7);
-      expect(localHour).toBeLessThanOrEqual(16);
+  it("starts every visit between 8:00 and 15:30 in the company's time zone, whatever time the world starts at", () => {
+    for (const startTime of [START, "2026-07-13T05:00:00.000Z", "2026-07-13T15:20:00.000Z"]) {
+      for (const seed of [42, 7, 1234]) {
+        const generated = generateWorld(new SeededRandom(seed), { startTime });
+        for (const visit of generated.history.jobs.flatMap((job) => job.visits)) {
+          const local = new Date(Date.parse(visit.startAt) + generated.company.utcOffsetHours * 3_600_000);
+          const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+          expect(minutes, `${startTime} seed ${seed}: ${visit.startAt}`).toBeGreaterThanOrEqual(8 * 60);
+          expect(minutes, `${startTime} seed ${seed}: ${visit.startAt}`).toBeLessThanOrEqual(15 * 60 + 30);
+        }
+      }
     }
   });
 
