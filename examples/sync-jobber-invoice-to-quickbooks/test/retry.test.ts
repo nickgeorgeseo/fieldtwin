@@ -39,6 +39,17 @@ describe("withRetries", () => {
     expect(runtime.waits).toHaveLength(5);
   });
 
+  it("gives up at once when Retry-After asks for more than ten minutes, rather than holding up everything behind it", async () => {
+    for (const retryAfter of ["86400", "Wed, 21 Oct 2099 07:28:00 GMT"]) {
+      const runtime = fakeRuntime();
+      const { send, calls } = scripted(new Response(null, { status: 503, headers: { "Retry-After": retryAfter } }), 200);
+      expect((await withRetries(send, POLICY, runtime, "test")).status).toBe(503);
+      expect(calls()).toBe(1);
+      expect(runtime.waits).toEqual([]);
+      expect(runtime.lines).toEqual([expect.stringContaining("not retrying")]);
+    }
+  });
+
   it("does not retry a 400 or a 404: asking again won't change the answer", async () => {
     for (const status of [400, 404]) {
       const { send, calls } = scripted(status, 200);

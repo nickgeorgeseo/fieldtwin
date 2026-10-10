@@ -7,7 +7,9 @@ import type { Runtime } from "./runtime.ts";
  * handle, because asking again won't change the answer to a bad request.
  *
  * How long to wait, in order of preference:
- *   1. a Retry-After header, when the server sends one (delay-seconds or an HTTP date);
+ *   1. a Retry-After header, when the server sends one (delay-seconds or an HTTP date). One asking for more than ten
+ *      minutes isn't waited out: the request fails now and the next run tries again, instead of everything queued
+ *      behind it waiting too;
  *   2. after a 429, the vendor's documented wait if it has one (QuickBooks: 60 seconds), via throttleWaitMs;
  *   3. exponential backoff with full jitter: a random wait between 0 and min(maxDelayMs, baseDelayMs * 2^(n-1))
  *      before attempt n+1, so many clients that failed together don't all come back together.
@@ -23,6 +25,7 @@ export interface RetryPolicy {
 }
 
 export const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([429, 500, 502, 503, 504]);
+const LONGEST_RETRY_AFTER_MS = 10 * 60_000;
 
 type RetryRuntime = Pick<Runtime, "sleep" | "now" | "random" | "log">;
 
@@ -55,11 +58,14 @@ export async function withRetries(
       problem = "network error";
     } else {
       const { response } = outcome;
+      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"), runtime.now());
+      if (retryAfterMs !== undefined && retryAfterMs > LONGEST_RETRY_AFTER_MS) {
+        runtime.log(`${what}: HTTP ${response.status} with Retry-After ${retryAfterMs / 1000}s, not retrying`);
+        return response;
+      }
       await response.body?.cancel(); // let the connection go back to the pool
       waitMs =
-        parseRetryAfter(response.headers.get("Retry-After"), runtime.now()) ??
-        (response.status === 429 ? policy.throttleWaitMs : undefined) ??
-        backoffDelayMs(attempt, policy, runtime.random);
+        retryAfterMs ?? (response.status === 429 ? policy.throttleWaitMs : undefined) ?? backoffDelayMs(attempt, policy, runtime.random);
       problem = `HTTP ${response.status}`;
     }
     runtime.log(`${what}: ${problem}, retrying in ${waitMs / 1000}s (attempt ${attempt + 1} of ${policy.maxAttempts})`);

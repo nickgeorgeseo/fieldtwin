@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: a `Retry-After` asking for more than ten minutes fails the request at once instead of being waited out, so a server that answers `Retry-After: 86400` (or a date years away) can't hold the webhook queue for a day.
+
 - Reference integration: a token endpoint that is down, throttling, or out of reach is a `TokenEndpointError`, not a lost connection. It was an `OAuthError`, so a short outage paused the webhook queue until someone reconnected an app that was still connected. A refresh that can't reach the endpoint is no longer retried by the API client as well (32 token requests for one API call, now 4), and a scheduled run stops at the outage instead of trying a refresh for every invoice.
 
 - Reference integration: when two processes sharing a connection refresh at the same moment, the one Jobber turns away looks for the other's saved tokens three times, a second apart, before reporting the connection lost. It looked once, at once, which could be before the other process had finished saving.
