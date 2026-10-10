@@ -49,6 +49,12 @@ export const qboErrors = {
       now,
     ),
 
+  invalidString: (element: string, supplied: string, now: string) =>
+    qboFault(
+      { code: "2040", Message: "Invalid String", Detail: `Element contains invalid characters: ${JSON.stringify(supplied)}`, element },
+      now,
+    ),
+
   stringTooLong: (element: string, max: number, supplied: number, now: string) =>
     qboFault({ code: "2050", Message: "Invalid String Length", Detail: `Min: 0, Max: ${max}, Supplied length: ${supplied}`, element }, now),
 

@@ -23,6 +23,7 @@ export interface QboCustomer {
   DisplayName: string;
   GivenName?: string;
   FamilyName?: string;
+  CompanyName?: string;
   PrimaryEmailAddr?: { Address: string };
   PrimaryPhone?: { FreeFormNumber: string };
   BillAddr?: QboPhysicalAddress;
@@ -42,6 +43,7 @@ export const WRITABLE_CUSTOMER_FIELDS = [
   "DisplayName",
   "GivenName",
   "FamilyName",
+  "CompanyName",
   "PrimaryEmailAddr",
   "PrimaryPhone",
   "BillAddr",

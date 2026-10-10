@@ -15,7 +15,7 @@ const DATES = ["TxnDate", "DueDate"]; // compared as YYYY-MM-DD
  * the entity reference marks "filterable"). Property names match without regard to case, like QuickBooks.
  */
 const FILTERABLE: Record<QboEntityName, string[]> = {
-  Customer: ["Id", "DisplayName", "GivenName", "FamilyName", "PrimaryEmailAddr", "Active", ...METADATA],
+  Customer: ["Id", "DisplayName", "GivenName", "FamilyName", "CompanyName", "PrimaryEmailAddr", "Active", ...METADATA],
   Item: ["Id", "Name", "FullyQualifiedName", "Type", "Active", ...METADATA],
   Invoice: ["Id", "DocNumber", "TxnDate", "DueDate", "CustomerRef", "TotalAmt", "Balance", ...METADATA],
   Payment: ["Id", "TxnDate", "CustomerRef", "TotalAmt", "PaymentRefNum", ...METADATA],

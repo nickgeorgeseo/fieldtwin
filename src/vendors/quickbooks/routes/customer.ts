@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
-import { qboErrors } from "../errors.ts";
+import { type QboFault, qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
 import { readTextFields } from "../values.ts";
@@ -47,8 +47,8 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: strin
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_CUSTOMER_FIELDS);
-  const notText = readTextFields(fields, NAME_FIELDS, now);
-  if (notText) return notText;
+  const badName = checkNames(fields, now);
+  if (badName) return badName;
 
   // QuickBooks builds a DisplayName from the person's name when none is given.
   fields.DisplayName ??= [fields.GivenName, fields.FamilyName].filter(Boolean).join(" ") || undefined;
@@ -71,8 +71,8 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   if (conflict) return conflict;
 
   const fields = mergeUpdate(existing, body, WRITABLE_CUSTOMER_FIELDS);
-  const notText = readTextFields(fields, NAME_FIELDS, now);
-  if (notText) return notText;
+  const badName = checkNames(fields, now);
+  if (badName) return badName;
   if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
   const taken = customerNamed(state, fields.DisplayName);
   if (taken && taken.Id !== existing.Id) return qboErrors.duplicateName(taken.Id, now);
@@ -82,8 +82,31 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   return customer;
 }
 
-const NAME_FIELDS = ["DisplayName", "GivenName", "FamilyName"] as const;
+const PERSON_NAME_FIELDS = ["DisplayName", "GivenName", "FamilyName"] as const;
+const COMPANY_NAME_MAX_LENGTH = 100; // "max character: maximum of 100 chars"
 
+/** The Customer reference's rules for names, or the Fault for the first one broken. */
+function checkNames(fields: Partial<QboCustomer>, now: string): QboFault | undefined {
+  const notText = readTextFields(fields, [...PERSON_NAME_FIELDS, "CompanyName"], now);
+  if (notText) return notText;
+  // "The DisplayName, Title, GivenName, MiddleName, FamilyName, Suffix, and PrintOnCheckName attributes must not contain
+  // colon (:), tab (\t), or newline (\n) characters."
+  for (const name of PERSON_NAME_FIELDS) {
+    const value = fields[name];
+    if (value && /[:\t\n]/.test(value)) return qboErrors.invalidString(name, value, now);
+  }
+  const { CompanyName } = fields;
+  if (CompanyName && CompanyName.length > COMPANY_NAME_MAX_LENGTH) {
+    return qboErrors.stringTooLong("CompanyName", COMPANY_NAME_MAX_LENGTH, CompanyName.length, now);
+  }
+  return undefined;
+}
+
+/**
+ * The customer with this DisplayName, which "must be unique". The docs don't say whether "Ada Alder" and "ADA ALDER "
+ * count as the same name; the twin says they do, so code that relies on telling them apart finds out here.
+ */
 function customerNamed(state: QboState, name: string): QboCustomer | undefined {
-  return [...state.customers.values()].find((customer) => customer.DisplayName === name);
+  const key = (displayName: string) => displayName.trim().toLowerCase();
+  return [...state.customers.values()].find((customer) => key(customer.DisplayName) === key(name));
 }
