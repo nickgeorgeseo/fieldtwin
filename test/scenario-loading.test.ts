@@ -51,3 +51,24 @@ describe("fault rules", () => {
     expect(() => setFaults(setup().twin, [rule])).toThrow(/INVOICE_UPDATED.*INVOICE_UPDATE/);
   });
 });
+
+describe("resetting and switching scenarios", () => {
+  it("resets to the start of the loaded scenario, faults and all, so each test in a run starts the same", () => {
+    const { twin } = setup();
+    const loaded = loadScenarioByName(twin, "flaky-apis");
+    setFaults(twin, []); // a test switches them off for a while
+    const reset = resetTwin(twin);
+    expect(reset.activeFaults).toEqual(loaded.activeFaults);
+    expect(reset.activeFaults.length).toBeGreaterThan(0);
+    expect(reset.upcoming).toEqual(loaded.upcoming);
+  });
+
+  it("goes back to the twin's own auth mode when the next scenario doesn't set one", () => {
+    const anyToken = setup().twin;
+    loadScenarioByName(anyToken, "flaky-apis"); // auth: oauth
+    expect(loadScenarioByName(anyToken, "heat-wave-monday").authMode).toBe("any-token");
+
+    const startedStrict = setup(42, { auth: "oauth" }).twin; // FIELDTWIN_AUTH=oauth
+    expect(loadScenarioByName(startedStrict, "heat-wave-monday").authMode).toBe("oauth");
+  });
+});

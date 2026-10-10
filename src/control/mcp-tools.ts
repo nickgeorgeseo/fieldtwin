@@ -18,7 +18,11 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     asText(ops.describeTwin(twin)),
   );
 
-  server.registerTool("twin_reset", { description: "Reset every vendor to the seeded starting world." }, () => asText(ops.resetTwin(twin)));
+  server.registerTool(
+    "twin_reset",
+    { description: "Back to the start: the seeded world (the loaded scenario's, if any), with its timeline and faults." },
+    () => asText(ops.resetTwin(twin)),
+  );
 
   server.registerTool(
     "twin_advance_clock",

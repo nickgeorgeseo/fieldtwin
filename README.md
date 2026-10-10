@@ -143,7 +143,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | Request | What it does |
 |---|---|
 | `GET /_twin` | Company, twin time, event count, auth mode, active faults, webhook subscriptions, what's scheduled next |
-| `POST /_twin/reset` | Back to the seeded starting world |
+| `POST /_twin/reset` | Back to the start: the seeded world (the loaded scenario's, if any), with its timeline and faults |
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move, scheduled events and their webhooks happen) |
 | `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2` |
 | `POST /_twin/checkpoints/:name` | Name this moment |
@@ -174,7 +174,7 @@ curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 | Tool | What it does |
 |---|---|
 | `twin_status` | Company, twin time, auth mode, active faults, what's scheduled next |
-| `twin_reset` | Back to the seeded starting world |
+| `twin_reset` | Back to the start of the loaded scenario (or the default world) |
 | `twin_advance_clock` | Move time forward; scheduled scenario events happen on the way |
 | `twin_checkpoint`, `twin_changes`, `twin_rewind` | Mark a moment, list what changed since (optionally only your API calls), undo it |
 | `twin_list_scenarios`, `twin_load_scenario` | Pick a ready-made scenario by name, or load your own YAML |

@@ -16,6 +16,7 @@ export interface TwinOptions {
   startTime: string;
   worldSize?: Partial<WorldSize>;
   drift?: DriftOptions;
+  faults?: FaultRule[]; // a loaded scenario's: back on after every reset
   auth?: AuthMode;
   vendors: VendorTwin[];
   sendWebhook?: WebhookSender; // how deliveries reach your app: fetch, unless a test answers them itself
@@ -35,6 +36,7 @@ export class Twin {
   world!: World;
   faultRules: FaultRule[] = [];
   authMode: AuthMode;
+  readonly defaultAuthMode: AuthMode; // what the twin started with (FIELDTWIN_AUTH); a scenario without `auth` returns to it
   faultRandom!: SeededRandom; // separate stream, so faults never change the generated world
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
@@ -56,7 +58,8 @@ export class Twin {
 
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
-    this.authMode = options.auth ?? "any-token";
+    this.defaultAuthMode = options.auth ?? "any-token";
+    this.authMode = this.defaultAuthMode;
     this.webhooks = new WebhookDispatcher(options.sendWebhook ?? ((url, init) => fetch(url, init)));
     this.reset();
   }
@@ -141,7 +144,7 @@ export class Twin {
     }
   }
 
-  /** Back to the seeded starting world. Same seed and options give a byte-identical log. */
+  /** Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical log. */
   reset(): void {
     this.rebuild(this.startOf(this.options));
   }
@@ -157,7 +160,7 @@ export class Twin {
     this.log = new EventLog();
     this.world = world;
     this.faultRandom = new SeededRandom(seed + 1);
-    this.faultRules = [];
+    this.faultRules = this.options.faults ?? [];
     this.checkpoints.clear();
     this.bookkeeping.clearRateLimits();
     this.webhooks.dropPending();

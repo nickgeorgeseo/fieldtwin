@@ -166,9 +166,8 @@ export function loadScenario(twin: Twin, yamlText: string) {
   for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
 
   const { drift, ...worldSize } = scenario.world ?? {};
-  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift });
-  twin.faultRules = faults;
-  if (scenario.auth) twin.authMode = scenario.auth;
+  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift, faults });
+  twin.authMode = scenario.auth ?? twin.defaultAuthMode;
   const utcOffsetHours = twin.world.company.utcOffsetHours;
   twin.schedule(entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, utcOffsetHours), ...entry })));
   return { scenario: scenario.name, ...describeTwin(twin) };
