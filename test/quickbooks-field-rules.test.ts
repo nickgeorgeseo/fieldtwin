@@ -28,6 +28,13 @@ describe("QuickBooks twin: text fields", () => {
     });
   });
 
+  it("reads a payment's PaymentRefNum and PrivateNote as text, as an invoice's, refusing an object (2010)", async () => {
+    const harness = setup();
+    const payment = (fields: object) => harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 5, ...fields });
+    expect(await faultOf(await payment({ PrivateNote: { text: "x" } }))).toMatchObject({ code: "2010", element: "PrivateNote" });
+    expect((await (await payment({ PaymentRefNum: 1234 })).json()).Payment.PaymentRefNum).toBe("1234");
+  });
+
   it("reads a number sent as a DocNumber as its digits, and still checks its length (2050)", async () => {
     const harness = setup();
     expect((await invoice(harness, { DocNumber: 4471 })).DocNumber).toBe("4471");
