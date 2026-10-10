@@ -17,6 +17,12 @@ export function decodeId(id: string): { type: string; n: number } | undefined {
   return match ? { type: match[1]!, n: Number(match[2]) } : undefined;
 }
 
+/** The id in the twin's own spelling, so a lookup finds the record whether the caller kept the base64 padding or not. */
+export function canonicalId(id: string): string {
+  const decoded = decodeId(id);
+  return decoded ? encodeId(decoded.type, decoded.n) : id;
+}
+
 /**
  * Whether a value is shaped like an EncodedId at all: a non-empty base64 string. Jobber rejects values that
  * are not (its docs show "'1' is not a valid EncodedId"); a well-formed id that matches no record is not an

@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Jobber: an id sent without its base64 padding finds the same record as the padded id. It resolved to `null`, though Jobber's own examples show ids both ways.
+
 - QuickBooks: an invoice or payment shows its customer's current name in `CustomerRef.name` after the customer is renamed, instead of the name it had when the invoice was written.
 
 - QuickBooks customers keep `CompanyName` (at most 100 characters, and filterable), which was silently dropped. A colon, tab, or newline in a name answers 2040, as the Customer reference's business rules say, and a DisplayName counts as taken whatever its case or surrounding spaces. FIDELITY.md now says that fields the twin doesn't model are dropped, and how its timestamps differ from QuickBooks'.

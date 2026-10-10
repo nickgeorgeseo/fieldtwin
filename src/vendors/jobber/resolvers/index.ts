@@ -1,4 +1,5 @@
 import type { NewEvent } from "../../../core/types.ts";
+import { canonicalId } from "../encoded-id.ts";
 import type { JobberState } from "../types.ts";
 import { clientNode } from "./clients.ts";
 import { connection, type PageArgs } from "./connection.ts";
@@ -26,7 +27,7 @@ export function createResolvers(state: () => JobberState, nowMs: () => number, r
     },
 
     client: ({ id }: { id: string }) => {
-      const client = state().clients.get(id);
+      const client = state().clients.get(canonicalId(id));
       return client ? clientNode(client, context) : null;
     },
 
@@ -37,7 +38,7 @@ export function createResolvers(state: () => JobberState, nowMs: () => number, r
     jobs: (args: PageArgs) => jobsConnection(args, context),
 
     job: ({ id }: { id: string }) => {
-      const job = state().jobs.get(id);
+      const job = state().jobs.get(canonicalId(id));
       return job ? jobNode(job, context) : null;
     },
 
@@ -46,12 +47,12 @@ export function createResolvers(state: () => JobberState, nowMs: () => number, r
     invoices: (args: PageArgs) => invoicesConnection(args, context),
 
     invoice: ({ id }: { id: string }) => {
-      const invoice = state().invoices.get(id);
+      const invoice = state().invoices.get(canonicalId(id));
       return invoice ? invoiceNode(invoice, context) : null;
     },
 
     quote: ({ id }: { id: string }) => {
-      const quote = state().quotes.get(id);
+      const quote = state().quotes.get(canonicalId(id));
       return quote ? quoteNode(quote, context) : null;
     },
   };

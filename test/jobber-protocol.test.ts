@@ -90,3 +90,17 @@ describe("Jobber twin: errors and ids", () => {
     expect(body.errors).toBeUndefined();
   });
 });
+
+describe("Jobber twin: ids with and without padding", () => {
+  it("finds a record whether its id keeps the base64 padding or not, since Jobber's own examples do both", async () => {
+    const harness = setup();
+    const padded = Buffer.from("gid://Jobber/Client/10").toString("base64");
+    expect(padded.endsWith("=")).toBe(true);
+    const unpadded = padded.replace(/=+$/, "");
+    const query = "query ($id: EncodedId!) { client(id: $id) { id name } }";
+    const fromPadded = (await (await harness.jobber(query, { id: padded })).json()).data.client;
+    const fromUnpadded = (await (await harness.jobber(query, { id: unpadded })).json()).data.client;
+    expect(fromPadded).not.toBeNull();
+    expect(fromUnpadded).toEqual(fromPadded);
+  });
+});
