@@ -7,4 +7,4 @@ import { startServer } from "./server.ts";
  * and serves the control tools to a coding agent over stdio.
  */
 const twin = startServer();
-await createMcpServer(twin, "0.1.0").connect(new StdioServerTransport());
+await createMcpServer(twin, "0.2.0").connect(new StdioServerTransport());
