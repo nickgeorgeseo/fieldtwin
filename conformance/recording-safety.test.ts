@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { caseId, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
+import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 
 /**
@@ -62,4 +64,25 @@ describe("recording against a sandbox it can't reach", () => {
       "Couldn't reach QuickBooks at https://sandbox-quickbooks.api.intuit.com/v3 (fetch failed)",
     );
   });
+});
+
+describe("what the conformance command was asked to do", () => {
+  it("takes npm's own --dry-run as a dry run, since npm keeps a --dry-run given without -- to itself", () => {
+    expect(parseCommand(["record"], { npm_config_dry_run: "true" })).toEqual({ command: "record", dryRun: true });
+    expect(parseCommand(["record", "--dry-run"], {})).toEqual({ command: "record", dryRun: true });
+    expect(parseCommand(["record"], {})).toEqual({ command: "record", dryRun: false });
+  });
+
+  it("refuses a command or option it doesn't know, instead of scoring", () => {
+    expect(() => parseCommand(["recrod"], {})).toThrow('unknown command "recrod"');
+    expect(() => parseCommand(["record", "--dryrun"], {})).toThrow("unknown option --dryrun");
+    expect(parseCommand([], {})).toEqual({ command: "score" });
+  });
+
+  it("exits with the reason when run with a misspelled command", () => {
+    const cli = new URL("./cli.ts", import.meta.url).pathname;
+    const run = spawnSync(process.execPath, ["--import", "tsx", cli, "recrod"], { encoding: "utf8", timeout: 20_000 });
+    expect(run.stderr).toContain('conformance: unknown command "recrod"');
+    expect(run.status).toBe(1);
+  }, 20_000);
 });

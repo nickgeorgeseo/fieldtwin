@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- `npm run conformance:record --dry-run`, without the `--`, is a dry run. npm keeps a flag given that way for itself, so it recorded for real and overwrote the recordings. A misspelled command or option is refused instead of running a score.
+
 - Reference integration: a `Retry-After` asking for more than ten minutes fails the request at once instead of being waited out, so a server that answers `Retry-After: 86400` (or a date years away) can't hold the webhook queue for a day.
 
 - Reference integration: a token endpoint that is down, throttling, or out of reach is a `TokenEndpointError`, not a lost connection. It was an `OAuthError`, so a short outage paused the webhook queue until someone reconnected an app that was still connected. A refresh that can't reach the endpoint is no longer retried by the API client as well (32 token requests for one API call, now 4), and a scheduled run stops at the outage instead of trying a refresh for every invoice.

@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { caseId } from "./case.ts";
 import { CASES } from "./cases/index.ts";
+import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { readRecordings, writeRecording } from "./recordings.ts";
 import { observeAll, report } from "./run.ts";
@@ -17,7 +18,6 @@ import { sandboxTarget, twinTarget } from "./targets.ts";
  *   npm run conformance:record -- --dry-run   the same, printing the observations instead of saving them. The cases
  *                                         still run, so the ones marked `writes` still create their test records
  */
-const [command, ...flags] = process.argv.slice(2);
 
 async function score(): Promise<void> {
   if (process.env.FIELDTWIN_URL) return scoreTwinAt(process.env.FIELDTWIN_URL);
@@ -100,8 +100,12 @@ async function startFreshTwin(): Promise<{ url: string; stop: () => void }> {
   return { url: `http://127.0.0.1:${port}`, stop: () => child.kill() };
 }
 
-const run = command === "record" ? record(flags.includes("--dry-run")) : score();
-run.catch((error: Error) => {
+async function main(): Promise<void> {
+  const asked = parseCommand(process.argv.slice(2), process.env);
+  return asked.command === "record" ? record(asked.dryRun) : score();
+}
+
+main().catch((error: Error) => {
   console.error(`conformance: ${error.message}`);
   process.exitCode = 1;
 });
