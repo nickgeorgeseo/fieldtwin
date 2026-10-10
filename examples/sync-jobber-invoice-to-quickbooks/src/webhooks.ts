@@ -22,13 +22,25 @@ export interface JobberWebhookEvent {
   occurredAt: string;
 }
 
+/** A webhook is a few hundred bytes. Anything far bigger is refused before it is read or hashed. */
+const MAX_BODY_BYTES = 64 * 1024;
+
 export function jobberWebhookHandler(options: { clientSecret: string; onEvent: (event: JobberWebhookEvent) => void }) {
   return async (request: Request): Promise<Response> => {
-    const body = await request.text(); // the raw body: the signature is over these exact bytes
+    if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return new Response("too large", { status: 413 });
+    // The raw bytes: the signature is over exactly these, and decoding first could change them (a byte-order mark).
+    const body = Buffer.from(await request.arrayBuffer());
+    if (body.length > MAX_BODY_BYTES) return new Response("too large", { status: 413 });
     if (!verifyJobberSignature(body, request.headers.get("X-Jobber-Hmac-SHA256"), options.clientSecret)) {
       return new Response("signature doesn't verify", { status: 401 });
     }
-    const event = (JSON.parse(body) as { data?: { webHookEvent?: JobberWebhookEvent } }).data?.webHookEvent;
+    let payload: { data?: { webHookEvent?: JobberWebhookEvent } };
+    try {
+      payload = JSON.parse(body.toString("utf8").replace(/^\uFEFF/, ""));
+    } catch {
+      return new Response("not JSON", { status: 400 });
+    }
+    const event = payload.data?.webHookEvent;
     if (!event?.topic || !event.itemId) return new Response("not a webhook event", { status: 400 });
     options.onEvent(event);
     return new Response(null, { status: 200 });
@@ -36,7 +48,7 @@ export function jobberWebhookHandler(options: { clientSecret: string; onEvent: (
 }
 
 /** Whether a body was signed with this client secret, compared in constant time like the docs' examples. */
-export function verifyJobberSignature(body: string, signature: string | null, clientSecret: string): boolean {
+export function verifyJobberSignature(body: string | Buffer, signature: string | null, clientSecret: string): boolean {
   if (!signature) return false;
   const expected = Buffer.from(createHmac("sha256", clientSecret).update(body).digest("base64"));
   const given = Buffer.from(signature);

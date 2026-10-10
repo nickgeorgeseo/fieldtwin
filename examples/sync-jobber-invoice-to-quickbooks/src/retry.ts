@@ -83,8 +83,10 @@ export function parseRetryAfter(value: string | null, nowMs: number): number | u
 
 /**
  * fetch rejects with a TypeError when the request never got an answer (DNS, refused, reset), and with a
- * TimeoutError when an AbortSignal.timeout() runs out. Any other error is a bug or a decision, not the network.
+ * TimeoutError when an AbortSignal.timeout() runs out. A URL that can't be parsed is a TypeError too, but retrying
+ * a misconfiguration never helps. Any other error is a bug or a decision, not the network.
  */
 function isNetworkError(error: unknown): boolean {
-  return error instanceof TypeError || (error instanceof Error && error.name === "TimeoutError");
+  if (error instanceof TypeError) return !/invalid url|parse url/i.test(error.message);
+  return error instanceof Error && error.name === "TimeoutError";
 }

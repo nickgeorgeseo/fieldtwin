@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: the webhook handler verifies the signature over the raw bytes (decoding first changed them when a body began with a byte-order mark), answers 400 instead of throwing on a signed body that isn't JSON, and refuses bodies over 64 KiB before hashing them. A malformed URL is no longer retried eight times as if it were a network failure, and the demo accepts a `FIELDTWIN_URL` with a trailing slash.
+
 - With `FIELDTWIN_HOST` set to a specific address, the startup line prints that address instead of a localhost URL that wouldn't work, and listening on `::1` no longer warns that others can reach the twin.
 
 - QuickBooks defaults `TxnDate` to the company's date in its own time zone. At 8 p.m. in Texas, new invoices and payments were dated tomorrow, the UTC date.

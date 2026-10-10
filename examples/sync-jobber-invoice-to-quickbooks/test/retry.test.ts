@@ -57,6 +57,12 @@ describe("withRetries", () => {
     expect(bug.calls()).toBe(1);
   });
 
+  it("doesn't retry a request that could never be sent, like one to a malformed URL", async () => {
+    const misconfigured = scripted(new TypeError("Failed to parse URL from htp//quickbooks"), 200);
+    await expect(withRetries(misconfigured.send, POLICY, fakeRuntime(), "test")).rejects.toThrow("Failed to parse URL");
+    expect(misconfigured.calls()).toBe(1);
+  });
+
   it("gives up after maxAttempts, returning the last response or throwing the last network error", async () => {
     const statuses = scripted(503);
     expect((await withRetries(statuses.send, POLICY, fakeRuntime(), "test")).status).toBe(503);

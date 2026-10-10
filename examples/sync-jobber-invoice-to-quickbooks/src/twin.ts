@@ -51,7 +51,10 @@ export async function connectWithoutBrowser(
  * twin, so it stays right as long as nothing else advances the twin's clock while the demo runs.
  */
 export async function twinRuntime(baseUrl: string, log: (line: string) => void, fetchImpl: Fetch = (url, init) => fetch(url, init)) {
-  const twinTime = async (response: Response) => Date.parse(((await response.json()) as { twinTime: string }).twinTime);
+  const twinTime = async (response: Response) => {
+    if (!response.ok) throw new Error(`The twin at ${baseUrl} answered HTTP ${response.status}: ${await response.text()}`);
+    return Date.parse(((await response.json()) as { twinTime: string }).twinTime);
+  };
   let nowMs = await twinTime(await fetchImpl(`${baseUrl}/_twin`));
   const runtime: Runtime = {
     fetch: fetchImpl,

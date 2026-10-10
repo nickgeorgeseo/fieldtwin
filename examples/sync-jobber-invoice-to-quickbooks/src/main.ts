@@ -109,7 +109,7 @@ function report(stats: SyncStats, log: (line: string) => void): void {
 // Node resolves symlinks in import.meta.url, so compare with the real path of what was run, as a URL (which handles
 // spaces and Windows paths).
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
-  const baseUrl = process.env.FIELDTWIN_URL ?? "http://localhost:4010";
+  const baseUrl = (process.env.FIELDTWIN_URL ?? "http://localhost:4010").replace(/\/+$/, "");
   runDemo(baseUrl).catch((error: Error) => {
     const hint = error instanceof TypeError ? ` Is fieldtwin running at ${baseUrl}? Start it with npm start.` : "";
     console.error(`sync example: ${error.message}.${hint}`);

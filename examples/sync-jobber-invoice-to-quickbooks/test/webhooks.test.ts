@@ -87,3 +87,31 @@ describe("reacting to Jobber webhooks", () => {
     expect(deliveries.some((delivery) => delivery.fault === "jobber-webhooks-late")).toBe(true);
   });
 });
+
+describe("the webhook handler's edges", () => {
+  const handler = () => jobberWebhookHandler({ clientSecret: JOBBER_APP.clientSecret, onEvent: () => {} });
+  const signed = (body: Uint8Array | string) => createHmac("sha256", JOBBER_APP.clientSecret).update(body).digest("base64");
+
+  it("verifies the signature over the exact bytes sent, a byte-order mark and all", async () => {
+    const json = JSON.stringify({
+      data: { webHookEvent: { topic: "INVOICE_UPDATE", appId: "a", accountId: "b", itemId: "c", occurredAt: "d" } },
+    });
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(json)]);
+    const response = await handler()(
+      new Request(HOOK_URL, { method: "POST", body: bytes, headers: { "X-Jobber-Hmac-SHA256": signed(bytes) } }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("answers 400 to a signed body that isn't JSON, instead of throwing", async () => {
+    const body = "not json";
+    const response = await handler()(new Request(HOOK_URL, { method: "POST", body, headers: { "X-Jobber-Hmac-SHA256": signed(body) } }));
+    expect(response.status).toBe(400);
+  });
+
+  it("refuses a body far bigger than any webhook before hashing it", async () => {
+    const body = "x".repeat(1_000_000);
+    const response = await handler()(new Request(HOOK_URL, { method: "POST", body, headers: { "X-Jobber-Hmac-SHA256": signed(body) } }));
+    expect(response.status).toBe(413);
+  });
+});
