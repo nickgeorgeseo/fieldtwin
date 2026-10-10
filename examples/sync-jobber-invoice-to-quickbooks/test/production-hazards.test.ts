@@ -1,13 +1,49 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../../src/app.ts";
 import type { JobberState } from "../../../src/vendors/jobber/types.ts";
+import { InvoiceQueue } from "../src/invoice-queue.ts";
 import { fetchPaidInvoicesSince } from "../src/jobber-invoices.ts";
-import { salesLineFor } from "../src/sync.ts";
+import { OAuthError } from "../src/oauth.ts";
+import { emptyStats, salesLineFor } from "../src/sync.ts";
 import { syncHarness } from "./harness.ts";
 
 /**
- * What happens in production that a single clean run never shows: clocks that disagree, and line items whose arithmetic QuickBooks would refuse.
+ * What happens in production that a single clean run never shows: a connection lost while webhooks keep coming, clocks that disagree, and line items whose arithmetic QuickBooks would refuse.
  */
+
+describe("the webhook queue when the connection is lost", () => {
+  const update = (itemId: string) => ({ topic: "INVOICE_UPDATE", appId: "app", accountId: "account", itemId, occurredAt: "now" });
+
+  it("stops, keeps what it hadn't synced, never rejects, and carries on once the app is connected again", async () => {
+    let connected = false;
+    const tried: string[] = [];
+    const lines: string[] = [];
+    const queue = new InvoiceQueue(
+      async (invoiceId) => {
+        tried.push(invoiceId);
+        if (!connected) throw new OAuthError("The refresh token was revoked. Reconnect the app.", 400, "invalid_grant");
+        return { ...emptyStats(), invoices: 1 };
+      },
+      (line) => lines.push(line),
+    );
+
+    queue.add(update("A"));
+    await expect(queue.idle()).resolves.toBeUndefined();
+    expect(queue.connectionLost).toBeInstanceOf(OAuthError);
+    expect(lines.join("\n")).toContain("Reconnect the app");
+
+    queue.add(update("B")); // news keeps coming while nobody has reconnected: kept, not tried
+    await queue.idle();
+    expect(tried).toEqual(["A"]);
+
+    connected = true;
+    queue.resume();
+    await queue.idle();
+    expect(tried).toEqual(["A", "A", "B"]);
+    expect(queue.connectionLost).toBeUndefined();
+    expect(queue.totals.invoices).toBe(2);
+  });
+});
 
 describe("the scheduled sync's cutoff", () => {
   it("reads again what changed in the minutes before `since`, so clocks that disagree can't hide an invoice", async () => {

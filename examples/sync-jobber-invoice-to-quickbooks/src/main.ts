@@ -78,6 +78,7 @@ export async function runDemo(baseUrl: string, log: (line: string) => void = con
     await twinAction(baseUrl, runtime.fetch, "jobber", "payInvoices", 2); // resolves once the webhooks were answered
     await runtime.sleep(10 * 60_000); // any late deliveries (flaky-apis delays some) arrive meanwhile
     await queue.idle();
+    if (queue.connectionLost) log(`  Paused: ${queue.connectionLost.message}`);
     report(queue.totals, log);
   } finally {
     await subscribeToWebhooks(baseUrl, runtime.fetch, []);

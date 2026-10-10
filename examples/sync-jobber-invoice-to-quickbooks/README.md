@@ -54,6 +54,7 @@ The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, 
 | Running twice | [`sync.ts`](src/sync.ts) | Every step looks before it writes. A second run changes nothing; a run that died halfway is finished by the next |
 | Trusting a webhook | [`webhooks.ts`](src/webhooks.ts) | Verifies `X-Jobber-Hmac-SHA256` over the raw body in constant time before anything else, and refuses what doesn't verify |
 | Answering a webhook in time | [`webhooks.ts`](src/webhooks.ts), [`invoice-queue.ts`](src/invoice-queue.ts) | Jobber allows [one second](https://developer.getjobber.com/docs/using_jobbers_api/setting_up_webhooks/): the handler only verifies and queues, and the sync runs in the background |
+| Losing the connection | [`invoice-queue.ts`](src/invoice-queue.ts) | An `OAuthError` pauses the webhook queue instead of failing every invoice or crashing the server. What hadn't synced stays queued, news keeps arriving, and `resume()` carries on once the person reconnects |
 | Clocks that disagree | [`jobber-invoices.ts`](src/jobber-invoices.ts) | The scheduled sync reads again what changed in the ten minutes before its cutoff: your server's clock and Jobber's never agree exactly, and reading an invoice twice is harmless where missing one is not |
 | Prices finer than a cent | [`sync.ts`](src/sync.ts) | QuickBooks refuses a line whose Amount isn't Qty × UnitPrice to the cent (6070). A Jobber line that doesn't add up is booked at its total, with the pricing in its description, rather than failing every run |
 | Repeated and out-of-order webhooks | [`invoice-queue.ts`](src/invoice-queue.ts) | Queues invoice ids, not events, so news about an invoice already waiting is folded in, and reads each invoice as it is when its turn comes. A payment's two `INVOICE_UPDATE`s, redeliveries, and late arrivals all end in one booking |
@@ -84,7 +85,7 @@ if (stats.conflicts > 0) alertTheBookkeeper(stats);
 
 An `OAuthError` from a run means the connection is gone (the refresh token was revoked or lost): ask the person to connect again.
 
-**Webhooks.** Mount `jobberWebhookHandler` at a public HTTPS URL in any framework that speaks `Request` and `Response`, add that URL and the `INVOICE_UPDATE` topic to your app in Jobber's Developer Center, and run an `InvoiceQueue` (or your job queue) behind it, calling `syncPaidInvoice`. Keep the scheduled sync too, less often: webhooks can be missed, and Jobber may switch them off for an app whose endpoint keeps failing.
+**Webhooks.** Mount `jobberWebhookHandler` at a public HTTPS URL in any framework that speaks `Request` and `Response`, add that URL and the `INVOICE_UPDATE` topic to your app in Jobber's Developer Center, and run an `InvoiceQueue` (or your job queue) behind it, calling `syncPaidInvoice`. When `queue.connectionLost` is set, ask the person to reconnect, then call `queue.resume()`. Keep the scheduled sync too, less often: webhooks can be missed, and Jobber may switch them off for an app whose endpoint keeps failing.
 
 ## What the tests prove
 
