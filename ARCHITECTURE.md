@@ -124,7 +124,7 @@ A scenario can schedule things to happen as twin time passes:
 
 ```yaml
 timeline:
-  - at: "08:00"          # business time on the start date; also "+90m", "+2h", "+1d", or an ISO time
+  - at: "08:00"          # business time on the start date; also "+90m", "+2h", "+1d", or a time with a UTC offset
     jobber: { newClients: 15 }
   - at: "+4h"
     jobber: { payInvoices: 3 }
@@ -135,7 +135,7 @@ The design is deliberately small:
 - **Vendors own their actions.** Each vendor may export `scenarioActions` on its `VendorTwin`: named actions that check their parameters when the scenario loads and return complete events when they run. `control/` only resolves times and hands the twin a flat list of `{ atMs, vendor, action, params }`; it never learns what an action does.
 - **The clock drives the schedule.** `twin.advance(ms)` (behind `POST /_twin/clock/advance` and the MCP tool) stops at each due entry, sets the clock to the entry's time, and records its events with source `scenario`. Nothing runs on wall-clock time. Code that calls `twin.clock.advance()` directly skips the schedule; use `twin.advance()`.
 - **History stays honest.** Entries at or before the load time run at load. Rewinding to a checkpoint makes every later entry due again; the earlier ones are already in the kept history, so nothing is applied twice. Each entry draws from its own seeded random stream, so a re-armed entry creates the same new clients as before.
-- **Bad scenarios fail at load.** An unknown vendor, action, time format, or parameter is an error when the YAML is loaded, not hours of twin time later.
+- **Bad scenarios fail at load, and change nothing.** An unknown key, vendor, action, time format, or parameter is an error when the YAML is loaded, not hours of twin time later, and a scenario that fails to load leaves the twin as it was. Times need a UTC offset (`Z` or `-05:00`), so a scenario means the same moments on every machine.
 
 ## Code style
 

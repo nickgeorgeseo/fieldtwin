@@ -12,6 +12,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- A scenario that fails to load leaves the twin as it was. A bad start time, an unreadable timeline time, or a world too big to name used to fail part way: the twin kept the new company and faults but no timeline, or emptied its log while still serving old data, and `POST /_twin/reset` failed until another scenario loaded.
+- Scenario and fault-rule keys the twin doesn't know are errors. `path` instead of `pathIncludes` used to be dropped silently, so the rule faulted every request; a misspelled effect or webhook topic did nothing. A request rule with neither `status` nor `latencyMs` is refused too.
+- Scenario times need a UTC offset (`2026-07-13T08:00:00-05:00` or `...Z`). Without one, a start time meant a different moment on every machine.
+
 - Jobber connections return at most 100 nodes, as documented. `clients(first: 500)` returned every client, so code that never pages passed against the twin and would miss records in production.
 - Jobber query cost: a negative `first` or `last` made the requested cost negative, which let any query past the throttle (and answered `hasNextPage: true` with no cursor). It now counts as 0. Variables' declared defaults (`$n: Int = 10`) and `@skip`/`@include` now count, so a cheap query that relies on them is no longer priced as if every page held 100 nodes and throttled forever.
 

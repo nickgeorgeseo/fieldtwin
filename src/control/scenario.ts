@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
+import { parseTwinTime, TWIN_TIME_FORM } from "../core/clock.ts";
 import { type FaultRule, isFaultStatus } from "../core/types.ts";
 import type { WebhookSubscription } from "../core/webhooks.ts";
 
@@ -26,16 +27,21 @@ const FaultRuleSchema = z
         duplicate: z.boolean().optional(),
         delayMs: z.number().int().positive().optional(),
       })
+      .strict()
       .refine((effect) => !effect.lostResponse || effect.status !== undefined, {
         message: "lostResponse needs a status: the error the client sees instead of the real answer, like 504",
       }),
   })
+  .strict()
   .superRefine((rule, context) => {
     const problem = (message: string) => context.addIssue({ code: z.ZodIssueCode.custom, message });
     const { duplicate, delayMs, ...requestEffects } = rule.effect;
     if (rule.webhook === undefined) {
-      if (duplicate !== undefined || delayMs !== undefined)
+      if (duplicate !== undefined || delayMs !== undefined) {
         problem('duplicate and delayMs are for webhook rules (add webhook: "TOPIC" or "*")');
+      } else if (requestEffects.status === undefined && requestEffects.latencyMs === undefined) {
+        problem("a request rule needs a status or latencyMs in its effect, or it does nothing");
+      }
     } else if (rule.method !== undefined || rule.pathIncludes !== undefined) {
       problem("webhook rules match deliveries, not requests: drop method and pathIncludes");
     } else if (Object.values(requestEffects).some((value) => value !== undefined) || (!duplicate && !delayMs)) {
@@ -52,31 +58,35 @@ const TimelineEntrySchema = z
   })
   .strict();
 
-const ScenarioSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  seed: z.number().int(),
-  startTime: z.string(),
-  world: z
-    .object({
-      customers: z.number().int().positive(),
-      technicians: z.number().int().positive(),
-      drift: z
-        .object({
-          renamedInAccounting: z.number().int().nonnegative(),
-          fieldServiceOnly: z.number().int().nonnegative(),
-          accountingOnly: z.number().int().nonnegative(),
-        })
-        .partial()
-        .strict(),
-    })
-    .partial()
-    .strict()
-    .optional(),
-  auth: z.enum(["any-token", "oauth"]).optional(),
-  faults: z.array(FaultRuleSchema).default([]),
-  timeline: z.array(TimelineEntrySchema).default([]),
-});
+const ScenarioSchema = z
+  .object({
+    name: z.string(),
+    description: z.string().optional(),
+    seed: z.number().int(),
+    startTime: z
+      .string()
+      .refine((value) => parseTwinTime(value) !== undefined, { message: `isn't a time the twin can start at. ${TWIN_TIME_FORM}` }),
+    world: z
+      .object({
+        customers: z.number().int().positive(),
+        technicians: z.number().int().positive(),
+        drift: z
+          .object({
+            renamedInAccounting: z.number().int().nonnegative(),
+            fieldServiceOnly: z.number().int().nonnegative(),
+            accountingOnly: z.number().int().nonnegative(),
+          })
+          .partial()
+          .strict(),
+      })
+      .partial()
+      .strict()
+      .optional(),
+    auth: z.enum(["any-token", "oauth"]).optional(),
+    faults: z.array(FaultRuleSchema).default([]),
+    timeline: z.array(TimelineEntrySchema).default([]),
+  })
+  .strict();
 
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
@@ -120,19 +130,28 @@ function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown
  *   "2026-07-13T15:00:00Z"   an exact moment
  */
 export function resolveAt(at: string, startMs: number, utcOffsetHours: number): number {
+  const ms = timeOf(at, startMs, utcOffsetHours);
+  if (ms === undefined) {
+    throw new Error(
+      `Timeline time "${at}" isn't one the twin understands. Use "+2h", "09:00" (business time), or a time with a UTC offset.`,
+    );
+  }
+  if (Number.isNaN(new Date(ms).getTime())) throw new Error(`Timeline time "${at}" is further from the start than any date can be.`);
+  return ms;
+}
+
+function timeOf(at: string, startMs: number, utcOffsetHours: number): number | undefined {
   const offset = /^\+(\d+(?:\.\d+)?)([mhd])$/.exec(at);
   if (offset) return startMs + Number(offset[1]) * { m: 60_000, h: 3_600_000, d: 86_400_000 }[offset[2] as "m" | "h" | "d"];
 
-  const localTime = /^(\d{1,2}):(\d{2})$/.exec(at);
+  const localTime = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(at);
   if (localTime) {
     const localStart = new Date(startMs + utcOffsetHours * 3_600_000);
     const localMidnightUtc = Date.UTC(localStart.getUTCFullYear(), localStart.getUTCMonth(), localStart.getUTCDate());
     return localMidnightUtc + (Number(localTime[1]) - utcOffsetHours) * 3_600_000 + Number(localTime[2]) * 60_000;
   }
 
-  const exact = /^\d{4}-\d{2}-\d{2}T/.test(at) ? Date.parse(at) : Number.NaN;
-  if (!Number.isNaN(exact)) return exact;
-  throw new Error(`Timeline time "${at}" isn't one the twin understands. Use "+2h", "09:00" (business time), or an ISO time.`);
+  return parseTwinTime(at);
 }
 
 /**

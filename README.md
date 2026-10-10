@@ -234,7 +234,7 @@ A scenario can also schedule what happens as twin time passes. Advancing the clo
 
 ```yaml
 timeline:
-  - at: "08:00"                  # business time; also "+90m", "+2h", or an ISO time
+  - at: "08:00"                  # business time; also "+90m", "+2h", or "2026-07-13T15:00:00Z"
     jobber: { newClients: 12 }   # new clients call in
   - at: "13:00"
     jobber: { payInvoices: 4 }   # the longest-open invoices get paid

@@ -1,6 +1,7 @@
+import { parseTwinTime } from "../core/clock.ts";
 import { SeededRandom } from "../core/random.ts";
 import type { Twin } from "../core/twin.ts";
-import type { AuthMode, TwinEvent, VendorName } from "../core/types.ts";
+import type { AuthMode, FaultRule, TwinEvent, VendorName } from "../core/types.ts";
 import { scenarioActionOf } from "../core/vendor-twin.ts";
 import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscriptions, readScenarioFile, resolveAt } from "./scenario.ts";
 
@@ -68,7 +69,7 @@ export async function runAction(twin: Twin, vendorName: string, action: string, 
 export function setWebhooks(twin: Twin, value: unknown) {
   const subscriptions = parseWebhookSubscriptions(value);
   for (const subscription of subscriptions) {
-    const topics = twin.vendor(knownVendor(twin, subscription.vendor)).webhooks?.topics ?? [];
+    const topics = topicsOf(twin, subscription.vendor);
     const unknown = subscription.topics.filter((topic) => !topics.includes(topic));
     if (unknown.length) {
       throw new Error(`${subscription.vendor} can't send ${unknown.join(", ")}. Topics the twin sends: ${topics.join(", ") || "none yet"}`);
@@ -109,8 +110,25 @@ export function rewindTo(twin: Twin, checkpointName: string) {
 
 /** Replace the active fault rules. Rules are validated first, so a bad rule never half-applies. */
 export function setFaults(twin: Twin, rules: unknown) {
-  twin.faultRules = parseFaultRules(rules);
+  twin.faultRules = checkWebhookTopics(twin, parseFaultRules(rules));
   return { activeFaults: twin.faultRules.map((rule) => rule.name) };
+}
+
+/** Fault rules whose webhook topics the vendor really sends; a misspelled topic would otherwise never fire. */
+function checkWebhookTopics(twin: Twin, rules: FaultRule[]): FaultRule[] {
+  for (const rule of rules) {
+    const topics = topicsOf(twin, rule.vendor);
+    if (rule.webhook !== undefined && rule.webhook !== "*" && !topics.includes(rule.webhook)) {
+      throw new Error(
+        `Fault rule "${rule.name}": ${rule.vendor} never sends ${rule.webhook}. Topics the twin sends: ${topics.join(", ") || "none yet"}`,
+      );
+    }
+  }
+  return rules;
+}
+
+function topicsOf(twin: Twin, vendor: string): readonly string[] {
+  return twin.vendor(knownVendor(twin, vendor)).webhooks?.topics ?? [];
 }
 
 /**
@@ -127,22 +145,28 @@ export function parseAuthMode(mode: unknown): AuthMode {
   throw new Error(`Unknown auth mode "${String(mode)}". Use "any-token" or "oauth".`);
 }
 
-/** Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults. */
+/**
+ * Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults and schedule its
+ * timeline. Everything is checked before anything changes, so a scenario that fails to load leaves the twin as it was.
+ */
 export function loadScenario(twin: Twin, yamlText: string) {
   const scenario = parseScenario(yamlText);
-  const { drift, ...worldSize } = scenario.world ?? {};
-  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift });
-  twin.faultRules = scenario.faults;
-  if (scenario.auth) twin.authMode = scenario.auth;
-
-  const startMs = twin.clock.nowMs();
-  const timeline = scenario.timeline.flatMap(({ at, ...byVendor }) => {
-    const atMs = resolveAt(at, startMs, twin.world.company.utcOffsetHours);
+  const faults = checkWebhookTopics(twin, scenario.faults);
+  const startMs = parseTwinTime(scenario.startTime) ?? Number.NaN; // the schema has checked it
+  const entries = scenario.timeline.flatMap(({ at, ...byVendor }) => {
+    resolveAt(at, startMs, 0); // a time it can't read fails now; local times are resolved once the world is known
     return Object.entries(byVendor).flatMap(([vendor, actions]) =>
-      Object.entries(actions ?? {}).map(([action, params]) => ({ atMs, vendor: vendor as VendorName, action, params })),
+      Object.entries(actions ?? {}).map(([action, params]) => ({ at, vendor: vendor as VendorName, action, params })),
     );
   });
-  twin.schedule(timeline);
+  for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
+
+  const { drift, ...worldSize } = scenario.world ?? {};
+  twin.reconfigure({ seed: scenario.seed, startTime: scenario.startTime, worldSize, drift });
+  twin.faultRules = faults;
+  if (scenario.auth) twin.authMode = scenario.auth;
+  const utcOffsetHours = twin.world.company.utcOffsetHours;
+  twin.schedule(entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, utcOffsetHours), ...entry })));
   return { scenario: scenario.name, ...describeTwin(twin) };
 }
 

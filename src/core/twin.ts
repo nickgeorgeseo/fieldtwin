@@ -90,11 +90,17 @@ export class Twin {
     return this.states.get(name) as State;
   }
 
-  /** Switch to a different seed, start time, or world size, then reset. Used when loading a scenario. */
+  /**
+   * Switch to a different seed, start time, or world size, then reset. Used when loading a scenario. If the new
+   * options can't make a world (a bad start time, more customers than there are names), this throws before anything
+   * changes.
+   */
   reconfigure(changes: Partial<Omit<TwinOptions, "vendors">>): void {
-    this.options = { ...this.options, ...changes };
+    const options = { ...this.options, ...changes };
+    const start = this.startOf(options);
+    this.options = options;
     this.timeline.schedule([]); // the old scenario's schedule doesn't belong in the new world
-    this.reset();
+    this.rebuild(start);
   }
 
   /** Schedule a scenario's timeline, replacing any other, and apply the entries already due. */
@@ -130,10 +136,19 @@ export class Twin {
 
   /** Back to the seeded starting world. Same seed and options give a byte-identical log. */
   reset(): void {
-    const { seed, startTime, worldSize, drift } = this.options;
-    this.clock = new TwinClock(startTime);
+    this.rebuild(this.startOf(this.options));
+  }
+
+  /** The clock and world a twin with these options starts from. Building them is all that can fail. */
+  private startOf({ seed, startTime, worldSize, drift }: TwinOptions): { clock: TwinClock; world: World } {
+    return { clock: new TwinClock(startTime), world: generateWorld(new SeededRandom(seed), { startTime, size: worldSize, drift }) };
+  }
+
+  private rebuild({ clock, world }: { clock: TwinClock; world: World }): void {
+    const { seed } = this.options;
+    this.clock = clock;
     this.log = new EventLog();
-    this.world = generateWorld(new SeededRandom(seed), { startTime, size: worldSize, drift });
+    this.world = world;
     this.faultRandom = new SeededRandom(seed + 1);
     this.faultRules = [];
     this.checkpoints.clear();
@@ -141,20 +156,28 @@ export class Twin {
     this.webhooks.dropPending();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
 
-    this.rebuilding = true;
-    for (const vendor of this.vendors.values()) {
-      for (const event of vendor.seed(this.world)) this.record(event, "seed");
-    }
-    this.rebuilding = false;
+    this.asHistory(() => {
+      for (const vendor of this.vendors.values()) {
+        for (const event of vendor.seed(this.world)) this.record(event, "seed");
+      }
+    });
     this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
     this.catchUp();
   }
 
   /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
   private catchUp(): void {
+    this.asHistory(() => this.runDue(this.clock.nowMs()));
+  }
+
+  /** Record history rather than news: nothing recorded meanwhile sends a webhook, even if something throws. */
+  private asHistory(record: () => void): void {
     this.rebuilding = true;
-    this.runDue(this.clock.nowMs());
-    this.rebuilding = false;
+    try {
+      record();
+    } finally {
+      this.rebuilding = false;
+    }
   }
 
   /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
