@@ -32,7 +32,7 @@ For a rougher ride, start the twin with real OAuth checks and faults on both ven
 npm start -- scenarios/flaky-apis.yaml
 ```
 
-The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off), refreshes its tokens mid-run, and the second run picks up the invoices customers paid while the first was struggling. `FIELDTWIN_URL` points the demo at a twin on another address.
+The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, and writes whose answer was lost are answered from their `requestid` on the retry), refreshes its tokens mid-run, and the second run picks up the invoices customers paid while the first was struggling. `FIELDTWIN_URL` points the demo at a twin on another address.
 
 ## What production code has to get right, and where this does
 
@@ -83,7 +83,7 @@ The tests in [`test/`](test/) run the code against an in-process twin with real 
 |---|---|
 | [`sync.test.ts`](test/sync.test.ts) | Every paid invoice ends in QuickBooks with Balance 0, the right customer, and its payment. A second run changes nothing (the twin's change list shows no API calls that wrote anything). Every payment's stale SyncToken is recovered. Invoices a timeline pays an hour later are picked up by the next run. After two hours both tokens refresh and Jobber's rotated refresh token is kept |
 | [`sync-drift.test.ts`](test/sync-drift.test.ts) | Under `mismatched-books`, respelled customers are matched by email (no duplicates, not renamed) and field-service-only customers are created. Switching to name matching fails all three tests |
-| [`sync-flaky.test.ts`](test/sync-flaky.test.ts) | Under `flaky-apis`, repeated runs settle to exactly the books a clean run produces, through more than a hundred retries and a token refresh |
+| [`sync-flaky.test.ts`](test/sync-flaky.test.ts) | Under `flaky-apis`, repeated runs settle to exactly the books a clean run produces, through more than a hundred retries, writes whose answers were lost, and a token refresh. When every answer to an invoice write is lost, each invoice is still made once; a client without `requestid`s makes eight copies, one per attempt |
 | [`jobber.test.ts`](test/jobber.test.ts), [`quickbooks.test.ts`](test/quickbooks.test.ts), [`oauth.test.ts`](test/oauth.test.ts), [`retry.test.ts`](test/retry.test.ts) | Each piece on its own: exact throttle waits, the 60-second QuickBooks wait, one `requestid` per write across retries, single-flight refresh, backoff and `Retry-After` |
 | [`demo.test.ts`](test/demo.test.ts) | The demo itself, end to end, through the control plane |
 
@@ -95,4 +95,4 @@ The tests in [`test/`](test/) run the code against an in-process twin with real 
 - **Server-side filtering.** Jobber's filter arguments aren't in the public docs, so every run pages through all invoices and filters them here.
 - **Dates.** `TxnDate` and `DueDate` are the date part of Jobber's timestamps, as Jobber wrote them.
 
-Some behaviors the code depends on are the twin's best reading of the docs rather than confirmed facts, notably that applying a payment bumps an invoice's SyncToken. If real QuickBooks doesn't, the stamp simply succeeds the first time. [FIDELITY.md](../../FIDELITY.md) marks each one. The twin honors `requestid` as documented, but its injected faults so far fire before it writes anything, so the tests can't yet show a lost answer to a real write.
+Some behaviors the code depends on are the twin's best reading of the docs rather than confirmed facts, notably that applying a payment bumps an invoice's SyncToken. If real QuickBooks doesn't, the stamp simply succeeds the first time. [FIDELITY.md](../../FIDELITY.md) marks each one.

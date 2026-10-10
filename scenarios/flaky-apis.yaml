@@ -3,12 +3,20 @@
 name: Flaky APIs
 description: >
   Heavy fault rates on both vendors, with real OAuth checks. QuickBooks throttles nearly a third of requests
-  (429) and is sometimes unavailable (503). Jobber's DDoS guard throttles one request in five (429) and its
-  gateway sometimes fails (502). Every response is a little slow.
+  (429), is sometimes unavailable (503), and loses the answer to some writes after making them (504).
+  Jobber's DDoS guard throttles one request in five (429) and its gateway sometimes fails (502). Every
+  response is a little slow.
 seed: 42
 startTime: "2026-07-13T11:00:00Z"
 auth: oauth
 faults:
+  # First, so every write gets its own chance at it. The write happens, then its answer is lost: retry without a
+  # requestid and it happens twice.
+  - name: qbo-lost-answers
+    vendor: quickbooks
+    method: POST
+    rate: 0.15
+    effect: { status: 504, message: "Gateway timeout", lostResponse: true }
   - name: qbo-throttled
     vendor: quickbooks
     rate: 0.3

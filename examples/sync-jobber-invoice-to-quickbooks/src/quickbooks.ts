@@ -52,7 +52,7 @@ export function createQuickBooksClient(options: {
   realmId: string;
   tokens: TokenManager;
   runtime: Runtime;
-  newRequestId?: () => string;
+  newRequestId?: () => string | undefined; // undefined sends none: only to show what goes wrong without them
 }): QuickBooksClient {
   const { apiBase, realmId, tokens, runtime } = options;
   const newRequestId = options.newRequestId ?? (() => randomUUID());
@@ -90,7 +90,8 @@ export function createQuickBooksClient(options: {
     },
     async write<T>(entity: string, body: object) {
       const requestId = newRequestId(); // once per write, so every retry of it carries the same one
-      return (await request("POST", `${entity.toLowerCase()}?requestid=${requestId}`, body))[entity] as T;
+      const path = requestId === undefined ? entity.toLowerCase() : `${entity.toLowerCase()}?requestid=${encodeURIComponent(requestId)}`;
+      return (await request("POST", path, body))[entity] as T;
     },
     async query<T>(entity: string, clauses = "") {
       const statement = `SELECT * FROM ${entity}${clauses ? ` ${clauses}` : ""}`;

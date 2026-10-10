@@ -70,13 +70,38 @@ describe("syncing through flaky APIs (flaky-apis)", () => {
 
     expect(books(flaky)).toEqual(books(clean));
 
-    // And the faults really happened. (Jobber's 5% bad gateway rarely meets a sync's few Jobber requests;
-    // jobber.test.ts covers it.)
+    // And the QuickBooks faults really happened, lost answers included: those writes were made, retried, and
+    // answered from their requestid instead of being made twice. (A sync sends Jobber only a few requests, so its
+    // faults may not meet them; jobber.test.ts covers those.)
     const retried = (pattern: RegExp) => harness.lines.filter((line) => pattern.test(line)).length;
     expect(retried(/^QuickBooks .*: HTTP 429, retrying in 60s/)).toBeGreaterThan(0);
     expect(retried(/^QuickBooks .*: HTTP 503, retrying/)).toBeGreaterThan(0);
-    expect(retried(/^Jobber: HTTP 429, retrying/)).toBeGreaterThan(0);
+    expect(retried(/^QuickBooks POST .*: HTTP 504, retrying/)).toBeGreaterThan(0);
     // Sixty-second waits add up: the run outlives its first access tokens, and refreshes them on the way.
     expect(harness.quickbooksTokens.refreshes).toBeGreaterThan(0);
+  });
+
+  it("makes each invoice once when every answer to it is lost, where a client without requestids makes eight", async () => {
+    const copiesOfEachInvoice = async (requestIds: boolean) => {
+      const target = createApp({ seed: 42, auth: "oauth" });
+      target.twin.faultRules = [
+        {
+          name: "lost",
+          vendor: "quickbooks",
+          method: "POST",
+          pathIncludes: "/invoice",
+          rate: 1,
+          effect: { status: 504, lostResponse: true },
+        },
+      ];
+      await (await syncHarness(target, { requestIds })).sync(EVER);
+      const copies = new Map<string, number>();
+      for (const invoice of target.twin.state<QboState>("quickbooks").invoices.values()) {
+        copies.set(invoice.DocNumber!, (copies.get(invoice.DocNumber!) ?? 0) + 1);
+      }
+      return Math.max(...copies.values());
+    };
+    expect(await copiesOfEachInvoice(true)).toBe(1);
+    expect(await copiesOfEachInvoice(false)).toBe(8); // every one of the client's eight attempts made another
   });
 });

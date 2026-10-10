@@ -50,11 +50,18 @@ export async function connectBoth(target: InProcessTwin) {
 }
 
 /** Everything connected and ready to sync, the way main.ts wires it, but in process. */
-export async function syncHarness(target: InProcessTwin) {
+export async function syncHarness(target: InProcessTwin, options: { requestIds?: boolean } = {}) {
   const connection = await connectBoth(target);
   const { runtime, realmId, jobberTokens, quickbooksTokens } = connection;
   const jobber = createJobberClient({ apiUrl: ENDPOINTS.jobber.apiUrl, tokens: jobberTokens, runtime });
-  const quickbooks = createQuickBooksClient({ apiBase: ENDPOINTS.quickbooks.apiBase, realmId, tokens: quickbooksTokens, runtime });
+  const newRequestId = options.requestIds === false ? () => undefined : undefined; // false: the client sends none
+  const quickbooks = createQuickBooksClient({
+    apiBase: ENDPOINTS.quickbooks.apiBase,
+    realmId,
+    tokens: quickbooksTokens,
+    runtime,
+    newRequestId,
+  });
   return { ...connection, jobber, quickbooks, sync: (since: string) => syncPaidInvoices({ jobber, quickbooks, log: runtime.log }, since) };
 }
 
