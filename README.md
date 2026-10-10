@@ -184,7 +184,7 @@ curl -X POST localhost:4010/_twin/actions/jobber/payInvoices -H "Content-Type: a
 
 **QuickBooks** deliveries are CloudEvents, the format Intuit sends today: a JSON array of events like `{ "specversion": "1.0", "type": "qbo.invoice.updated.v1", "intuitentityid": "130", "intuitaccountid": "9341000000000001", ... }`, signed in `intuit-signature` with the subscription's `clientSecret` standing in for your app's verifier token. Customers, invoices, and payments created or updated through the API are announced (`qbo.customer.created.v1`, `qbo.customer.updated.v1`, `qbo.invoice.created.v1`, `qbo.invoice.updated.v1`, `qbo.payment.created.v1`), and a payment also announces each invoice it pays. Your app has 3 seconds to answer HTTP 200; otherwise the twin tries again on Intuit's schedule, from 10 seconds up to every 6 hours of twin time.
 
-`GET /_twin/webhooks` shows every recent delivery and how your app answered it.
+Each URL gets its deliveries one at a time, in order; an app that is slow to answer doesn't hold up deliveries to another. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
 Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
 

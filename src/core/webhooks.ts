@@ -136,7 +136,7 @@ export class WebhookDispatcher {
   }
 
   /**
-   * Send everything due by `nowMs`, in order. Rounds never overlap; failed deliveries are queued again for later.
+   * Send everything due by `nowMs`. Rounds never overlap; failed deliveries are queued again for later.
    * This never rejects: a round that throws (a bug) is logged, and the next round runs as usual.
    */
   deliverDue(nowMs: number): Promise<void> {
@@ -165,12 +165,21 @@ export class WebhookDispatcher {
     this.recent = this.recent.filter((delivery) => delivery.status !== "pending");
   }
 
+  /**
+   * Each URL gets its due deliveries in order, the next once the one before is answered (Intuit holds an app's later
+   * events back the same way). URLs don't wait for each other, so an app that stalls only delays itself.
+   */
   private async sendDue(nowMs: number): Promise<void> {
     const generation = this.generation;
-    for (;;) {
-      const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id)[0];
-      if (!due) return;
-      this.queue = this.queue.filter((delivery) => delivery !== due);
+    const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id);
+    this.queue = this.queue.filter((delivery) => delivery.dueMs > nowMs);
+    const byUrl = new Map<string, Queued[]>();
+    for (const delivery of due) byUrl.set(delivery.url, [...(byUrl.get(delivery.url) ?? []), delivery]);
+    await Promise.all([...byUrl.values()].map((deliveries) => this.sendInOrder(deliveries, nowMs, generation)));
+  }
+
+  private async sendInOrder(deliveries: Queued[], nowMs: number, generation: number): Promise<void> {
+    for (const due of deliveries) {
       due.attempts++;
       const { answer, accepted } = await this.attempt(due);
       if (this.generation !== generation) return; // reset or rewound while it was on its way: neither retry nor go on

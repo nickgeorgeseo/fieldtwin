@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- An app slow to answer webhooks no longer holds up deliveries to other URLs. Deliveries went out one at a time across every subscription, so with two apps subscribed, one that stalled delayed the other's by a second (Jobber) or three (QuickBooks) per delivery, and `POST /_twin/clock/advance` and `/_twin/actions` with them. Each URL still gets its own deliveries in order.
+
 - In a drifted world, every customer who is only in the field-service system has at least one invoiced job, as drift promises. Across seeds, about a quarter had no invoice, so `mismatched-books` with another seed tested less than it said.
 
 - Today's visits in the generated world start at 8:00 or later, as every other day's do. With the default 6 a.m. start, some started at 7:00, and a world starting at midnight booked visits at 2:30 a.m.
