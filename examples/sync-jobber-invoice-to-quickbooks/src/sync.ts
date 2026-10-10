@@ -1,7 +1,8 @@
 import type { JobberClient } from "./jobber.ts";
-import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice, type JobberLineItem } from "./jobber-invoices.ts";
+import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice } from "./jobber-invoices.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
 import * as books from "./quickbooks-entities.ts";
+import { cents, salesLineFor } from "./sales-lines.ts";
 import { ensureActive, ensureCustomer } from "./sync-customers.ts";
 import { OAuthError, TokenEndpointError } from "./token-endpoint.ts";
 
@@ -133,24 +134,6 @@ async function ensureInvoice(invoice: JobberInvoice, customer: books.Customer, c
   return created;
 }
 
-/**
- * A Jobber line item as a QuickBooks sales line, booked to the Item `itemId`. QuickBooks refuses a line whose Amount
- * isn't Qty × UnitPrice to the cent (6070), and a Jobber price can be finer than a cent, so Qty and UnitPrice go along
- * only when they agree with the total. Otherwise the line is booked at its total, and its description says how
- * Jobber priced it: an invoice that fails every run would hold the scheduled sync's cutoff back for good.
- */
-export function salesLineFor(line: JobberLineItem, itemId: string): books.SalesLine {
-  const description = line.description ?? line.name;
-  const agrees = line.unitPrice !== null && cents(line.quantity * line.unitPrice) === cents(line.totalPrice);
-  const priced = line.unitPrice === null ? { Qty: line.quantity } : agrees ? { Qty: line.quantity, UnitPrice: line.unitPrice } : {};
-  return {
-    DetailType: "SalesItemLineDetail",
-    Amount: line.totalPrice,
-    Description: agrees || line.unitPrice === null ? description : `${description} (${line.quantity} × ${line.unitPrice})`,
-    SalesItemLineDetail: { ItemRef: { value: itemId }, ...priced },
-  };
-}
-
 async function ensurePayment(invoice: JobberInvoice, booked: books.Invoice, context: SyncContext): Promise<void> {
   const { quickbooks, stats } = context;
   // Pay what's still open, but never more than Jobber says was paid. Nothing open: the books already have it.
@@ -196,9 +179,4 @@ async function stamp(booked: books.Invoice, invoiceNumber: string, context: Sync
 /** Jobber sends date-times; QuickBooks transaction dates are YYYY-MM-DD. The date as Jobber wrote it. */
 function dateOf(dateTime: string): string {
   return dateTime.slice(0, 10);
-}
-
-/** Whole cents, half a cent rounding away from zero. toFixed first: 2.5 × 33.33 is 83.32499999999999 in floating point. */
-function cents(amount: number): number {
-  return Math.sign(amount) * Math.round(Number((Math.abs(amount) * 100).toFixed(6)));
 }

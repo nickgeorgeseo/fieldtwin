@@ -6,7 +6,8 @@ import { InvoiceQueue } from "../src/invoice-queue.ts";
 import { fetchPaidInvoicesSince } from "../src/jobber-invoices.ts";
 import { TokenManager } from "../src/oauth.ts";
 import { createQuickBooksClient } from "../src/quickbooks.ts";
-import { emptyStats, salesLineFor, syncPaidInvoices } from "../src/sync.ts";
+import { salesLineFor } from "../src/sales-lines.ts";
+import { emptyStats, syncPaidInvoices } from "../src/sync.ts";
 import { OAuthError, TokenEndpointError } from "../src/token-endpoint.ts";
 import { ENDPOINTS, EVER, QUICKBOOKS_APP, syncHarness } from "./harness.ts";
 
