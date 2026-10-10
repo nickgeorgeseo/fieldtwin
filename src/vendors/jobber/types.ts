@@ -22,7 +22,7 @@ export interface JobberClient {
 
 /** Jobber's `Client.name`: the company name for a business client, otherwise the person's name. */
 export function clientName(client: JobberClient): string {
-  return client.companyName ?? `${client.firstName} ${client.lastName}`;
+  return client.companyName ?? [client.firstName, client.lastName].filter(Boolean).join(" ");
 }
 
 /** A user on the account, generally a technician who completes work. */

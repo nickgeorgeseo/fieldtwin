@@ -32,11 +32,12 @@ export function createMutations(context: ResolverContext, record: (event: NewEve
       if (userErrors.length) return { client: null, userErrors };
 
       const state = context.state();
+      // Names are kept as typed but trimmed, and a blank company name means there is no company.
       const client: JobberClient = {
         id: encodeId("Client", nextIdNumber(state.clients.keys(), "Client")),
-        firstName: input.firstName ?? "",
-        lastName: input.lastName!,
-        companyName: input.companyName ?? null,
+        firstName: input.firstName?.trim() ?? "",
+        lastName: input.lastName!.trim(),
+        companyName: input.companyName?.trim() || null,
         emails: (input.emails ?? []).map((email) => ({ address: email.address, primary: email.primary ?? false })),
         phones: [],
         createdAt: new Date(context.nowMs()).toISOString(),

@@ -89,3 +89,19 @@ describe("Jobber twin: clientCreate", () => {
     expect(body.extensions.cost.requestedQueryCost).toBe(8);
   });
 });
+
+describe("Jobber twin: clientCreate with blank or partial names", () => {
+  const created = async (input: object) => (await (await setup().jobber(CREATE, { input })).json()).data.clientCreate.client;
+
+  it("names a person from the parts given, without stray spaces", async () => {
+    expect(await created({ lastName: "Smith" })).toMatchObject({ name: "Smith", isCompany: false });
+    expect(await created({ firstName: "  Ada ", lastName: " Alder  " })).toMatchObject({ name: "Ada Alder", isCompany: false });
+  });
+
+  it("treats a blank company name as no company", async () => {
+    expect(await created({ firstName: "Ada", lastName: "Alder", companyName: "  " })).toMatchObject({
+      name: "Ada Alder",
+      isCompany: false,
+    });
+  });
+});

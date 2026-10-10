@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Jobber `clientCreate` trims names and treats a blank `companyName` as none. A last name alone made the name " Smith", and `companyName: ""` made a company client with an empty name.
+
 - Jobber `newClients` never runs out of names: once the word lists' names are taken, newcomers get a middle initial. A long timeline used to fail hours into twin time with "no unused names left", leaving the clock half advanced. New clients also never take the name of a customer who is only in QuickBooks, whose email address could otherwise match.
 
 - Jobber: a query that costs more than the whole 10,000-point budget still answers `THROTTLED`, but its message now says it can never run and to ask for fewer nodes. It looked like a temporary limit, so retry loops retried it forever.
