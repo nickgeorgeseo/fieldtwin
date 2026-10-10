@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- The sync example reacts to Jobber's webhooks: `jobberWebhookHandler` verifies the signature and answers at once, and an `InvoiceQueue` syncs each invoice a webhook names (`syncPaidInvoice`), folding repeats together. The demo has a third run that receives real webhooks over HTTP; `flaky-apis` sends Jobber webhooks twice and late.
 - Jobber webhooks (roadmap v0.2): `CLIENT_CREATE` and `INVOICE_UPDATE` in the documented payload, signed with `X-Jobber-Hmac-SHA256`, sent to the subscriptions set with `PUT /_twin/webhooks` (or the `twin_set_webhooks` MCP tool) after the request or clock advance that caused them. Paying an invoice fires `INVOICE_UPDATE` twice, a second apart, as documented; a delivery the app doesn't accept within a second is retried on twin time; `GET /_twin/webhooks` shows each delivery and how the app answered. Subscriptions survive reset and rewind; nothing is sent for the seeded world or rebuilt history. `VendorTwin` gains an optional `webhooks`.
 - Webhook delivery faults: a fault rule with `webhook: TOPIC` (or `"*"`) and `effect: { duplicate: true }` or `{ delayMs }` sends deliveries twice, or late enough that later ones overtake them, marked with `X-Twin-Fault`.
 - `POST /_twin/actions/:vendor/:action` and the `twin_run_action` MCP tool make a vendor's scenario action happen now (`jobber/payInvoices`, `jobber/newClients`), recorded with source `control`.

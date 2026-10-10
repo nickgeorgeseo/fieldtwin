@@ -1,10 +1,13 @@
+import { serve } from "@hono/node-server";
 import { endpointsAt } from "./endpoints.ts";
+import { InvoiceQueue } from "./invoice-queue.ts";
 import { createJobberClient } from "./jobber.ts";
 import { TokenManager, type VendorOAuth } from "./oauth.ts";
 import { createQuickBooksClient } from "./quickbooks.ts";
 import type { Fetch } from "./runtime.ts";
-import { type SyncStats, syncPaidInvoices } from "./sync.ts";
-import { connectWithoutBrowser, twinRuntime } from "./twin.ts";
+import { type SyncStats, syncPaidInvoice, syncPaidInvoices } from "./sync.ts";
+import { connectWithoutBrowser, subscribeToWebhooks, twinAction, twinRuntime } from "./twin.ts";
+import { jobberWebhookHandler } from "./webhooks.ts";
 
 /**
  * The demo: sync paid Jobber invoices into QuickBooks against a running fieldtwin.
@@ -12,8 +15,10 @@ import { connectWithoutBrowser, twinRuntime } from "./twin.ts";
  *   npm start                  # in one terminal: the twin (try FIELDTWIN_AUTH=oauth, or -- scenarios/flaky-apis.yaml)
  *   npm run example:sync       # in another: this file
  *
- * FIELDTWIN_URL points it at a twin somewhere other than http://localhost:4010. Production wiring, where the
- * only differences are real endpoints, a real consent page, saved tokens, and a schedule, is in README.md.
+ * It syncs every paid invoice, syncs again two hours later from where it left off, then subscribes to webhooks
+ * and syncs the invoices customers pay as the news arrives. FIELDTWIN_URL points it at a twin somewhere other
+ * than http://localhost:4010. Production wiring (real endpoints, a real consent page, saved tokens, a public
+ * webhook URL, and a schedule) is in README.md.
  */
 
 const EVER = "1970-01-01T00:00:00Z";
@@ -58,7 +63,35 @@ export async function runDemo(baseUrl: string, log: (line: string) => void = con
   log(`Run 2, two hours of twin time later: invoices paid since run 1 began (${firstRunAt}), with refreshed tokens.`);
   const second = await syncPaidInvoices(clients, firstRunAt);
   report(second, log);
-  return { first, second };
+
+  // Run 3: react instead of polling. A real app subscribes in Jobber's Developer Center; the twin's equivalent is
+  // its control plane. Customers pay, Jobber tells the app, and the app syncs just those invoices.
+  log("Run 3, from webhooks: subscribed to INVOICE_UPDATE, two customers pay.");
+  const queue = new InvoiceQueue((invoiceId) => syncPaidInvoice(clients, invoiceId), log);
+  const receiver = await listen(jobberWebhookHandler({ clientSecret: JOBBER_APP.clientSecret, onEvent: (event) => queue.add(event) }));
+  const { clientId, clientSecret } = JOBBER_APP;
+  try {
+    await subscribeToWebhooks(baseUrl, runtime.fetch, [
+      { vendor: "jobber", url: `${receiver.url}/webhooks/jobber`, topics: ["INVOICE_UPDATE"], clientId, clientSecret },
+    ]);
+    await twinAction(baseUrl, runtime.fetch, "jobber", "payInvoices", 2); // resolves once the webhooks were answered
+    await runtime.sleep(10 * 60_000); // any late deliveries (flaky-apis delays some) arrive meanwhile
+    await queue.idle();
+    report(queue.totals, log);
+  } finally {
+    await subscribeToWebhooks(baseUrl, runtime.fetch, []);
+    receiver.close();
+  }
+  return { first, second, third: queue.totals };
+}
+
+/** Serve a request handler on a free local port, where your web server would serve it at a public URL. */
+function listen(handler: (request: Request) => Promise<Response>): Promise<{ url: string; close: () => void }> {
+  return new Promise((resolve) => {
+    const server = serve({ fetch: handler, port: 0, hostname: "127.0.0.1" }, ({ port }) =>
+      resolve({ url: `http://127.0.0.1:${port}`, close: () => server.close() }),
+    );
+  });
 }
 
 function report(stats: SyncStats, log: (line: string) => void): void {

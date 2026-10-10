@@ -54,17 +54,20 @@ type InvoiceNode = Omit<JobberInvoice, "client" | "lineItems"> & {
 
 const LINE_ITEM_FIELDS = "nodes { name description quantity unitPrice totalPrice } pageInfo { hasNextPage endCursor }";
 
+const INVOICE_FIELDS = `
+  id invoiceNumber invoiceStatus subject issuedDate dueDate updatedAt
+  amounts { total paymentsTotal invoiceBalance }
+  client { id name firstName lastName companyName email }
+  lineItems(first: $lines) { ${LINE_ITEM_FIELDS} }`;
+
 const INVOICES = `
   query Invoices($first: Int!, $after: String, $lines: Int!) {
-    invoices(first: $first, after: $after) {
-      nodes {
-        id invoiceNumber invoiceStatus subject issuedDate dueDate updatedAt
-        amounts { total paymentsTotal invoiceBalance }
-        client { id name firstName lastName companyName email }
-        lineItems(first: $lines) { ${LINE_ITEM_FIELDS} }
-      }
-      pageInfo { hasNextPage endCursor }
-    }
+    invoices(first: $first, after: $after) { nodes { ${INVOICE_FIELDS} } pageInfo { hasNextPage endCursor } }
+  }`;
+
+const INVOICE = `
+  query Invoice($id: EncodedId!, $lines: Int!) {
+    invoice(id: $id) { ${INVOICE_FIELDS} }
   }`;
 
 const MORE_LINE_ITEMS = `
@@ -81,14 +84,25 @@ export async function fetchPaidInvoicesSince(jobber: JobberClient, since: string
     const variables: Record<string, unknown> = { first: pageSizes.invoices, after, lines: pageSizes.lineItems };
     const { invoices } = await jobber.query<{ invoices: Page<InvoiceNode> }>(INVOICES, variables);
     for (const node of invoices.nodes) {
-      // Invoice.client is nullable in the schema; an invoice with no client can't be booked to a customer.
-      if (node.invoiceStatus !== "paid" || Date.parse(node.updatedAt) <= sinceMs || !node.client) continue;
-      const { invoiceStatus: _status, lineItems, client, ...invoice } = node;
-      paid.push({ ...invoice, client, lineItems: [...lineItems.nodes, ...(await moreLineItems(jobber, node.id, lineItems, pageSizes))] });
+      const invoice = Date.parse(node.updatedAt) > sinceMs ? await paidInvoiceFrom(jobber, node, pageSizes) : undefined;
+      if (invoice) paid.push(invoice);
     }
     after = invoices.pageInfo.hasNextPage ? invoices.pageInfo.endCursor : null;
   } while (after);
   return paid;
+}
+
+/** One invoice by its id (what a webhook's itemId names), if it is paid. Undefined when it isn't (or is gone). */
+export async function fetchPaidInvoice(jobber: JobberClient, id: string, pageSizes = PAGE_SIZES): Promise<JobberInvoice | undefined> {
+  const { invoice } = await jobber.query<{ invoice: InvoiceNode | null }>(INVOICE, { id, lines: pageSizes.lineItems });
+  return invoice ? paidInvoiceFrom(jobber, invoice, pageSizes) : undefined;
+}
+
+/** A paid invoice, with all its line items. Invoice.client is nullable: one without a client can't be booked. */
+async function paidInvoiceFrom(jobber: JobberClient, node: InvoiceNode, pageSizes: typeof PAGE_SIZES): Promise<JobberInvoice | undefined> {
+  if (node.invoiceStatus !== "paid" || !node.client) return undefined;
+  const { invoiceStatus: _status, lineItems, client, ...invoice } = node;
+  return { ...invoice, client, lineItems: [...lineItems.nodes, ...(await moreLineItems(jobber, node.id, lineItems, pageSizes))] };
 }
 
 /** The rest of an invoice's line items, when there are more than one page of them. */

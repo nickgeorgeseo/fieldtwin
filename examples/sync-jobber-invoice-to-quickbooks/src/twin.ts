@@ -67,3 +67,23 @@ export async function twinRuntime(baseUrl: string, log: (line: string) => void, 
   };
   return runtime;
 }
+
+/** Subscribe to webhooks, as an app would in Jobber's Developer Center. An empty list unsubscribes. */
+export async function subscribeToWebhooks(baseUrl: string, fetchImpl: Fetch, subscriptions: object[]): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/_twin/webhooks`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscriptions),
+  });
+  if (!response.ok) throw new Error(`The twin refused the webhook subscriptions: ${await response.text()}`);
+}
+
+/** Make something happen in a vendor's own app ("payInvoices", 2). Resolves once its webhooks have been answered. */
+export async function twinAction(baseUrl: string, fetchImpl: Fetch, vendor: string, action: string, params: unknown): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/_twin/actions/${vendor}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) throw new Error(`The twin couldn't ${action}: ${await response.text()}`);
+}

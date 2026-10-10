@@ -4,8 +4,8 @@ name: Flaky APIs
 description: >
   Heavy fault rates on both vendors, with real OAuth checks. QuickBooks throttles nearly a third of requests
   (429), is sometimes unavailable (503), and loses the answer to some writes after making them (504).
-  Jobber's DDoS guard throttles one request in five (429) and its gateway sometimes fails (502). Every
-  response is a little slow.
+  Jobber's DDoS guard throttles one request in five (429) and its gateway sometimes fails (502), and its
+  webhooks come twice or late. Every response is a little slow.
 seed: 42
 startTime: "2026-07-13T11:00:00Z"
 auth: oauth
@@ -39,6 +39,17 @@ faults:
     vendor: quickbooks
     rate: 1
     effect: { latencyMs: 5 }
+  # For apps subscribed to webhooks: Jobber's documented repeats, and some late enough to arrive out of order.
+  - name: jobber-webhooks-twice
+    vendor: jobber
+    webhook: "*"
+    rate: 0.3
+    effect: { duplicate: true }
+  - name: jobber-webhooks-late
+    vendor: jobber
+    webhook: "*"
+    rate: 0.3
+    effect: { delayMs: 300000 }
 timeline:
   # Customers keep paying while your sync struggles.
   - at: "+30m"

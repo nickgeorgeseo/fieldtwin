@@ -1,5 +1,5 @@
 import type { JobberClient } from "./jobber.ts";
-import { fetchPaidInvoicesSince, type JobberInvoice } from "./jobber-invoices.ts";
+import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice } from "./jobber-invoices.ts";
 import { OAuthError } from "./oauth.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
 import * as books from "./quickbooks-entities.ts";
@@ -47,8 +47,19 @@ export interface SyncContext extends SyncClients {
 export const stampFor = (invoiceNumber: string) => `Synced from Jobber invoice #${invoiceNumber}`;
 const STALE_RETRIES = 3;
 
+/** The scheduled sync: every paid invoice changed since `since`, found by paging through Jobber's invoices. */
 export async function syncPaidInvoices(clients: SyncClients, since: string): Promise<SyncStats> {
-  const stats: SyncStats = {
+  return syncAll(clients, await fetchPaidInvoicesSince(clients.jobber, since));
+}
+
+/** One invoice, by its Jobber id: what an INVOICE_UPDATE webhook asks for. An unpaid invoice has nothing to sync. */
+export async function syncPaidInvoice(clients: SyncClients, invoiceId: string): Promise<SyncStats> {
+  const invoice = await fetchPaidInvoice(clients.jobber, invoiceId);
+  return syncAll(clients, invoice ? [invoice] : []);
+}
+
+export function emptyStats(): SyncStats {
+  return {
     invoices: 0,
     customersCreated: 0,
     customersSpelledDifferently: 0,
@@ -59,9 +70,10 @@ export async function syncPaidInvoices(clients: SyncClients, since: string): Pro
     conflicts: 0,
     failed: 0,
   };
-  const invoices = await fetchPaidInvoicesSince(clients.jobber, since);
-  stats.invoices = invoices.length;
+}
 
+async function syncAll(clients: SyncClients, invoices: JobberInvoice[]): Promise<SyncStats> {
+  const stats = { ...emptyStats(), invoices: invoices.length };
   const context: SyncContext = { ...clients, stats, customers: new Map(), items: new Map() };
   for (const invoice of invoices) {
     try {
