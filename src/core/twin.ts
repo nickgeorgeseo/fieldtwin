@@ -9,7 +9,8 @@ import { copyFaultRandom, type FaultRandom, streams } from "./streams.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
-import { WebhookDispatcher, type WebhookSender } from "./webhooks.ts";
+import { WebhookDispatcher } from "./webhook-dispatcher.ts";
+import type { WebhookSender } from "./webhooks.ts";
 
 export interface TwinOptions {
   seed: number;
@@ -50,7 +51,7 @@ export class Twin {
   // A loaded scenario's schedule, run as advance() moves the clock. See timeline.ts.
   private readonly timeline = new Timeline(this);
 
-  // Webhook subscriptions and deliveries: bookkeeping too. See core/webhooks.ts.
+  // Webhook subscriptions and deliveries: bookkeeping too. See webhooks.ts and webhook-dispatcher.ts.
   readonly webhooks: WebhookDispatcher;
   private rebuilding = false; // while the world or its history is being rebuilt, nothing is news to anyone
 

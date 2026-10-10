@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TwinEvent } from "../src/core/types.ts";
 import type { VendorTwin } from "../src/core/vendor-twin.ts";
-import { WebhookDispatcher } from "../src/core/webhooks.ts";
+import { WebhookDispatcher } from "../src/core/webhook-dispatcher.ts";
 
 /**
  * How a round of deliveries goes out. Each app's URL gets its deliveries in order, one answer at a time, as Intuit
