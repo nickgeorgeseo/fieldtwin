@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
 import { parseTwinTime, TWIN_TIME_FORM } from "../core/clock.ts";
-import { type FaultRule, isFaultStatus } from "../core/types.ts";
+import { type FaultRule, isFaultStatus, VENDOR_NAMES, type VendorName } from "../core/types.ts";
 import type { WebhookSubscription } from "../core/webhooks.ts";
 
 /**
@@ -15,7 +15,7 @@ const WEEK_MS = 7 * 86_400_000;
 const FaultRuleSchema = z
   .object({
     name: z.string(),
-    vendor: z.enum(["quickbooks", "jobber"]),
+    vendor: z.enum(VENDOR_NAMES),
     method: z.string().optional(),
     pathIncludes: z.string().optional(),
     webhook: z.string().optional(),
@@ -52,12 +52,10 @@ const FaultRuleSchema = z
   });
 
 /** One timeline entry: when, and what each vendor should do then ({ jobber: { newClients: 15 } }). */
+const vendorActions = z.record(z.unknown()).optional();
 const TimelineEntrySchema = z
-  .object({
-    at: z.string(),
-    quickbooks: z.record(z.unknown()).optional(),
-    jobber: z.record(z.unknown()).optional(),
-  })
+  .object({ at: z.string() })
+  .extend(Object.fromEntries(VENDOR_NAMES.map((vendor) => [vendor, vendorActions])) as Record<VendorName, typeof vendorActions>)
   .strict();
 
 const ScenarioSchema = z
@@ -100,7 +98,7 @@ export function parseScenario(yamlText: string): Scenario {
 /** A webhook subscription: what an app would set up in the vendor's developer settings. */
 const WebhookSubscriptionSchema = z
   .object({
-    vendor: z.enum(["quickbooks", "jobber"]),
+    vendor: z.enum(VENDOR_NAMES),
     url: z.string().url(),
     topics: z.array(z.string()).min(1),
     clientId: z.string().min(1),

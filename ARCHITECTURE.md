@@ -151,7 +151,7 @@ The goal is code a new contributor can read top to bottom without jumping around
 
 ## Adding a vendor
 
-1. Add the name to `VendorName` in `core/types.ts`.
+1. Add the name to `VENDOR_NAMES` in `core/types.ts`. Scenarios, fault rules, and webhook subscriptions accept exactly those names.
 2. Copy `vendors/quickbooks/` (REST) or `vendors/jobber/` (GraphQL) to `vendors/<name>/` and empty it out.
 3. Write `types.ts` from the vendor's public docs, then `state.ts`, `seed.ts`, `routes.ts`, `index.ts`, in that order.
 4. Pick a `pathPrefix` no other vendor uses.

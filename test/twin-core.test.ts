@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { ALL_VENDORS } from "../src/app.ts";
 import { createCheckpoint, listChanges, loadScenario, rewindTo } from "../src/control/operations.ts";
+import { VENDOR_NAMES } from "../src/core/types.ts";
 import { setup } from "./helpers.ts";
 
 describe("the twin", () => {
@@ -70,5 +72,11 @@ describe("the control plane over HTTP", () => {
     const lines = (await (await app.request("/_twin/log.jsonl?since=mark")).text()).split("\n");
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("Exported Customer");
+  });
+});
+
+describe("the list of vendors", () => {
+  it("names exactly the vendors app.ts serves, so scenarios and fault rules accept every one of them", () => {
+    expect(ALL_VENDORS.map((vendor) => vendor.name).sort()).toEqual([...VENDOR_NAMES].sort());
   });
 });
