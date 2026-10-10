@@ -1,6 +1,6 @@
 import type { Endpoints } from "./endpoints.ts";
-import { exchangeCode, type Tokens, type VendorOAuth } from "./oauth.ts";
 import type { Fetch, Runtime } from "./runtime.ts";
+import { exchangeCode, type Tokens, type VendorOAuth } from "./token-endpoint.ts";
 
 /**
  * Twin-only plumbing for the demo and the tests. Production code doesn't use this file.

@@ -4,9 +4,10 @@ import type { JobberState } from "../../../src/vendors/jobber/types.ts";
 import type { QboState } from "../../../src/vendors/quickbooks/types.ts";
 import { InvoiceQueue } from "../src/invoice-queue.ts";
 import { fetchPaidInvoicesSince } from "../src/jobber-invoices.ts";
-import { OAuthError, TokenEndpointError, TokenManager } from "../src/oauth.ts";
+import { TokenManager } from "../src/oauth.ts";
 import { createQuickBooksClient } from "../src/quickbooks.ts";
 import { emptyStats, salesLineFor, syncPaidInvoices } from "../src/sync.ts";
+import { OAuthError, TokenEndpointError } from "../src/token-endpoint.ts";
 import { ENDPOINTS, EVER, QUICKBOOKS_APP, syncHarness } from "./harness.ts";
 
 /**

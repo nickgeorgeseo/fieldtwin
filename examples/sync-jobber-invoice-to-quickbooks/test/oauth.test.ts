@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../../src/app.ts";
-import { OAuthError, TokenManager } from "../src/oauth.ts";
+import { TokenManager } from "../src/oauth.ts";
+import { OAuthError } from "../src/token-endpoint.ts";
 import { connectBoth, ENDPOINTS, inProcessRuntime, JOBBER_APP } from "./harness.ts";
 
 const MINUTE = 60_000;

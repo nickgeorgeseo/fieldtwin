@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { OAuthError, TokenManager } from "../src/oauth.ts";
+import { TokenManager } from "../src/oauth.ts";
 import { createQuickBooksClient } from "../src/quickbooks.ts";
 import type { Runtime } from "../src/runtime.ts";
+import { OAuthError } from "../src/token-endpoint.ts";
 import { JOBBER_APP } from "./harness.ts";
 
 /**

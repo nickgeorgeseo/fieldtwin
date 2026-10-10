@@ -4,10 +4,11 @@ import { serve } from "@hono/node-server";
 import { endpointsAt } from "./endpoints.ts";
 import { InvoiceQueue } from "./invoice-queue.ts";
 import { createJobberClient } from "./jobber.ts";
-import { TokenManager, type VendorOAuth } from "./oauth.ts";
+import { TokenManager } from "./oauth.ts";
 import { createQuickBooksClient } from "./quickbooks.ts";
 import type { Fetch } from "./runtime.ts";
 import { type SyncStats, syncPaidInvoice, syncPaidInvoices } from "./sync.ts";
+import type { VendorOAuth } from "./token-endpoint.ts";
 import { connectWithoutBrowser, subscribeToWebhooks, twinAction, twinRuntime } from "./twin.ts";
 import { jobberWebhookHandler } from "./webhooks.ts";
 

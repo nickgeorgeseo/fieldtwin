@@ -1,9 +1,9 @@
 import type { JobberClient } from "./jobber.ts";
 import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice, type JobberLineItem } from "./jobber-invoices.ts";
-import { OAuthError, TokenEndpointError } from "./oauth.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
 import * as books from "./quickbooks-entities.ts";
 import { ensureActive, ensureCustomer } from "./sync-customers.ts";
+import { OAuthError, TokenEndpointError } from "./token-endpoint.ts";
 
 /**
  * Sync paid Jobber invoices into QuickBooks: the customer, the invoice, and the payment that settled it.

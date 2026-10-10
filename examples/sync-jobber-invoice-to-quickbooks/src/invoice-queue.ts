@@ -1,5 +1,5 @@
-import { OAuthError } from "./oauth.ts";
 import { emptyStats, type SyncStats } from "./sync.ts";
+import { OAuthError } from "./token-endpoint.ts";
 import type { JobberWebhookEvent } from "./webhooks.ts";
 
 /**
