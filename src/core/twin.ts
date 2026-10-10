@@ -1,5 +1,4 @@
-import type { DriftOptions } from "../world/drift.ts";
-import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
+import type { World } from "../world/generate-world.ts";
 import { Bookkeeping } from "./bookkeeping.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { TwinClock } from "./clock.ts";
@@ -7,22 +6,10 @@ import { EventLog } from "./event-log.ts";
 import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { copyFaultRandom, type FaultRandom, streams } from "./streams.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
+import { startingPoint, type TwinOptions } from "./twin-options.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
 import { WebhookDispatcher } from "./webhook-dispatcher.ts";
-import type { WebhookSender } from "./webhooks.ts";
-
-export interface TwinOptions {
-  seed: number;
-  scenario?: string; // the loaded scenario's name, for status displays
-  startTime: string;
-  worldSize?: Partial<WorldSize>;
-  drift?: DriftOptions;
-  faults?: FaultRule[]; // a loaded scenario's: back on after every reset
-  auth?: AuthMode;
-  vendors: VendorTwin[];
-  sendWebhook?: WebhookSender; // how deliveries reach your app: fetch, unless a test answers them itself
-}
 
 /**
  * The running twin: one fake business, seen through several vendor APIs.
@@ -68,14 +55,7 @@ export class Twin {
     const recorded = this.log.append({ ...event, at: this.clock.nowIso(), source });
     const vendor = this.vendor(event.vendor);
     vendor.apply(this.state(event.vendor), recorded);
-    if (!this.rebuilding) {
-      // Webhooks are bookkeeping: a bug there must never turn a write that happened into an error.
-      try {
-        this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
-      } catch (error) {
-        console.error(`fieldtwin: couldn't queue webhooks for event ${recorded.seq}: ${(error as Error).stack ?? error}`);
-      }
-    }
+    if (!this.rebuilding) this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
     return recorded;
   }
 
@@ -116,7 +96,7 @@ export class Twin {
    */
   reconfigure(changes: Partial<Omit<TwinOptions, "vendors">>): void {
     const options = { ...this.options, ...changes };
-    const start = this.startOf(options);
+    const start = startingPoint(options);
     this.options = options;
     this.timeline.schedule([]); // the old scenario's schedule doesn't belong in the new world
     this.rebuild(start);
@@ -140,25 +120,14 @@ export class Twin {
 
   /** Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical log. */
   reset(): void {
-    this.rebuild(this.startOf(this.options));
-  }
-
-  /** The clock and world a twin with these options starts from. Building them is all that can fail. */
-  private startOf({ seed, startTime, worldSize, drift }: TwinOptions): { clock: TwinClock; world: World } {
-    return { clock: new TwinClock(startTime), world: generateWorld(streams.world(seed), { startTime, size: worldSize, drift }) };
+    this.rebuild(startingPoint(this.options));
   }
 
   private rebuild({ clock, world }: { clock: TwinClock; world: World }): void {
-    this.clock = clock;
-    this.log = new EventLog();
+    this.restart(clock, streams.faults(this.options.seed), []);
     this.world = world;
-    this.faultRandom = streams.faults(this.options.seed);
     this.faultRules = this.options.faults ?? [];
     this.checkpoints.clear();
-    this.bookkeeping.clearRateLimits();
-    this.webhooks.dropPending();
-    this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
-
     this.asHistory(() => {
       for (const vendor of this.vendors.values()) {
         for (const event of vendor.seed(this.world)) this.record(event, "seed");
@@ -166,6 +135,20 @@ export class Twin {
     });
     this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
     this.catchUp();
+  }
+
+  /**
+   * Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. Rate-limit
+   * budgets start full and pending deliveries are dropped, since they are bookkeeping about requests.
+   */
+  private restart(clock: TwinClock, faultRandom: FaultRandom, history: readonly TwinEvent[]): void {
+    this.clock = clock;
+    this.faultRandom = faultRandom;
+    this.log = new EventLog();
+    this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
+    for (const event of history) this.vendor(event.vendor).apply(this.state(event.vendor), this.log.append(event));
+    this.bookkeeping.clearRateLimits();
+    this.webhooks.dropPending();
   }
 
   /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
@@ -201,30 +184,16 @@ export class Twin {
     return this.checkpoints.all();
   }
 
-  getCheckpoint(name: string): Checkpoint {
-    return this.checkpoints.get(name);
-  }
-
   /** Everything recorded since a checkpoint. The answer to "what did my agent just do?" */
   changesSince(name: string): TwinEvent[] {
-    return this.log.after(this.getCheckpoint(name).seq);
+    return this.log.after(this.checkpoints.get(name).seq);
   }
 
   /** Go back to a checkpoint by replaying the log up to that point. The same requests then meet the same faults. */
   rewind(name: string): void {
-    const checkpoint = this.getCheckpoint(name);
-    const kept = this.log.all().slice(0, checkpoint.seq);
-
-    this.log = new EventLog();
-    this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
-    for (const event of kept) {
-      const replayed = this.log.append(event);
-      this.vendor(event.vendor).apply(this.state(event.vendor), replayed);
-    }
-    this.clock = new TwinClock(checkpoint.time);
-    this.faultRandom = copyFaultRandom(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
-    this.bookkeeping.clearRateLimits();
-    this.webhooks.dropPending();
+    const checkpoint = this.checkpoints.get(name);
+    const faultRandom = copyFaultRandom(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
+    this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
     this.timeline.rearmAfter(this.clock.nowMs());
     this.checkpoints.forgetAfter(checkpoint.seq);
   }

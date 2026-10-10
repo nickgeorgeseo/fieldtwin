@@ -27,8 +27,19 @@ export class WebhookDispatcher {
 
   constructor(private readonly send: WebhookSender) {}
 
-  /** Queue a delivery to every subscription that wants what this event announces. */
+  /**
+   * Queue a delivery to every subscription that wants what this event announces. Never throws: webhooks are
+   * bookkeeping, and a bug here must never turn a write that happened into an error.
+   */
   notice(event: TwinEvent, vendor: VendorTwin, state: unknown, nowMs: number): void {
+    try {
+      this.queueFor(event, vendor, state, nowMs);
+    } catch (error) {
+      console.error(`fieldtwin: couldn't queue webhooks for event ${event.seq}: ${(error as Error).stack ?? error}`);
+    }
+  }
+
+  private queueFor(event: TwinEvent, vendor: VendorTwin, state: unknown, nowMs: number): void {
     if (!vendor.webhooks) return;
     for (const announced of vendor.webhooks.notify(event, state)) {
       const notification = { ...announced, number: this.nextNumber++ };
