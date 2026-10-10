@@ -15,6 +15,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | `GET /customer/{id}` | Modeled | docs only | [Customer][qbo-customer] | |
 | `POST /customer` create | Modeled | docs only | [Customer][qbo-customer] | DisplayName derived from GivenName + FamilyName when missing |
 | `POST /customer` update with SyncToken | Modeled | docs only | [Customer][qbo-customer] | A stale SyncToken answers 5010 `Stale Object` |
+| `?operation=` on writes | Modeled | docs only | [REST features][qbo-rest] | `?operation=update`, as Intuit's SDKs send it, works like a body with an Id. Any other operation (`delete`, `void`) answers 500 `Unsupported operation` and changes nothing |
 | Sparse vs full update | Modeled | docs only | [Customer][qbo-customer] | Full update clears omitted writable fields |
 | Unique DisplayName | Approximate | docs only | [Error codes][qbo-errors] | Real QuickBooks checks across customers, vendors, and employees. Twin checks customers only. 6240 names the Id that has the name |
 | `GET /query` and `POST /query` | Approximate | docs only | [Queries][qbo-query] | `SELECT *` or `SELECT COUNT(*)` from Customer, Item, Invoice, or Payment; `WHERE` with `=`, `<`, `>`, `<=`, `>=`, `LIKE` (`%` the only wildcard), and `IN (...)`, joined by `AND`; `ORDERBY Property [ASC\|DESC], ...`; `STARTPOSITION`, `MAXRESULTS` (default 100, at most 1,000). Results are sorted before they are paged |

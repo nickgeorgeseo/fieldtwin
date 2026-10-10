@@ -92,3 +92,31 @@ describe("QuickBooks requestid", () => {
     expect(created(harness)).toEqual([]);
   });
 });
+
+describe("QuickBooks requestid, when the retry arrives before the first request's body", () => {
+  it("still writes once: the first request, its body uploaded last, gets the retry's answer", async () => {
+    const harness = setup();
+    const body = JSON.stringify({
+      CustomerRef: { value: "1" },
+      Line: [{ DetailType: "SalesItemLineDetail", Amount: 20, SalesItemLineDetail: { ItemRef: { value: "1" } } }],
+    });
+    let finishUpload = () => {};
+    const slowBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        finishUpload = () => {
+          controller.enqueue(new TextEncoder().encode(body));
+          controller.close();
+        };
+      },
+    });
+    const url = "/v3/company/9341000000000001/invoice?requestid=slow-upload-1";
+    const headers = { Authorization: "Bearer t", "Content-Type": "application/json" };
+    const first = harness.app.request(url, { method: "POST", headers, body: slowBody, duplex: "half" } as RequestInit);
+    const retry = await harness.app.request(url, { method: "POST", headers, body });
+    finishUpload();
+
+    const [firstAnswer, retryAnswer] = [await (await first).json(), await retry.json()];
+    expect(firstAnswer.Invoice.Id).toBe(retryAnswer.Invoice.Id);
+    expect(created(harness).filter((event) => event.type === "InvoiceCreated")).toHaveLength(1);
+  });
+});

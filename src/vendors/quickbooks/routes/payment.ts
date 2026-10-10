@@ -5,7 +5,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody } from "./entity.ts";
+import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody, writeKind } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
 /**
@@ -26,10 +26,10 @@ export function paymentRoutes(app: Hono, twin: Twin): void {
   app.post(`${COMPANY}/payment`, async (c) => {
     const body = await readEntityBody<QboPayment>(c, '{"CustomerRef": {"value": "1"}, "TotalAmt": 25}', now());
     if ("Fault" in body) return c.json(body, 400);
-    const operation = c.req.query("operation") ?? (body.Id ? "update" : undefined);
-    if (operation) {
-      return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Payment by the twin yet.`, now()), 400);
-    }
+    const kind = writeKind(c.req.query("operation"), body, "Payment", now());
+    if (typeof kind !== "string") return c.json(kind, 400);
+    if (kind === "update")
+      return c.json(qboErrors.unsupportedOperation("Operation update is not supported for Payment by the twin yet.", now()), 400);
     const checked = checkRequestId(c, state(), now());
     if ("answer" in checked) return checked.answer;
     const result = createPayment(twin, body, checked.requestId);

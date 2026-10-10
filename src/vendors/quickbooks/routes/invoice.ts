@@ -5,7 +5,17 @@ import { qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, readEntityBody, type UpdateBody } from "./entity.ts";
+import {
+  asResponse,
+  COMPANY,
+  checkSyncToken,
+  mergeUpdate,
+  nextVersion,
+  pickWritable,
+  readEntityBody,
+  type UpdateBody,
+  writeKind,
+} from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
 /** Invoice: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice */
@@ -21,15 +31,13 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
 
   // One POST endpoint for create and update; an Id in the body means update.
   app.post(`${COMPANY}/invoice`, async (c) => {
-    const operation = c.req.query("operation");
-    if (operation) {
-      return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Invoice by the twin yet.`, now()), 400);
-    }
-    const checked = checkRequestId(c, state(), now());
-    if ("answer" in checked) return checked.answer;
     const body = await readEntityBody<QboInvoice>(c, INVOICE_EXAMPLE, now());
     if ("Fault" in body) return c.json(body, 400);
-    const result = body.Id ? updateInvoice(twin, body, checked.requestId) : createInvoice(twin, body, checked.requestId);
+    const kind = writeKind(c.req.query("operation"), body, "Invoice", now());
+    if (typeof kind !== "string") return c.json(kind, 400);
+    const checked = checkRequestId(c, state(), now()); // after the body is read, so nothing writes in between
+    if ("answer" in checked) return checked.answer;
+    const result = kind === "update" ? updateInvoice(twin, body, checked.requestId) : createInvoice(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Invoice: asResponse(result), time: now() });
   });

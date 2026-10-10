@@ -21,6 +21,24 @@ export interface Versioned {
 /** What a client sends to update an entity: its Id, the SyncToken it last read, and `sparse`. */
 export type UpdateBody<T> = Partial<T> & { Id?: string; SyncToken?: string; sparse?: boolean };
 
+/**
+ * What a POST to an entity's one write endpoint asks for: a body with an Id updates (Intuit's SDKs also send
+ * `?operation=update`), one without creates. Any other `?operation=` (delete, void) is one the twin hasn't modeled,
+ * and must never fall through to an update.
+ */
+export function writeKind(
+  operation: string | undefined,
+  body: { Id?: unknown },
+  entity: string,
+  now: string,
+): "create" | "update" | QboFault {
+  if (operation !== undefined && operation !== "update") {
+    return qboErrors.unsupportedOperation(`Operation ${operation} is not supported for ${entity} by the twin yet.`, now);
+  }
+  if (operation === "update" && !body.Id) return qboErrors.missingField("Id", now);
+  return body.Id ? "update" : "create";
+}
+
 /** The JSON object a write sends, or the Fault for a body that isn't one. `example` shows the entity's shape. */
 export async function readEntityBody<T>(c: Context, example: string, now: string): Promise<UpdateBody<T> | QboFault> {
   const read = await readJsonObject(c, example);

@@ -3,7 +3,17 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, readEntityBody, type UpdateBody } from "./entity.ts";
+import {
+  asResponse,
+  COMPANY,
+  checkSyncToken,
+  mergeUpdate,
+  nextVersion,
+  pickWritable,
+  readEntityBody,
+  type UpdateBody,
+  writeKind,
+} from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
 /** Customer: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer */
@@ -19,11 +29,14 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 
   // QuickBooks uses one POST endpoint for both create and update. An Id in the body means update.
   app.post(`${COMPANY}/customer`, async (c) => {
-    const checked = checkRequestId(c, state(), now());
-    if ("answer" in checked) return checked.answer;
     const body = await readEntityBody<QboCustomer>(c, '{"DisplayName": "Ada Alder"}', now());
     if ("Fault" in body) return c.json(body, 400);
-    const result = body.Id ? updateCustomer(twin, body, checked.requestId) : createCustomer(twin, body, checked.requestId);
+    const kind = writeKind(c.req.query("operation"), body, "Customer", now());
+    if (typeof kind !== "string") return c.json(kind, 400);
+    // Only now, with the whole body read, is the requestid checked: nothing can write between the check and the write.
+    const checked = checkRequestId(c, state(), now());
+    if ("answer" in checked) return checked.answer;
+    const result = kind === "update" ? updateCustomer(twin, body, checked.requestId) : createCustomer(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Customer: asResponse(result), time: now() });
   });

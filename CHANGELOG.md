@@ -12,6 +12,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks: `POST /customer?operation=delete` was ignored and the body applied as a full update, wiping the customer's other fields. Operations the twin doesn't model now answer "Unsupported operation" and change nothing, for every entity. `?operation=update`, which Intuit's SDKs send on every update, now works for invoices as it did for customers.
+- QuickBooks: a write whose body was still uploading when its retry arrived could be made twice despite its `requestid`. The requestid is now checked after the body is read.
+
 - A request body the twin can't use gets the vendor's own error, with a 400 that says what was wrong, instead of a plain-text 500 "Internal Server Error": malformed JSON, a body that isn't an object, QuickBooks lines that aren't objects, Jobber `variables` sent as a string, a `redirect_uri` that isn't an absolute URL, and an OAuth token request that isn't form-encoded. Anything else the twin didn't expect answers a 500 in the vendor's format and is logged with its stack, so bugs in the twin are visible.
 
 - QuickBooks change data capture reads a `changedSince` without a UTC offset as UTC. It used the time zone of the machine running the twin, so the same request found different changes on different machines.
