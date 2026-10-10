@@ -1,4 +1,4 @@
-import { type RetryPolicy, withRetries } from "./retry.ts";
+import { RETRYABLE_STATUSES, type RetryPolicy, withRetries } from "./retry.ts";
 import { REQUEST_TIMEOUT_MS, type Runtime } from "./runtime.ts";
 
 /**
@@ -54,6 +54,14 @@ export class OAuthError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * The token endpoint couldn't be reached, or was down or throttling, even after retries. Unlike an OAuthError, the
+ * connection itself is fine: what needed a token fails for now and is tried again later.
+ */
+export class TokenEndpointError extends Error {
+  override name = "TokenEndpointError";
 }
 
 const TOKEN_RETRY: RetryPolicy = { maxAttempts: 4, baseDelayMs: 1000, maxDelayMs: 10_000 };
@@ -172,9 +180,20 @@ async function requestTokens(
   // answer is lost, a rotated refresh token is gone either way, and the retry's invalid_grant says to reconnect.
   const send = () =>
     runtime.fetch(oauth.tokenUrl, { method: "POST", headers, body: body.toString(), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  const response = await withRetries(send, TOKEN_RETRY, runtime, `OAuth ${form.grant_type}`);
+  let response: Response;
+  try {
+    response = await withRetries(send, TOKEN_RETRY, runtime, `OAuth ${form.grant_type}`);
+  } catch (error) {
+    // Already retried: wrapped, so an API client that retries network failures doesn't send it all round again.
+    throw new TokenEndpointError(`Couldn't reach the token endpoint (${(error as Error).message}). Try again later.`, { cause: error });
+  }
   const json = (await response.json().catch(() => ({}))) as Partial<Record<string, string | number>>;
 
+  // Only the endpoint saying no (a 4xx such as invalid_grant) means the connection is gone. Down, throttled, or an
+  // answer that isn't a token (a proxy's error page) is temporary.
+  if (typeof json.access_token !== "string" && (response.ok || RETRYABLE_STATUSES.has(response.status))) {
+    throw new TokenEndpointError(`The token endpoint answered HTTP ${response.status} without a token. Try again later.`);
+  }
   if (!response.ok || typeof json.access_token !== "string") {
     const code = typeof json.error === "string" ? json.error : undefined;
     const description = json.error_description ? ` (${json.error_description})` : "";

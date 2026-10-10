@@ -4,9 +4,10 @@ import type { JobberState } from "../../../src/vendors/jobber/types.ts";
 import type { QboState } from "../../../src/vendors/quickbooks/types.ts";
 import { InvoiceQueue } from "../src/invoice-queue.ts";
 import { fetchPaidInvoicesSince } from "../src/jobber-invoices.ts";
-import { OAuthError } from "../src/oauth.ts";
+import { OAuthError, TokenEndpointError, TokenManager } from "../src/oauth.ts";
+import { createQuickBooksClient } from "../src/quickbooks.ts";
 import { emptyStats, salesLineFor, syncPaidInvoices } from "../src/sync.ts";
-import { EVER, syncHarness } from "./harness.ts";
+import { ENDPOINTS, EVER, QUICKBOOKS_APP, syncHarness } from "./harness.ts";
 
 /**
  * What happens in production that a single clean run never shows: two syncs at once, a connection lost while
@@ -25,6 +26,32 @@ describe("two syncs at the same moment", () => {
     expect(docNumbers.length).toBe(new Set(docNumbers).size);
     const refs = [...qbo.payments.values()].map((payment) => payment.PaymentRefNum).filter(Boolean);
     expect(refs.length).toBe(new Set(refs).size);
+  });
+});
+
+describe("a token endpoint that is down", () => {
+  it("stops the scheduled run, since nothing else would work either, instead of failing every invoice in turn", async () => {
+    const target = createApp({ seed: 42, auth: "oauth" });
+    const harness = await syncHarness(target);
+    target.twin.advance(2 * 3_600_000); // the access tokens have expired
+    let tokenRequests = 0;
+    const runtime = {
+      ...harness.runtime,
+      fetch: async (url: string, init?: RequestInit) => {
+        if (url !== ENDPOINTS.quickbooks.tokenUrl) return harness.runtime.fetch(url, init);
+        tokenRequests++;
+        return new Response("Service Unavailable", { status: 503 }); // QuickBooks' token endpoint is down
+      },
+    };
+    const tokens = new TokenManager(
+      { ...QUICKBOOKS_APP, tokenUrl: ENDPOINTS.quickbooks.tokenUrl },
+      harness.quickbooksTokens.current,
+      runtime,
+    );
+    const quickbooks = createQuickBooksClient({ apiBase: ENDPOINTS.quickbooks.apiBase, realmId: harness.realmId, tokens, runtime });
+
+    await expect(syncPaidInvoices({ jobber: harness.jobber, quickbooks, log: () => {} }, EVER)).rejects.toBeInstanceOf(TokenEndpointError);
+    expect(tokenRequests).toBe(4); // one refresh, retried, for the first invoice; none for the rest
   });
 });
 

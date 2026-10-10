@@ -1,6 +1,6 @@
 import type { JobberClient } from "./jobber.ts";
 import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice, type JobberLineItem } from "./jobber-invoices.ts";
-import { OAuthError } from "./oauth.ts";
+import { OAuthError, TokenEndpointError } from "./oauth.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
 import * as books from "./quickbooks-entities.ts";
 import { ensureActive, ensureCustomer } from "./sync-customers.ts";
@@ -16,8 +16,8 @@ import { ensureActive, ensureCustomer } from "./sync-customers.ts";
  *   4. stamp the invoice's PrivateNote, so whoever reads the books can see where it came from.
  *
  * Every step looks before it writes, so a second run changes nothing and a run that died halfway is finished by
- * the next one. One invoice failing doesn't stop the others; a lost connection (OAuthError) does, since nothing
- * else would work either.
+ * the next one. One invoice failing doesn't stop the others; a lost connection (OAuthError) or a token endpoint that
+ * is down (TokenEndpointError) does, since nothing else would work either.
  */
 
 export interface SyncClients {
@@ -81,7 +81,7 @@ async function syncAll(clients: SyncClients, invoices: JobberInvoice[]): Promise
     try {
       await syncInvoice(invoice, context);
     } catch (error) {
-      if (error instanceof OAuthError) throw error;
+      if (error instanceof OAuthError || error instanceof TokenEndpointError) throw error;
       stats.failed++;
       clients.log(`Invoice #${invoice.invoiceNumber} not synced: ${error instanceof Error ? error.message : String(error)}`);
     }
