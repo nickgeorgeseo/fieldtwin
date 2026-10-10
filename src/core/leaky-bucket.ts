@@ -1,7 +1,7 @@
 /**
  * A leaky-bucket rate limit, measured in twin time: a budget of points that refills at a steady rate.
- * Jobber's query-cost limit is one (10,000 points, 500 per second). Any vendor limit of the form
- * "N per period" can use it too.
+ * Jobber's query-cost limit is one (10,000 points, 500 per second). A limit a vendor describes as "N per period,
+ * then wait" is a SlidingWindowLimit instead (sliding-window.ts).
  */
 export interface BucketLimits {
   capacity: number;

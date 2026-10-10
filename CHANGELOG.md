@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- QuickBooks' documented rate limit: 500 requests per minute per company, every app together, counted over a sliding minute of twin time. The 501st answers HTTP 429 (`ThrottleExceeded`) and nothing more gets through until 60 seconds after the burst, so waiting the documented 60 seconds is exactly enough and retrying sooner isn't. The 10-requests-per-second limit stays a fault rule, since twin time stands still between requests. `SlidingWindowLimit` (in `core/`) is the new kind of limit behind it.
 - QuickBooks webhooks: customers, invoices, and payments created or updated through the API are announced in Intuit's CloudEvents format (a JSON array of events with `type` like `qbo.invoice.updated.v1`, which is also what a subscription names), signed in `intuit-signature` with the subscription's `clientSecret` standing in for the app's verifier token. A payment also announces each invoice it pays. Apps have 3 seconds to answer HTTP 200; other answers are retried on Intuit's documented schedule (10s, 20s, 30s, 5m, 20m, 2h, 4h, then every 6h) in twin time. Each vendor now sets its own delivery policy (`VendorWebhooks.delivery`), and every notification gets a number that is never reused, so vendors can give each event an id that its redeliveries keep.
 - The sync example reacts to Jobber's webhooks: `jobberWebhookHandler` verifies the signature and answers at once, and an `InvoiceQueue` syncs each invoice a webhook names (`syncPaidInvoice`), folding repeats together. The demo has a third run that receives real webhooks over HTTP; `flaky-apis` sends Jobber webhooks twice and late.
 - Jobber webhooks (roadmap v0.2): `CLIENT_CREATE` and `INVOICE_UPDATE` in the documented payload, signed with `X-Jobber-Hmac-SHA256`, sent to the subscriptions set with `PUT /_twin/webhooks` (or the `twin_set_webhooks` MCP tool) after the request or clock advance that caused them. Paying an invoice fires `INVOICE_UPDATE` twice, a second apart, as documented; a delivery the app doesn't accept within a second is retried on twin time; `GET /_twin/webhooks` shows each delivery and how the app answered. Subscriptions survive reset and rewind; nothing is sent for the seeded world or rebuilt history. `VendorTwin` gains an optional `webhooks`.
@@ -17,6 +18,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- `twin.rateLimitBucket(key, limits)` is now `twin.rateLimit(key, create)`, so each vendor keeps the kind of limit its docs describe: Jobber a `LeakyBucket`, QuickBooks a `SlidingWindowLimit`.
 - Advancing the clock (`POST /_twin/clock/advance`, the MCP tool, `advanceClock()`) now resolves once the webhooks it caused have been delivered, so `advanceClock()` returns a promise.
 - `flaky-apis` also loses the answer to 15% of QuickBooks writes after making them (504), so retry logic has to be idempotent to pass it. The sync example sends a `requestid` with every write and settles to a clean run's books; its tests show a client without one making eight copies of an invoice.
 

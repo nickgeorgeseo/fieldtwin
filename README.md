@@ -57,6 +57,8 @@ Change only the base URL. Paths, headers, and body shapes match the real APIs.
 
 The QuickBooks twin serves one company, realm `9341000000000001`.
 
+Both twins enforce the vendors' documented rate limits, in twin time: Jobber's query-cost budget (10,000 points, refilling 500 a second) answers `THROTTLED`, and QuickBooks' 500 requests per minute per company answers HTTP 429 until a minute has passed. Advancing the clock lets them recover; a reset starts them full. Faults can add more throttling on top (see [Scenarios and faults](#scenarios-and-faults)).
+
 ## A worked example: Jobber to QuickBooks
 
 [`examples/sync-jobber-invoice-to-quickbooks`](examples/sync-jobber-invoice-to-quickbooks) is a reference integration written like production code. It books every paid Jobber invoice into QuickBooks (customer, invoice, payment), on a schedule and from Jobber's webhooks as customers pay, and handles everything the twins throw at it: 429s and 5xx with backoff, answers lost after a write, Jobber's query-cost throttle, expiring and rotating OAuth tokens, stale SyncTokens, customers spelled differently in each system, webhooks that come twice or late, and being run twice.

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { checkBearer } from "../../../core/auth.ts";
+import { SlidingWindowLimit } from "../../../core/sliding-window.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { QBO_OAUTH_POLICY, quickbooksOAuthRoutes } from "../oauth.ts";
@@ -33,6 +34,11 @@ export function quickbooksRoutes(twin: Twin): Hono {
     if (c.req.param("realmId") !== realmId()) {
       return c.json(qboErrors.wrongRealm(c.req.param("realmId") ?? "", realmId(), now()), 403);
     }
+    // "500 requests per minute per realm ID", whichever app sends them, and on a 429 "wait 60 seconds before
+    // retrying the request": https://developer.intuit.com/app/developer/qbo/docs/learn/limits-and-throttles
+    // A sliding minute makes waiting 60 seconds exactly enough, and retrying sooner not (see FIDELITY.md).
+    const limit = twin.rateLimit(`quickbooks:${realmId()}`, () => new SlidingWindowLimit(REQUESTS_PER_REALM));
+    if (!limit.take(twin.clock.nowMs())) return c.json(qboErrors.throttled(THROTTLED, now()), 429);
     await next();
   });
 
@@ -44,6 +50,9 @@ export function quickbooksRoutes(twin: Twin): Hono {
   cdcRoutes(app, twin);
   return app;
 }
+
+const REQUESTS_PER_REALM = { requests: 500, periodMs: 60_000 };
+const THROTTLED = "This company has had 500 requests in the last minute. Wait 60 seconds before retrying the request.";
 
 const AUTH_PROBLEMS = {
   missing: "Send an Authorization: Bearer <access token> header.",
