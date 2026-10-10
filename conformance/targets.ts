@@ -3,6 +3,22 @@ import type { Target } from "./case.ts";
 type Fetch = Target["fetch"];
 
 /**
+ * The twin FIELDTWIN_URL names, and the auth mode to put it back to after scoring. A trailing slash is fine; no
+ * answer, or an answer that isn't a twin's status, says what to do.
+ */
+export async function runningTwin(url: string, fetchImpl: Fetch = (to, init) => fetch(to, init)) {
+  const baseUrl = url.replace(/\/+$/, "");
+  const response = await fetchImpl(`${baseUrl}/_twin`).catch(() => {
+    throw new Error(`no twin answered at ${baseUrl}. Start one with npm start, or leave FIELDTWIN_URL unset to score a fresh twin.`);
+  });
+  const status = (await response.json().catch(() => undefined)) as { authMode?: unknown } | undefined;
+  if (!response.ok || typeof status?.authMode !== "string") {
+    throw new Error(`${baseUrl} answered GET /_twin with HTTP ${response.status}, so it isn't a fieldtwin. Check FIELDTWIN_URL.`);
+  }
+  return { baseUrl, authMode: status.authMode };
+}
+
+/**
  * A twin at baseUrl, reached over HTTP like any client. It is switched to real token checks (so the cases about
  * bad tokens mean something) and connected through its own OAuth endpoints, with no browser.
  *

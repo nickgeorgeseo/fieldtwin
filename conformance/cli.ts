@@ -7,7 +7,7 @@ import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording, readRecordings, writeRecording } from "./recordings.ts";
 import { observeAll, report } from "./run.ts";
-import { sandboxTarget, twinTarget } from "./targets.ts";
+import { runningTwin, sandboxTarget, twinTarget } from "./targets.ts";
 
 /**
  *   npm run conformance                   score a fresh twin of its own against the recordings: per case, per
@@ -29,11 +29,8 @@ async function score(): Promise<void> {
   }
 }
 
-async function scoreTwinAt(baseUrl: string): Promise<void> {
-  const status = await fetch(`${baseUrl}/_twin`).catch(() => {
-    throw new Error(`no twin answered at ${baseUrl}. Start one with npm start, or leave FIELDTWIN_URL unset to score a fresh twin.`);
-  });
-  const before = (await status.json()) as { authMode: string };
+async function scoreTwinAt(url: string): Promise<void> {
+  const { baseUrl, authMode } = await runningTwin(url);
   try {
     const target = await twinTarget(baseUrl);
     console.log(report(CASES, await observeAll(target, CASES), readRecordings()));
@@ -42,7 +39,7 @@ async function scoreTwinAt(baseUrl: string): Promise<void> {
     await fetch(`${baseUrl}/_twin/auth`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: before.authMode }),
+      body: JSON.stringify({ mode: authMode }),
     });
   }
 }

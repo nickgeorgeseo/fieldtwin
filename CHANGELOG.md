@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- `FIELDTWIN_URL=http://localhost:4010/ npm run conformance` works with the trailing slash, and something other than a twin answering there is named as such, instead of "Unexpected non-whitespace character after JSON".
+
 - The conformance recorder names the missing variable when only one of `QBO_ACCESS_TOKEN` and `QBO_REALM_ID` is set. It skipped QuickBooks without a word and recorded only Jobber.
 
 - The conformance recorder refuses production QuickBooks however its URL is written. `https://QuickBooks.api.intuit.com/v3`, or one with a user name before the host, got past the check.

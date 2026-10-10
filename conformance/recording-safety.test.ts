@@ -6,7 +6,7 @@ import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording } from "./recordings.ts";
 import type { Results } from "./run.ts";
-import { sandboxTarget } from "./targets.ts";
+import { runningTwin, sandboxTarget } from "./targets.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
@@ -151,5 +151,21 @@ describe("which vendors a recording covers", () => {
   it("names the missing variable when only part of QuickBooks' settings are given, instead of quietly skipping it", () => {
     expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", JOBBER_ACCESS_TOKEN: "j" })).toThrow("QBO_REALM_ID");
     expect(() => sandboxTarget({ QBO_REALM_ID: "1" })).toThrow("QBO_ACCESS_TOKEN");
+  });
+});
+
+describe("scoring a twin that is already running", () => {
+  const twinAnswering = (status: number, body: string) => async (url: string) =>
+    url === "http://localhost:4010/_twin" ? new Response(body, { status }) : new Response("Not Found", { status: 404 });
+
+  it("finds it at a FIELDTWIN_URL written with a trailing slash", async () => {
+    const twin = await runningTwin("http://localhost:4010/", twinAnswering(200, JSON.stringify({ authMode: "any-token" })));
+    expect(twin).toEqual({ baseUrl: "http://localhost:4010", authMode: "any-token" });
+  });
+
+  it("says so when something other than a twin answers there", async () => {
+    await expect(runningTwin("http://localhost:4010", twinAnswering(200, "<html>a dev server</html>"))).rejects.toThrow(
+      "isn't a fieldtwin",
+    );
   });
 });
