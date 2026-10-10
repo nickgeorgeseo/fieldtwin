@@ -146,3 +146,10 @@ describe("which QuickBooks company a recording may write to", () => {
     },
   );
 });
+
+describe("which vendors a recording covers", () => {
+  it("names the missing variable when only part of QuickBooks' settings are given, instead of quietly skipping it", () => {
+    expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", JOBBER_ACCESS_TOKEN: "j" })).toThrow("QBO_REALM_ID");
+    expect(() => sandboxTarget({ QBO_REALM_ID: "1" })).toThrow("QBO_ACCESS_TOKEN");
+  });
+});

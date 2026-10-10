@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- The conformance recorder names the missing variable when only one of `QBO_ACCESS_TOKEN` and `QBO_REALM_ID` is set. It skipped QuickBooks without a word and recorded only Jobber.
+
 - The conformance recorder refuses production QuickBooks however its URL is written. `https://QuickBooks.api.intuit.com/v3`, or one with a user name before the host, got past the check.
 
 - Conformance: `orderby-text-case` creates two customers of its own, named so that ignoring case and sorting by character code put them in opposite orders. It sorted the company's existing customers, which in most sandboxes sort the same either way, and whose answer changed once earlier runs had added lowercase names.

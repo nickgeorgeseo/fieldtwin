@@ -77,6 +77,10 @@ export const SANDBOX_DEFAULTS = {
 
 export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors: ("quickbooks" | "jobber")[] } {
   const vendors: ("quickbooks" | "jobber")[] = [];
+  if (Boolean(env.QBO_ACCESS_TOKEN) !== Boolean(env.QBO_REALM_ID)) {
+    const missing = env.QBO_ACCESS_TOKEN ? "QBO_REALM_ID (the sandbox company's id)" : "QBO_ACCESS_TOKEN";
+    throw new Error(`Set ${missing} too, to record QuickBooks, or neither, to record only Jobber.`);
+  }
   if (env.QBO_ACCESS_TOKEN && env.QBO_REALM_ID) vendors.push("quickbooks");
   if (env.JOBBER_ACCESS_TOKEN) vendors.push("jobber");
   if (!vendors.length) {
