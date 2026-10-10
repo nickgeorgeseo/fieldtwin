@@ -1,24 +1,6 @@
-import {
-  type DocumentNode,
-  type FieldNode,
-  type FragmentDefinitionNode,
-  type FragmentSpreadNode,
-  GraphQLIncludeDirective,
-  type GraphQLNamedType,
-  type GraphQLSchema,
-  GraphQLSkipDirective,
-  getDirectiveValues,
-  getNamedType,
-  getVariableValues,
-  type InlineFragmentNode,
-  isInterfaceType,
-  isObjectType,
-  Kind,
-  type OperationDefinitionNode,
-  type SelectionSetNode,
-  type ValueNode,
-} from "graphql";
+import type { DocumentNode, FieldNode, GraphQLNamedType, GraphQLSchema, SelectionSetNode } from "graphql";
 import { MAX_PAGE_SIZE } from "./resolvers/connection.ts";
+import { type Context, collectFields, fieldType, isConnection, operationOf, readInt, rootType } from "./selections.ts";
 
 /**
  * Jobber's query cost, exactly as documented:
@@ -42,19 +24,13 @@ export const COST_LIMITS = { capacity: 10_000, restorePerSecond: 500 };
 
 const PER_NODE_FIELDS = new Set(["nodes", "edges"]);
 
-interface Context {
-  schema: GraphQLSchema;
-  variables: Record<string, unknown>;
-  fragments: Map<string, FragmentDefinitionNode>;
-}
-
 export function requestedQueryCost(
   schema: GraphQLSchema,
   document: DocumentNode,
   variables: Record<string, unknown>,
   operationName?: string,
 ): number {
-  const { operation, context } = start(schema, document, variables, operationName);
+  const { operation, context } = operationOf(schema, document, variables, operationName);
   return operation ? selectionCost(operation.selectionSet, rootType(schema, operation), 1, context) : 0;
 }
 
@@ -65,7 +41,7 @@ export function actualQueryCost(
   data: unknown,
   operationName?: string,
 ): number {
-  const { operation, context } = start(schema, document, variables, operationName);
+  const { operation, context } = operationOf(schema, document, variables, operationName);
   return operation && data ? actualSelectionCost(operation.selectionSet, rootType(schema, operation), data, context) : 0;
 }
 
@@ -144,67 +120,4 @@ function actualFieldCost(field: FieldNode, parentType: GraphQLNamedType, value: 
 /** Plain lists (like Client.emails) are charged like a single object, matching the requested cost. */
 function firstItem(value: unknown): unknown {
   return Array.isArray(value) ? (value[0] ?? {}) : value;
-}
-
-// ---------------------------------------------------------------------------------------------------
-// shared helpers
-
-function start(schema: GraphQLSchema, document: DocumentNode, variables: Record<string, unknown>, operationName?: string) {
-  const fragments = new Map<string, FragmentDefinitionNode>();
-  let operation: OperationDefinitionNode | undefined;
-  for (const definition of document.definitions) {
-    if (definition.kind === Kind.FRAGMENT_DEFINITION) fragments.set(definition.name.value, definition);
-    if (definition.kind === Kind.OPERATION_DEFINITION && (!operationName || definition.name?.value === operationName)) {
-      operation ??= definition;
-    }
-  }
-  // The variables as execution will see them: declared defaults filled in. If they don't coerce, execution reports it.
-  const coerced = getVariableValues(schema, operation?.variableDefinitions ?? [], variables);
-  return { operation, context: { schema, variables: coerced.coerced ?? variables, fragments } };
-}
-
-function rootType(schema: GraphQLSchema, operation: OperationDefinitionNode): GraphQLNamedType {
-  const root = operation.operation === "mutation" ? schema.getMutationType() : schema.getQueryType();
-  if (!root) throw new Error(`The schema has no ${operation.operation} type`);
-  return root;
-}
-
-/** The fields of a selection set, with fragments and inline fragments flattened in and skipped selections left out. */
-function collectFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
-  const fields: FieldNode[] = [];
-  for (const selection of selectionSet.selections) {
-    if (!included(selection, context)) continue;
-    if (selection.kind === Kind.FIELD) fields.push(selection);
-    else if (selection.kind === Kind.INLINE_FRAGMENT) fields.push(...collectFields(selection.selectionSet, parentType, context));
-    else {
-      const fragment = context.fragments.get(selection.name.value);
-      if (fragment) fields.push(...collectFields(fragment.selectionSet, parentType, context));
-    }
-  }
-  return fields;
-}
-
-/** Whether `@skip(if: ...)` and `@include(if: ...)` keep a selection in the query. */
-function included(selection: FieldNode | InlineFragmentNode | FragmentSpreadNode, context: Context): boolean {
-  if (getDirectiveValues(GraphQLSkipDirective, selection, context.variables)?.if === true) return false;
-  return getDirectiveValues(GraphQLIncludeDirective, selection, context.variables)?.if !== false;
-}
-
-function fieldType(parentType: GraphQLNamedType, field: FieldNode): GraphQLNamedType | undefined {
-  if (!isObjectType(parentType) && !isInterfaceType(parentType)) return undefined;
-  const definition = parentType.getFields()[field.name.value];
-  return definition && getNamedType(definition.type);
-}
-
-function isConnection(type: GraphQLNamedType): boolean {
-  return type.name.endsWith("Connection");
-}
-
-function readInt(value: ValueNode, variables: Record<string, unknown>): number | undefined {
-  if (value.kind === Kind.INT) return Number(value.value);
-  if (value.kind === Kind.VARIABLE) {
-    const variable = variables[value.name.value];
-    return typeof variable === "number" ? variable : undefined;
-  }
-  return undefined;
 }
