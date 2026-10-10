@@ -70,3 +70,5 @@ If you change dependencies, regenerate the lockfile with npm 11 or newer (`npx n
 Include the seed, the scenario (if any), and the event log: `curl localhost:4010/_twin/log.jsonl > log.jsonl`. With those, anyone can replay your exact run.
 
 If the twin disagrees with the real API, that is a fidelity bug and the most valuable kind of report. Please include the docs link or a redacted real response, never real customer data.
+
+Security problems are different: report them privately, as [SECURITY.md](SECURITY.md) describes, not in a public issue.
