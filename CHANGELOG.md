@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- A webhook delivery on its way during a reset or rewind is forgotten. If it failed, it used to be queued again, and the next clock advance sent news about an invoice the reset had erased.
+
 - Twin time can't be pushed past what a date can hold. `POST /_twin/clock/advance {"minutes": 1e12}` used to leave the twin answering "Invalid time value" until a reset, and with a webhook retry pending it crashed the process. Advances are capped at ten years and webhook `delayMs` faults at a week. `twin_advance_clock` accepts 0, as the control plane does, to send the deliveries already due.
 - Webhooks can't break anything else: a failure while queueing one no longer turns a write that succeeded into a 500, and a delivery round that fails is logged instead of failing every round after it.
 

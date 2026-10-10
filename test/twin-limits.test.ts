@@ -86,3 +86,37 @@ describe("a twin built with an unusual start", () => {
     expect((await app.request("/_twin")).status).toBe(200);
   });
 });
+
+describe("a reset while a webhook is on its way", () => {
+  it("forgets the delivery: if it fails, it isn't tried again about a world that no longer exists", async () => {
+    const vendor = {
+      name: "jobber",
+      webhooks: {
+        topics: ["TOPIC"],
+        delivery: { answerWithinMs: 1000, accepts: (status: number) => status === 200, retryAfterMs: () => 10_000 },
+        notify: (event: TwinEvent) => [{ topic: "TOPIC", itemId: String(event.seq), occurredAtMs: 0 }],
+        request: () => ({ headers: {}, body: "{}" }),
+      },
+    } as unknown as VendorTwin;
+    let answer: (response: Response) => void = () => {};
+    let sent = 0;
+    const dispatcher = new WebhookDispatcher(() => {
+      sent++;
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    });
+    dispatcher.subscriptions = [{ vendor: "jobber", url: "http://app.example.com", topics: ["TOPIC"], clientId: "a", clientSecret: "b" }];
+
+    dispatcher.notice({ seq: 1 } as TwinEvent, vendor, {}, 0);
+    const round = dispatcher.deliverDue(0);
+    await vi.waitFor(() => expect(sent).toBe(1)); // on its way
+    dispatcher.dropPending(); // what reset and rewind do
+    answer(new Response(null, { status: 500 }));
+    await round;
+
+    await dispatcher.deliverDue(60_000); // long after the retry would have been due
+    expect(sent).toBe(1);
+    expect(dispatcher.deliveries()).toEqual([]);
+  });
+});

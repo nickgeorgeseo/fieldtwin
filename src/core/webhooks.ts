@@ -98,6 +98,7 @@ export class WebhookDispatcher {
   private nextId = 1;
   private nextNumber = 1;
   private running: Promise<void> = Promise.resolve();
+  private generation = 0; // bumped by dropPending(), so a delivery already on its way when the world changed is forgotten
 
   constructor(private readonly send: WebhookSender) {}
 
@@ -157,19 +158,22 @@ export class WebhookDispatcher {
     return this.recent.map(({ dueMs: _dueMs, request: _request, policy: _policy, ...delivery }) => ({ ...delivery }));
   }
 
-  /** Forget deliveries not yet made: the events behind them were reset or rewound away. */
+  /** Forget deliveries not yet made, and any on their way: the events behind them were reset or rewound away. */
   dropPending(): void {
+    this.generation++;
     this.queue = [];
     this.recent = this.recent.filter((delivery) => delivery.status !== "pending");
   }
 
   private async sendDue(nowMs: number): Promise<void> {
+    const generation = this.generation;
     for (;;) {
       const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id)[0];
       if (!due) return;
       this.queue = this.queue.filter((delivery) => delivery !== due);
       due.attempts++;
       const { answer, accepted } = await this.attempt(due);
+      if (this.generation !== generation) return; // reset or rewound while it was on its way: neither retry nor go on
       due.lastAnswer = answer;
       const retryAfterMs = accepted ? null : due.policy.retryAfterMs(due.attempts);
       if (accepted) {
