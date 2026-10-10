@@ -13,16 +13,24 @@ type Env = Record<string, string | undefined>;
  * any URL, so it should only be reachable from the network when someone asks for that.
  */
 export function listenOn(env: Env) {
-  return { hostname: env.FIELDTWIN_HOST ?? "127.0.0.1", port: wholeNumber(env, "FIELDTWIN_PORT", "a port number", 4010) };
+  return { hostname: setting(env, "FIELDTWIN_HOST") ?? "127.0.0.1", port: wholeNumber(env, "FIELDTWIN_PORT", "a port number", 4010) };
 }
 
 /** The twin's seed (the same seed builds the same world) and auth mode, from the environment. */
 export function settingsFrom(env: Env) {
-  return { seed: wholeNumber(env, "FIELDTWIN_SEED", "a whole number", 42), auth: parseAuthMode(env.FIELDTWIN_AUTH ?? "any-token") };
+  return {
+    seed: wholeNumber(env, "FIELDTWIN_SEED", "a whole number", 42),
+    auth: parseAuthMode(setting(env, "FIELDTWIN_AUTH") ?? "any-token"),
+  };
+}
+
+/** A setting's value, or undefined if it is unset or empty: a compose file passes on a variable nobody set as "". */
+function setting(env: Env, name: string): string | undefined {
+  return env[name]?.trim() || undefined;
 }
 
 function wholeNumber(env: Env, name: string, description: string, fallback: number): number {
-  const text = env[name];
+  const text = setting(env, name);
   if (text === undefined) return fallback;
   if (!/^\d+$/.test(text)) throw new Error(`${name} must be ${description} like ${fallback}, not "${text}"`);
   return Number(text);

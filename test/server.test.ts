@@ -27,6 +27,11 @@ describe("the server", () => {
     expect(addressOf("192.168.1.20", 4010)).toEqual({ url: "http://192.168.1.20:4010", reachableByOthers: true });
   });
 
+  it("treats a setting left empty as unset, the way a compose file passes on a variable nobody set", () => {
+    expect(listenOn({ FIELDTWIN_HOST: "", FIELDTWIN_PORT: "" })).toEqual({ hostname: "127.0.0.1", port: 4010 });
+    expect(settingsFrom({ FIELDTWIN_SEED: "", FIELDTWIN_AUTH: "" })).toEqual({ seed: 42, auth: "any-token" });
+  });
+
   it("says what a port looks like when FIELDTWIN_PORT isn't one", () => {
     expect(() => listenOn({ FIELDTWIN_PORT: "four thousand" })).toThrow(
       'FIELDTWIN_PORT must be a port number like 4010, not "four thousand"',
