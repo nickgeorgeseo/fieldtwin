@@ -8,7 +8,7 @@ import { jobber, quickbooks, type Target } from "./case.ts";
 export async function checkTokens(target: Target, vendors: ("quickbooks" | "jobber")[]): Promise<void> {
   if (vendors.includes("quickbooks")) {
     const { status } = await reach(
-      quickbooks(target, "GET", `companyinfo/${target.quickbooks.realmId}`),
+      quickbooks(target, "GET", `companyinfo/${target.quickbooks.realmId}`, undefined, { anyAnswer: true }),
       "QuickBooks",
       target.quickbooks.apiBase,
     );
@@ -24,7 +24,7 @@ export async function checkTokens(target: Target, vendors: ("quickbooks" | "jobb
     }
   }
   if (vendors.includes("jobber")) {
-    const answer = await reach(jobber(target, "{ account { id } }"), "Jobber", target.jobber.apiUrl);
+    const answer = await reach(jobber(target, "{ account { id } }", { anyAnswer: true }), "Jobber", target.jobber.apiUrl);
     if (answer.status === 401 || answer.status === 403) {
       throw new Error(`Jobber refused JOBBER_ACCESS_TOKEN (HTTP ${answer.status}). Access tokens last an hour: get a fresh one.`);
     }

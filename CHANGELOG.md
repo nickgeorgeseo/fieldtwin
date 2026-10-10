@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Conformance recorder: an answer that says nothing about the API is never recorded. A 429, 502, 503, or 504, Jobber's `THROTTLED`, or a 401 for the run's own token (expired part way) stops the case instead of being saved as evidence. A case that couldn't run keeps what it observed last time, where the whole file used to be replaced with this run's cases only; the recorder then exits with an error, and writes each file whole or not at all.
+
 - `npm run conformance:record --dry-run`, without the `--`, is a dry run. npm keeps a flag given that way for itself, so it recorded for real and overwrote the recordings. A misspelled command or option is refused instead of running a score.
 
 - Reference integration: a `Retry-After` asking for more than ten minutes fails the request at once instead of being waited out, so a server that answers `Retry-After: 86400` (or a date years away) can't hold the webhook queue for a day.

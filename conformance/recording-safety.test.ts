@@ -4,6 +4,8 @@ import { caseId, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
+import { nextRecording } from "./recordings.ts";
+import type { Results } from "./run.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
@@ -49,6 +51,54 @@ describe("recording against a sandbox", () => {
   it("doesn't record the padding of ids from a testing account with no clients, which would never match", async () => {
     const encodedIds = CASES.find((testCase) => caseId(testCase) === "jobber/encoded-id-format")!;
     await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [] } } }))).rejects.toThrow("no clients");
+  });
+});
+
+describe("answers that are never evidence", () => {
+  const readMissing = CASES.find((testCase) => caseId(testCase) === "quickbooks/read-missing-entity")!;
+  const jobberSyntax = CASES.find((testCase) => caseId(testCase) === "jobber/syntax-error")!;
+
+  it.each([429, 502, 503, 504])(
+    "stop a case when the sandbox answers HTTP %i, throttling or down, rather than record it",
+    async (status) => {
+      await expect(readMissing.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
+      await expect(jobberSyntax.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
+    },
+  );
+
+  it("stop a case when Jobber says it is throttling, which it answers with HTTP 200", async () => {
+    const throttled = { errors: [{ message: "Throttled", extensions: { code: "THROTTLED" } }] };
+    await expect(jobberSyntax.observe(sandboxAnswering(200, throttled))).rejects.toThrow("throttling");
+  });
+
+  it("stop a case when the run's own token stops working part way, but not one that sends a bad token on purpose", async () => {
+    await expect(readMissing.observe(sandboxAnswering(401))).rejects.toThrow("get a fresh one");
+    const badToken = CASES.find((testCase) => caseId(testCase) === "quickbooks/unknown-access-token")!;
+    await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
+  });
+});
+
+describe("a recording run's results", () => {
+  const quickbooksCases = CASES.filter((testCase) => testCase.vendor === "quickbooks").slice(0, 3);
+  const [first, second, third] = quickbooksCases.map((testCase) => testCase.name);
+  const earlier = { recordedAt: "2026-10-01T00:00:00Z", target: "sandbox", cases: { [first!]: { status: 1 }, [second!]: { status: 2 } } };
+
+  it("keep what a case observed last time when it couldn't run this time, so one bad run can't erase evidence", () => {
+    const results: Results = {
+      [`quickbooks/${first}`]: { status: 10 },
+      [`quickbooks/${second}`]: { error: "QuickBooks answered HTTP 503" },
+      [`quickbooks/${third}`]: { error: "QuickBooks answered HTTP 503" },
+    };
+    const next = nextRecording(earlier, quickbooksCases, results, "2026-10-12T00:00:00Z", "sandbox");
+    expect(next.recording.cases).toEqual({ [first!]: { status: 10 }, [second!]: { status: 2 } });
+    expect(next.kept).toEqual([second]);
+    expect(next.missing).toEqual([third]);
+  });
+
+  it("drop cases that no longer exist", () => {
+    const stale = { ...earlier, cases: { ...earlier.cases, "a-case-since-removed": { status: 3 } } };
+    const next = nextRecording(stale, quickbooksCases, {}, "2026-10-12T00:00:00Z", "sandbox");
+    expect(Object.keys(next.recording.cases)).not.toContain("a-case-since-removed");
   });
 });
 

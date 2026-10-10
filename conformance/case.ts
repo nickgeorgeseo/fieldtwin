@@ -38,13 +38,34 @@ export interface Answer {
   body: any;
 }
 
+/** What a request may ask for besides the target's own settings. */
+interface RequestOptions {
+  token?: string; // instead of the target's, for the cases about bad tokens
+  anyAnswer?: boolean; // return even an answer that is never evidence (preflight reports those itself)
+}
+
+/**
+ * An answer no case may observe: the vendor was throttling or down, or stopped accepting the run's own token (they
+ * last an hour). It says nothing about the API, so the case stops, and a recording keeps what it observed last time.
+ */
+function refuseUnrecordable(vendor: string, answer: Answer, ownToken: boolean): void {
+  const throttled = answer.status === 429 || answer.body?.errors?.[0]?.extensions?.code === "THROTTLED";
+  if (throttled || [502, 503, 504].includes(answer.status)) {
+    const what = throttled ? "that it is throttling" : `HTTP ${answer.status}`;
+    throw new Error(`${vendor} answered ${what}, which says nothing about the API: try again later`);
+  }
+  if (answer.status === 401 && ownToken) {
+    throw new Error(`${vendor} stopped accepting the access token (HTTP 401). Tokens last an hour: get a fresh one`);
+  }
+}
+
 /** A QuickBooks request. `realmId` and `token` override the target's, for the cases about wrong ones. */
 export async function quickbooks(
   target: Target,
   method: "GET" | "POST",
   path: string,
   body?: unknown,
-  options: { realmId?: string; token?: string } = {},
+  options: RequestOptions & { realmId?: string } = {},
 ): Promise<Answer> {
   const { apiBase, realmId, accessToken } = target.quickbooks;
   const response = await target.fetch(`${apiBase}/company/${options.realmId ?? realmId}/${path}`, {
@@ -56,7 +77,9 @@ export async function quickbooks(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: response.status, body: await response.json().catch(() => null) };
+  const answer = { status: response.status, body: await response.json().catch(() => null) };
+  if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, options.token === undefined);
+  return answer;
 }
 
 /** A QuickBooks query, by statement. */
@@ -68,7 +91,7 @@ export function quickbooksQuery(target: Target, statement: string): Promise<Answ
 export async function jobber(
   target: Target,
   query: string,
-  options: { variables?: Record<string, unknown>; version?: string | null; token?: string } = {},
+  options: RequestOptions & { variables?: Record<string, unknown>; version?: string | null } = {},
 ): Promise<Answer> {
   const version = options.version === undefined ? "2025-04-16" : options.version;
   const response = await target.fetch(target.jobber.apiUrl, {
@@ -80,7 +103,9 @@ export async function jobber(
     },
     body: JSON.stringify({ query, variables: options.variables ?? {} }),
   });
-  return { status: response.status, body: await response.json().catch(() => null) };
+  const answer = { status: response.status, body: await response.json().catch(() => null) };
+  if (!options.anyAnswer) refuseUnrecordable("Jobber", answer, options.token === undefined);
+  return answer;
 }
 
 /**

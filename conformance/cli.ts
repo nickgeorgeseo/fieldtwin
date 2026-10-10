@@ -5,7 +5,7 @@ import { caseId } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
-import { readRecordings, writeRecording } from "./recordings.ts";
+import { nextRecording, readRecordings, writeRecording } from "./recordings.ts";
 import { observeAll, report } from "./run.ts";
 import { sandboxTarget, twinTarget } from "./targets.ts";
 
@@ -59,21 +59,23 @@ async function record(dryRun: boolean): Promise<void> {
   if (writes.length) console.log(`These create records named "fieldtwin conformance ..." in the sandbox: ${writes.join(", ")}.`);
 
   const results = await observeAll(target, cases);
+  const earlier = readRecordings();
+  let incomplete = false;
   for (const vendor of vendors) {
-    const recorded: Record<string, Record<string, unknown>> = {};
-    for (const testCase of cases.filter((candidate) => candidate.vendor === vendor)) {
+    const vendorCases = cases.filter((candidate) => candidate.vendor === vendor);
+    for (const testCase of vendorCases) {
       const result = results[caseId(testCase)]!;
-      if ("error" in result) console.log(`  ${caseId(testCase)} couldn't run, so it isn't recorded: ${result.error}`);
-      else recorded[testCase.name] = result;
+      if ("error" in result) console.log(`  ${caseId(testCase)} couldn't run: ${result.error}`);
     }
-    const recording = {
-      recordedAt: new Date().toISOString(),
-      target: vendor === "quickbooks" ? "QuickBooks Online sandbox company" : "Jobber developer testing account",
-      cases: recorded as Record<string, never>,
-    };
+    const name = vendor === "quickbooks" ? "QuickBooks Online sandbox company" : "Jobber developer testing account";
+    const { recording, kept, missing } = nextRecording(earlier[vendor], vendorCases, results, new Date().toISOString(), name);
+    if (kept.length) console.log(`  Kept the earlier recording of ${kept.join(", ")}.`);
+    if (missing.length) console.log(`  Not recorded: ${missing.join(", ")}.`);
+    incomplete ||= kept.length + missing.length > 0;
     if (dryRun) console.log(JSON.stringify(recording, null, 2));
-    else console.log(`Saved ${Object.keys(recorded).length} cases to ${writeRecording(vendor, recording)}`);
+    else console.log(`Saved ${Object.keys(recording.cases).length} cases to ${writeRecording(vendor, recording)}`);
   }
+  if (incomplete) throw new Error("some cases couldn't run (above). Fix what they say and record again.");
 }
 
 /** A twin of this checkout's own on a free port, so scoring never changes yours. Stopped once the score is printed. */
