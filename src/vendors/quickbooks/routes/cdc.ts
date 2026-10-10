@@ -35,14 +35,12 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
     }
 
     const entities: QboEntityName[] = [];
-    for (const name of entityList.split(",")) {
+    for (const name of entityList.split(",").filter((name) => name.trim())) {
       const entity = entityNamed(name);
       if (!entity) {
+        const supported = Object.keys(ENTITY_RECORDS).join(", ");
         return c.json(
-          qboErrors.unsupportedOperation(
-            `The twin can't capture changes for ${name.trim()}. Supported: Customer, Item, Invoice, Payment`,
-            now(),
-          ),
+          qboErrors.unsupportedOperation(`The twin can't capture changes for ${name.trim()}. Supported: ${supported}`, now()),
           400,
         );
       }

@@ -48,8 +48,17 @@ export function quickbooksRoutes(twin: Twin): Hono {
   paymentRoutes(app, twin);
   queryRoutes(app, twin);
   cdcRoutes(app, twin);
+
+  // Anything else under the company is an entity or report the twin doesn't model yet: say so in QuickBooks' format.
+  app.all(`${COMPANY}/*`, (c) => {
+    const [, , , , what = ""] = c.req.path.split("/"); // /v3/company/{realmId}/{what}/...
+    const detail = `The twin doesn't model ${c.req.method} ${what} yet. It serves ${SERVED}.`;
+    return c.json(qboErrors.unsupportedOperation(detail, now()), 400);
+  });
   return app;
 }
+
+const SERVED = "customer, item, invoice, payment (by Id and through query), query, and cdc; see FIDELITY.md";
 
 const REQUESTS_PER_REALM = { requests: 500, periodMs: 60_000 };
 const THROTTLED = "This company has had 500 requests in the last minute. Wait 60 seconds before retrying the request.";

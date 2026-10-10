@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks paths the twin doesn't model (`/vendor/1`, `/estimate`, `/reports/...`) answer a Fault saying so, with what the twin serves, instead of a plain-text 404 an SDK can't parse.
+
 - QuickBooks amounts: an amount sent as a numeric string (`"93.00"`, as python-quickbooks sends decimals) is accepted instead of answering "Required parameter Line.Amount is missing". Fractions of a cent, and amounts too big to add up, answer 2140 Invalid Amount; they used to be stored as sent while totals were kept in rounded cents, so lines and totals disagreed, and a 1e307 line made `TotalAmt` null. Qty × UnitPrice is checked to the cent with decimal-correct rounding, so 2.5 × 33.33 = 83.33 is no longer refused with 6070.
 
 - A webhook delivery on its way during a reset or rewind is forgotten. If it failed, it used to be queued again, and the next clock advance sent news about an invoice the reset had erased.

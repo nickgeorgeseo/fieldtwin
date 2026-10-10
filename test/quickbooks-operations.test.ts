@@ -49,3 +49,27 @@ describe("QuickBooks twin: ?operation= on writes", () => {
     }
   });
 });
+
+describe("QuickBooks twin: entities it doesn't model", () => {
+  it.each([
+    ["GET", "/vendor/1"],
+    ["POST", "/estimate"],
+    ["GET", "/reports/ProfitAndLoss"],
+  ])("answers %s %s with a Fault naming what the twin serves, not a plain-text 404", async (method, path) => {
+    const harness = setup();
+    const response =
+      method === "GET" ? await harness.qboGet(path) : await harness.qboPost(path, { CustomerRef: { value: "1" }, Line: [sale(10)] });
+    expect(response.status).toBe(400);
+    const error = (await response.json()).Fault.Error[0];
+    expect(error).toMatchObject({ code: "500", Message: "Unsupported operation" });
+    expect(error.Detail).toContain(path.split("/")[1]);
+    expect(error.Detail).toContain("customer, item, invoice, payment");
+  });
+});
+
+describe("QuickBooks twin: change data capture's entity list", () => {
+  it("ignores an empty name left by a trailing comma", async () => {
+    const response = await setup().qboGet("/cdc?entities=Customer,&changedSince=2026-07-13T10:00:00Z");
+    expect(response.status).toBe(200);
+  });
+});
