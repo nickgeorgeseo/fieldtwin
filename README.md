@@ -6,7 +6,7 @@ Point your integration, script, or AI agent at `http://localhost:4010` instead o
 
 Nothing touches a real customer's account. Every run starts from the same seed, so a bug you hit once you can hit again.
 
-> Status: v0.1. QuickBooks Online customers, items, invoices, payments, queries, and change data capture; Jobber clients, jobs, visits, quotes, invoices, users, and `clientCreate`; both vendors' OAuth 2.0 flows; scenarios with timelines and drifted books; and a [reference integration](#a-worked-example-jobber-to-quickbooks) that syncs one into the other. [FIDELITY.md](FIDELITY.md) says exactly what is modeled, and how closely.
+> Status: v0.2. QuickBooks Online customers, items, invoices, payments, queries, change data capture, idempotent writes (`requestid`), and its documented rate limit; Jobber clients, jobs, visits, quotes, invoices, users, and `clientCreate`; webhooks from both, signed and retried the vendor's way; both vendors' OAuth 2.0 flows; faults for requests and webhook deliveries; scenarios with timelines and drifted books; a [conformance suite](conformance/README.md) waiting for its first sandbox recordings; and a [reference integration](#a-worked-example-jobber-to-quickbooks) that syncs one into the other. [FIDELITY.md](FIDELITY.md) says exactly what is modeled, and how closely.
 
 ## Why this exists
 
