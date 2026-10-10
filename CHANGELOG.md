@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- The conformance score compares observations the way the test does. It ignored observations only the twin made and counted a recorded `null` as matching one the twin didn't make, so a case could read "matches" in the score while failing `npm test`.
+
 - `FIELDTWIN_URL=http://localhost:4010/ npm run conformance` works with the trailing slash, and something other than a twin answering there is named as such, instead of "Unexpected non-whitespace character after JSON".
 
 - The conformance recorder names the missing variable when only one of `QBO_ACCESS_TOKEN` and `QBO_REALM_ID` is set. It skipped QuickBooks without a word and recorded only Jobber.

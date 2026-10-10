@@ -130,7 +130,12 @@ describe("the conformance score", () => {
   });
 
   it("counts an observation the twin doesn't make as a difference", () => {
-    expect(compare({ a: 1, b: 2 }, { a: 1 })).toMatchObject({ matched: 1, total: 2, differences: [{ key: "b", recorded: 2, twin: null }] });
+    expect(compare({ a: 1, b: 2 }, { a: 1 })).toMatchObject({ matched: 1, total: 2, differences: [{ key: "b", recorded: 2 }] });
+  });
+
+  it("counts what only the twin observes, and tells a recorded null from nothing at all, as the test does", () => {
+    expect(compare({ a: 1 }, { a: 1, b: 2 })).toMatchObject({ matched: 1, total: 2, differences: [{ key: "b", twin: 2 }] });
+    expect(compare({ a: null }, {})).toMatchObject({ matched: 0, total: 1 });
   });
 });
 
@@ -141,7 +146,10 @@ describe("the twin against recordings of the real APIs", () => {
     if (!recorded) {
       it.todo(`${title} (not recorded yet)`);
     } else {
-      it(`${title} matches what the real API did`, () => expect(observed[caseId(testCase)]).toEqual(recorded));
+      it(`${title} matches what the real API did`, () => {
+        const twin = observed[caseId(testCase)]!;
+        expect("error" in twin ? twin : compare(recorded, twin).differences).toEqual([]);
+      });
     }
   }
 });

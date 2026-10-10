@@ -19,17 +19,21 @@ export async function observeAll(target: Target, cases: ConformanceCase[]): Prom
 export interface Comparison {
   matched: number;
   total: number;
-  differences: { key: string; recorded: Observation; twin: Observation }[];
+  differences: { key: string; recorded?: Observation; twin?: Observation }[]; // undefined: not observed at all
 }
 
-/** How many of the recorded observations the twin makes too, and the ones it doesn't. */
+/**
+ * How many observations the recording and the twin agree on, out of every one either made, and the ones they don't.
+ * An observation only one side made is a difference, and so is null against nothing: a case that has grown an
+ * observation since it was recorded needs recording again.
+ */
 export function compare(recorded: Observations, twin: Observations): Comparison {
   const differences: Comparison["differences"] = [];
-  for (const [key, value] of Object.entries(recorded)) {
-    if (JSON.stringify(twin[key] ?? null) !== JSON.stringify(value)) differences.push({ key, recorded: value, twin: twin[key] ?? null });
+  const keys = [...new Set([...Object.keys(recorded), ...Object.keys(twin)])];
+  for (const key of keys) {
+    if (JSON.stringify(recorded[key]) !== JSON.stringify(twin[key])) differences.push({ key, recorded: recorded[key], twin: twin[key] });
   }
-  const total = Object.keys(recorded).length;
-  return { matched: total - differences.length, total, differences };
+  return { matched: keys.length - differences.length, total: keys.length, differences };
 }
 
 /**
@@ -60,9 +64,7 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
     if ("error" in observed) lines.push(`${label} 0/${result.total}  the twin couldn't run it: ${observed.error}`);
     else lines.push(`${label} ${result.matched}/${result.total}${result.differences.length ? "" : "  matches"}`);
     for (const { key, recorded: real, twin: ours } of result.differences) {
-      lines.push(
-        `${" ".repeat(46)}${key}: real ${JSON.stringify(real)}, twin ${JSON.stringify(ours)}   (FIDELITY.md: ${testCase.fidelity})`,
-      );
+      lines.push(`${" ".repeat(46)}${key}: real ${shown(real)}, twin ${shown(ours)}   (FIDELITY.md: ${testCase.fidelity})`);
     }
   }
 
@@ -70,6 +72,10 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
   for (const [endpoint, score] of byEndpoint) lines.push(`  ${endpoint.padEnd(34)} ${percent(score)}`);
   lines.push("", `Fidelity: ${total ? percent({ matched, total }) : "nothing recorded yet. Run npm run conformance:record."}`);
   return lines.join("\n");
+}
+
+function shown(observation: Observation | undefined): string {
+  return observation === undefined ? "nothing" : JSON.stringify(observation);
 }
 
 /** Rounded down, so nothing short of every observation reads as 100%. */
