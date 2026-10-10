@@ -2,6 +2,12 @@
 
 All notable changes to fieldtwin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Security
+
+- The twin listens on 127.0.0.1 by default instead of every network interface. It accepts any token by default, its control plane has no auth, and a webhook subscription makes it POST to any URL, so on a shared network anyone could control it or use it to reach addresses inside yours. `FIELDTWIN_HOST` (`0.0.0.0` in a container) opens it up again, with a warning at startup.
+
 ## 0.2.0 - 2026-10-09
 
 The twins start talking back: webhooks from both vendors, signed and retried the way each one does it, with faults that deliver them twice or late. QuickBooks writes become safe to retry with `requestid`, and a new fault loses answers after the work is done to prove it. QuickBooks enforces its own rate limit, Jobber pages backwards, the reference integration reacts to webhooks, and a conformance suite stands ready to turn the twins' guesses into evidence against real sandboxes.

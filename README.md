@@ -29,6 +29,8 @@ fieldtwin: Rowntree Electric is open for business at http://localhost:4010
 fieldtwin: auth is any-token: ANY Bearer token is accepted. Set FIELDTWIN_AUTH=oauth for real OAuth checks.
 ```
 
+The twin listens on this machine only (127.0.0.1). `FIELDTWIN_PORT` changes the port. To reach it from a container or another machine, set `FIELDTWIN_HOST=0.0.0.0`, but only on a network you trust: anyone who can reach it can control it.
+
 Read a customer from the QuickBooks twin (by default any bearer token works; see [Authentication](#authentication)):
 
 ```bash
