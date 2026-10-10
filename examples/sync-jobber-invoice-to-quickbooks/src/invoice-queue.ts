@@ -18,10 +18,11 @@ import type { JobberWebhookEvent } from "./webhooks.ts";
  * In production this is a job queue (a database table, SQS, BullMQ); in memory is enough for the demo and tests.
  */
 const MAX_TRIES = 3;
+const REMEMBERED = 10_000; // synced invoice ids kept to count distinct ones, so a long-running server stays small
 
 export class InvoiceQueue {
-  readonly totals: SyncStats = emptyStats(); // `invoices` counts distinct paid invoices, however often each was synced
-  private synced = new Set<string>();
+  readonly totals: SyncStats = emptyStats(); // `invoices` counts distinct paid invoices (of the latest 10,000), not syncs
+  private synced = new Set<string>(); // the latest REMEMBERED, oldest first
   private waiting = new Map<string, number>(); // invoice id -> tries so far, in the order the news came
   private draining: Promise<void> = Promise.resolve();
   /** Why the queue stopped, if it has: nothing is tried until resume(). */
@@ -75,8 +76,11 @@ export class InvoiceQueue {
         this.log(`Invoice ${invoiceId} from a webhook: ${error instanceof Error ? error.message : String(error)}`);
       }
       for (const key of Object.keys(this.totals) as (keyof SyncStats)[]) if (key !== "invoices") this.totals[key] += stats[key];
-      if (stats.invoices > 0) this.synced.add(invoiceId);
-      this.totals.invoices = this.synced.size;
+      if (stats.invoices > 0 && !this.synced.has(invoiceId)) {
+        this.totals.invoices++;
+        this.synced.add(invoiceId);
+        if (this.synced.size > REMEMBERED) this.synced.delete(this.synced.values().next().value!);
+      }
       if (stats.failed > 0 && tries + 1 < MAX_TRIES) this.waiting.set(invoiceId, tries + 1);
     }
   }
