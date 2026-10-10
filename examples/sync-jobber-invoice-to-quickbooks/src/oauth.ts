@@ -115,10 +115,13 @@ export class TokenManager {
     }
   }
 
-  /** The saved tokens, adopted, if another process has saved a different set since this one last looked. */
+  /**
+   * The saved tokens, adopted, if another process has saved a newer set: one that expires later than this one's. An
+   * older saved set is never taken over the one in hand: if a save failed, the saved refresh token is already dead.
+   */
   private async newerSavedTokens(): Promise<Tokens | undefined> {
     const saved = await this.options.loadTokens?.();
-    if (!saved || saved.refreshToken === this.tokens.refreshToken) return undefined;
+    if (!saved || saved.expiresAtMs <= this.tokens.expiresAtMs) return undefined;
     this.tokens = saved;
     return saved;
   }

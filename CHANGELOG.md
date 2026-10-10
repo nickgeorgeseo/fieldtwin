@@ -25,6 +25,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- Reference integration: with `loadTokens`, a `TokenManager` takes the saved tokens only when they are newer than its own. It took any saved set that differed, so after a save that failed it swapped its working tokens for the old saved ones, whose refresh token Jobber had already killed, and reported the connection lost.
+
 - With `FIELDTWIN_PORT=0` the startup line says which port the system picked, instead of `http://localhost:0`.
 
 - A `FIELDTWIN_` setting left empty counts as unset, as when a compose file passes on a variable nobody set. An empty `FIELDTWIN_HOST` listened on every address and printed `http://:4010`.

@@ -128,6 +128,29 @@ describe("several processes sharing one connection", () => {
     expect(await processB.accessToken()).toBe(saved().accessToken);
   });
 
+  it("keeps its own tokens when the saved set is older, as after a save that failed", async () => {
+    const { target, jobberTokens } = await connected();
+    let saved = jobberTokens.current;
+    let databaseDown = false;
+    const jobberOAuth = { ...JOBBER_APP, tokenUrl: ENDPOINTS.jobber.tokenUrl };
+    const manager = new TokenManager(jobberOAuth, saved, inProcessRuntime(target), {
+      onTokens: (tokens) => {
+        if (databaseDown) throw new Error("the database is down");
+        saved = tokens;
+      },
+      loadTokens: () => saved,
+    });
+    target.twin.advance(60 * MINUTE);
+    databaseDown = true;
+    await expect(manager.accessToken()).rejects.toThrow("the database is down"); // refreshed, but the new set wasn't saved
+    databaseDown = false;
+
+    target.twin.advance(60 * MINUTE); // time for the next refresh: the saved set's refresh token is the one Jobber killed
+    const token = await manager.accessToken();
+    expect(token).toBe(manager.current.accessToken);
+    expect(saved).toBe(manager.current); // and the set that works is saved now
+  });
+
   it("can't recover without a way to read the saved tokens: the stale refresh token is dead", async () => {
     const { processB } = await twoProcesses({ sharedStore: false });
     await expect(processB.accessToken()).rejects.toThrow(OAuthError);
