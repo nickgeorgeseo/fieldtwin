@@ -2,9 +2,10 @@ import { fromCents, toCents } from "../../core/money.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 
 /**
- * Numbers as QuickBooks reads them: JSON numbers, or numeric strings, which SDKs such as python-quickbooks send for
- * decimals. Amounts are dollars and whole cents. The docs give no limits, so the twin refuses fractions of a cent and
- * amounts too big to add up exactly, with 2140 Invalid Amount (FIDELITY.md marks both "check").
+ * Values as QuickBooks reads them from a request. Numbers: JSON numbers, or numeric strings, which SDKs such as
+ * python-quickbooks send for decimals. Amounts: dollars and whole cents; the docs give no limits, so the twin refuses
+ * fractions of a cent and amounts too big to add up exactly, with 2140 Invalid Amount (FIDELITY.md marks both
+ * "check"). Text: strings, or numbers read as their digits.
  * https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
  */
 const MAX_AMOUNT = 999_999_999_999.99;
@@ -47,4 +48,20 @@ export function readOptionalNumber(
   if (number !== undefined) return number;
   const detail = `${element} must be a number, not ${JSON.stringify(value)}.`;
   return kind === "quantity" ? qboErrors.invalidQuantity(element, detail, now) : qboErrors.invalidAmount(element, detail, now);
+}
+
+/**
+ * Text fields as QuickBooks' JSON reader takes them: a string as sent, a number as its digits. Anything else (an
+ * object, a list) answers 2010 naming the field. Normalizes `fields` in place; the Fault, if any, is returned.
+ */
+export function readTextFields(fields: object, names: readonly string[], now: string): QboFault | undefined {
+  const record = fields as Record<string, unknown>;
+  for (const name of names) {
+    const value = record[name];
+    if (typeof value === "number" && Number.isFinite(value)) record[name] = String(value);
+    else if (value !== undefined && value !== null && typeof value !== "string") {
+      return qboErrors.invalidProperty(name, `${name} must be text, not ${JSON.stringify(value)}.`, now);
+    }
+  }
+  return undefined;
 }

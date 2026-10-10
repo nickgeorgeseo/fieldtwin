@@ -3,6 +3,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
+import { readTextFields } from "../values.ts";
 import {
   asResponse,
   COMPANY,
@@ -46,6 +47,8 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: strin
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_CUSTOMER_FIELDS);
+  const notText = readTextFields(fields, NAME_FIELDS, now);
+  if (notText) return notText;
 
   // QuickBooks builds a DisplayName from the person's name when none is given.
   fields.DisplayName ??= [fields.GivenName, fields.FamilyName].filter(Boolean).join(" ") || undefined;
@@ -68,6 +71,8 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   if (conflict) return conflict;
 
   const fields = mergeUpdate(existing, body, WRITABLE_CUSTOMER_FIELDS);
+  const notText = readTextFields(fields, NAME_FIELDS, now);
+  if (notText) return notText;
   if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
   const taken = customerNamed(state, fields.DisplayName);
   if (taken && taken.Id !== existing.Id) return qboErrors.duplicateName(taken.Id, now);
@@ -76,6 +81,8 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   twin.record({ vendor: "quickbooks", type: "CustomerUpdated", data: { customer, ...(requestId && { requestId }) } }, "api");
   return customer;
 }
+
+const NAME_FIELDS = ["DisplayName", "GivenName", "FamilyName"] as const;
 
 function customerNamed(state: QboState, name: string): QboCustomer | undefined {
   return [...state.customers.values()].find((customer) => customer.DisplayName === name);

@@ -1,9 +1,9 @@
 import { multiplyMoney, sameMoney, sumMoney } from "../../core/money.ts";
 import { isObject } from "../../core/request-body.ts";
-import { readAmount, readOptionalNumber } from "./amounts.ts";
 import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
+import { readAmount, readOptionalNumber, readTextFields } from "./values.ts";
 
 /**
  * How QuickBooks builds an invoice from a request: references, lines, totals, numbers, and dates.
@@ -22,14 +22,20 @@ const FIRST_DOC_NUMBER = 1001; // the twin's company starts invoice numbers here
 export function draftInvoice(
   state: QboState,
   fields: InvoiceFields,
-  options: { today: string; now: string; existingLines?: QboInvoiceLine[]; isCreate: boolean },
+  options: { today: string; now: string; existingLines?: QboInvoiceLine[]; existingCustomerId?: string; isCreate: boolean },
 ): InvoiceDraft | QboFault {
   const { now } = options;
+  const notText = readTextFields(fields, ["DocNumber", "PrivateNote"], now);
+  if (notText) return notText;
 
   // "An invoice must have CustomerRef populated."
   if (!fields.CustomerRef?.value) return qboErrors.missingField("CustomerRef", now);
   const customer = state.customers.get(String(fields.CustomerRef.value));
-  if (!customer?.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  // An inactive customer gets no new invoices, but the invoices it already has can still be updated.
+  if (!customer.Active && customer.Id !== options.existingCustomerId) {
+    return qboErrors.invalidReference("CustomerRef", `Customer ${customer.Id}, which is inactive`, now);
+  }
 
   const lines = salesLines(state, fields.Line, options.existingLines ?? [], now);
   if ("Fault" in lines) return lines;
@@ -128,7 +134,10 @@ interface LineInput {
   SalesItemLineDetail?: { ItemRef?: QboRef; Qty?: unknown; UnitPrice?: unknown; ServiceDate?: string };
 }
 
+/** The last ordinary invoice number plus one. A DocNumber like "JB-77", or too long to count on from exactly, is skipped. */
 function nextDocNumber(state: QboState): string {
-  const numbers = [...state.invoices.values()].map((invoice) => Number(invoice.DocNumber)).filter(Number.isInteger);
+  const numbers = [...state.invoices.values()].flatMap((invoice) =>
+    /^\d{1,15}$/.test(invoice.DocNumber ?? "") ? [Number(invoice.DocNumber)] : [],
+  );
   return String(Math.max(FIRST_DOC_NUMBER - 1, ...numbers) + 1);
 }

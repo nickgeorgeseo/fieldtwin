@@ -75,7 +75,18 @@ function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: stri
   if (conflict) return conflict;
 
   const fields: InvoiceFields = mergeUpdate(existing, body, WRITABLE_INVOICE_FIELDS);
-  const draft = draftInvoice(state, fields, { today: qboToday(now), now, existingLines: existing.Line, isCreate: false });
+  // Payments applied to an invoice belong to the customer who paid them, so it can't move to someone else.
+  const movesCustomer = fields.CustomerRef?.value !== undefined && String(fields.CustomerRef.value) !== existing.CustomerRef.value;
+  if (movesCustomer && existing.LinkedTxn.length) {
+    return qboErrors.businessValidation(`Invoice ${existing.Id} has payments applied, so it can't move to another customer.`, now);
+  }
+  const draft = draftInvoice(state, fields, {
+    today: qboToday(now),
+    now,
+    existingLines: existing.Line,
+    existingCustomerId: existing.CustomerRef.value,
+    isCreate: false,
+  });
   if ("Fault" in draft) return draft;
 
   // Payments already applied stay applied, so the new balance is the new total minus what has been paid.

@@ -2,10 +2,10 @@ import type { Hono } from "hono";
 import { formatMoney, fromCents, toCents } from "../../../core/money.ts";
 import { isObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
-import { readAmount } from "../amounts.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
+import { readAmount } from "../values.ts";
 import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody, writeKind } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
@@ -48,7 +48,8 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   if (typeof TotalAmt !== "number") return TotalAmt;
   if (!fields.CustomerRef?.value) return qboErrors.missingField("CustomerRef", now);
   const customer = state.customers.get(String(fields.CustomerRef.value));
-  if (!customer?.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  if (!customer.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${customer.Id}, which is inactive`, now);
   const TxnDate = fields.TxnDate === undefined ? qboToday(now) : qboDate(fields.TxnDate);
   if (!TxnDate) return qboErrors.invalidDate("TxnDate", String(fields.TxnDate), now);
 
