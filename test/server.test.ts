@@ -1,6 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { createServer } from "node:net";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
 import { listenOn, loadScenarioArgument, settingsFrom } from "../src/server.ts";
@@ -60,8 +62,8 @@ describe("npm start", () => {
   });
 
   /** Runs src/server.ts the way `npm start` does, collecting what it prints. */
-  function start(port: number, args: string[] = []) {
-    const child = spawn(process.execPath, ["--import", "tsx", join(import.meta.dirname, "..", "src", "server.ts"), ...args], {
+  function start(port: number, args: string[] = [], checkout = join(import.meta.dirname, "..")) {
+    const child = spawn(process.execPath, ["--import", "tsx", join(checkout, "src", "server.ts"), ...args], {
       env: { ...process.env, FIELDTWIN_PORT: String(port) },
     });
     children.push(child);
@@ -88,6 +90,17 @@ describe("npm start", () => {
     await server.printed(`is open for business at http://localhost:${port}`);
     const response = await fetch(`http://localhost:${port}/_twin`);
     expect(response.status).toBe(200);
+  }, 20_000);
+
+  it("starts through a symlinked path too, instead of exiting without a word", async () => {
+    const linked = join(mkdtempSync(join(tmpdir(), "fieldtwin-")), "checkout");
+    symlinkSync(join(import.meta.dirname, ".."), linked);
+    try {
+      const port = await freePort();
+      await start(port, [], linked).printed(`is open for business at http://localhost:${port}`);
+    } finally {
+      rmSync(dirname(linked), { recursive: true });
+    }
   }, 20_000);
 
   it("explains how to pick another port when its port is taken, instead of crashing", async () => {

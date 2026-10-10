@@ -76,7 +76,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 - QuickBooks change data capture reads a `changedSince` without a UTC offset as UTC. It used the time zone of the machine running the twin, so the same request found different changes on different machines.
 - Startup problems are one readable line instead of a crash: a port already in use says so and how to pick another, a scenario that can't be found lists the ones that exist, and `FIELDTWIN_PORT` or `FIELDTWIN_SEED` values that aren't numbers say what is expected. The "open for business" line now appears only once the twin is really listening.
-- `npm start` and `npm run example:sync` start from any folder. From a path with a space in it, or on Windows, they used to exit silently without starting anything.
+- `npm start` and `npm run example:sync` start from any folder. From a path with a space in it, through a symlink, or on Windows, they used to exit silently without starting anything.
 
 ## 0.2.1 - 2026-10-09
 
