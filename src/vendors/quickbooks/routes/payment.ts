@@ -65,8 +65,12 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
     if (line.LinkedTxn !== undefined && !Array.isArray(line.LinkedTxn)) {
       return qboErrors.invalidProperty("Line.LinkedTxn", 'LinkedTxn must be a list, like [{"TxnId": "130", "TxnType": "Invoice"}].', now);
     }
-    const [link] = line.LinkedTxn ?? [];
+    const [link, ...more] = line.LinkedTxn ?? [];
     if (!link?.TxnId) return qboErrors.missingField("Line.LinkedTxn", now);
+    if (more.length) {
+      return qboErrors.unsupportedOperation("The twin applies each payment line to one invoice. Send one line per invoice.", now);
+    }
+    if (!link.TxnType) return qboErrors.missingField("Line.LinkedTxn.TxnType", now);
     if (link.TxnType !== "Invoice") {
       return qboErrors.unsupportedOperation(`The twin applies payments to invoices only, not to ${link.TxnType}.`, now);
     }

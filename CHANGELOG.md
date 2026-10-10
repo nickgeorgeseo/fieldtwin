@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- QuickBooks payment lines: a `LinkedTxn` without `TxnType` answers 2020 naming it, instead of "not to undefined", and a line linked to several transactions is refused instead of applied to the first with the rest ignored (even ones naming invoices that don't exist).
+
 - Jobber `clientCreate` trims names and treats a blank `companyName` as none. A last name alone made the name " Smith", and `companyName: ""` made a company client with an empty name.
 
 - Jobber `newClients` never runs out of names: once the word lists' names are taken, newcomers get a middle initial. A long timeline used to fail hours into twin time with "no unused names left", leaving the clock half advanced. New clients also never take the name of a customer who is only in QuickBooks, whose email address could otherwise match.
