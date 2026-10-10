@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- With `FIELDTWIN_HOST` set to a specific address, the startup line prints that address instead of a localhost URL that wouldn't work, and listening on `::1` no longer warns that others can reach the twin.
+
 - QuickBooks defaults `TxnDate` to the company's date in its own time zone. At 8 p.m. in Texas, new invoices and payments were dated tomorrow, the UTC date.
 
 - QuickBooks: one numeric `DocNumber` of 21 digits made every later invoice number `1e+21`, failing 2050 until a reset; numbering now counts on from ordinary numbers only. Text fields read a number as its digits and refuse objects and lists with 2010, instead of storing `{"a": 1}` as a DisplayName. An invoice with payments can't move to another customer (6000), which left payments and invoices belonging to different people. An invoice whose customer was made inactive can still be updated, and naming an inactive customer on a new invoice or payment says it is inactive.

@@ -69,8 +69,9 @@ export function startServer(args = process.argv.slice(2), env: Env = process.env
 
 // stderr, not stdout: when running as an MCP server, stdout belongs to the MCP protocol.
 function announce(twin: Twin, hostname: string, port: number) {
-  console.error(`fieldtwin: ${twin.world.company.name} is open for business at http://localhost:${port}`);
-  if (hostname !== "127.0.0.1" && hostname !== "localhost") {
+  const { url, reachableByOthers } = addressOf(hostname, port);
+  console.error(`fieldtwin: ${twin.world.company.name} is open for business at ${url}`);
+  if (reachableByOthers) {
     console.error(`fieldtwin: listening on ${hostname}: anyone who can reach this machine can control the twin and send webhooks from it.`);
   }
   console.error(
@@ -78,6 +79,16 @@ function announce(twin: Twin, hostname: string, port: number) {
       ? "fieldtwin: auth is any-token: ANY Bearer token is accepted. Set FIELDTWIN_AUTH=oauth for real OAuth checks."
       : "fieldtwin: auth is oauth: only access tokens from the twin's OAuth endpoints are accepted, until they expire.",
   );
+}
+
+const LOOPBACK = ["127.0.0.1", "localhost", "::1"];
+const EVERY_ADDRESS = ["0.0.0.0", "::"];
+
+/** The URL to print for where the twin listens, and whether other machines can reach it there. */
+export function addressOf(hostname: string, port: number): { url: string; reachableByOthers: boolean } {
+  const local = LOOPBACK.includes(hostname) || EVERY_ADDRESS.includes(hostname);
+  const host = local ? "localhost" : hostname.includes(":") ? `[${hostname}]` : hostname;
+  return { url: `http://${host}:${port}`, reachableByOthers: !LOOPBACK.includes(hostname) };
 }
 
 function exitWith(message: string): never {

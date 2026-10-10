@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { listenOn, loadScenarioArgument, settingsFrom } from "../src/server.ts";
+import { addressOf, listenOn, loadScenarioArgument, settingsFrom } from "../src/server.ts";
 
 /**
  * The twin accepts any bearer token by default and its control plane has no auth (it is a local test tool), so
@@ -18,6 +18,13 @@ describe("the server", () => {
 
   it("listens wherever FIELDTWIN_HOST and FIELDTWIN_PORT say, for running in a container", () => {
     expect(listenOn({ FIELDTWIN_HOST: "0.0.0.0", FIELDTWIN_PORT: "8080" })).toEqual({ hostname: "0.0.0.0", port: 8080 });
+  });
+
+  it("prints an address that works for where it listens, and warns only when others can reach it", () => {
+    expect(addressOf("127.0.0.1", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: false });
+    expect(addressOf("::1", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: false });
+    expect(addressOf("0.0.0.0", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: true });
+    expect(addressOf("192.168.1.20", 4010)).toEqual({ url: "http://192.168.1.20:4010", reachableByOthers: true });
   });
 
   it("says what a port looks like when FIELDTWIN_PORT isn't one", () => {
