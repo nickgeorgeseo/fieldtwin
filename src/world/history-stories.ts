@@ -21,7 +21,8 @@ const NET_DAYS = 30;
 const FIRST_START_HOUR = 8; // local time; visits start between 8:00 and 15:30
 const LAST_START_HOUR = 15;
 
-export function jobStory(context: HistoryContext, requestedDay: number): JobStory {
+/** A job on `requestedDay` (days from today), for `customerKey` or a customer picked at random. */
+export function jobStory(context: HistoryContext, requestedDay: number, customerKey?: string): JobStory {
   const { random, customers, technicians } = context;
   const lineItems = pickLineItems(context);
   const big = lineItems[0]!.unitPrice >= BIG_JOB_PRICE;
@@ -49,7 +50,7 @@ export function jobStory(context: HistoryContext, requestedDay: number): JobStor
   const job: WorldJob = {
     key: "",
     number: 0,
-    customerKey: random.pick(customers).key,
+    customerKey: customerKey ?? random.pick(customers).key,
     title: titleFor(lineItems, context),
     createdAt: iso(Math.min(firstStart, context.startMs) - random.int(1, 10) * DAY),
     lineItems,

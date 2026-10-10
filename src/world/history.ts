@@ -74,6 +74,7 @@ export interface HistoryContext {
   catalog: CatalogEntry[];
   startMs: number;
   utcOffsetHours: number;
+  needsWork?: string[]; // customers who must have an invoiced job: drift's field-service-only customers
 }
 
 const PAST_DAYS = 90;
@@ -96,6 +97,13 @@ export function makeHistory(context: HistoryContext): WorldHistory {
   const finished = stories.filter((story) => story.job.visits.every((visit) => visit.completedAt));
   const latest = finished.reduce((a, b) => (a.job.visits.at(-1)!.completedAt! > b.job.visits.at(-1)!.completedAt! ? a : b));
   latest.invoice = undefined;
+
+  // Customers only the field-service system knows (see drift.ts) have work the books have never seen. Drawn last,
+  // so a world without them is exactly as before. Three days back or more, a job is always finished and invoiced.
+  for (const key of context.needsWork ?? []) {
+    const invoiced = stories.some((story) => story.invoice && story.job.customerKey === key);
+    if (!invoiced) stories.push(jobStory(context, random.int(-PAST_DAYS, -3), key));
+  }
 
   const jobs = numberInOrder(
     stories.map((story) => story.job),

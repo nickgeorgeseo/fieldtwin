@@ -22,6 +22,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- In a drifted world, every customer who is only in the field-service system has at least one invoiced job, as drift promises. Across seeds, about a quarter had no invoice, so `mismatched-books` with another seed tested less than it said.
+
 - Today's visits in the generated world start at 8:00 or later, as every other day's do. With the default 6 a.m. start, some started at 7:00, and a world starting at midnight booked visits at 2:30 a.m.
 
 - Jobber: an id sent without its base64 padding finds the same record as the padded id. It resolved to `null`, though Jobber's own examples show ids both ways.

@@ -83,6 +83,7 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
     catalog,
     startMs: Date.parse(options.startTime),
     utcOffsetHours: home.utcOffsetHours,
+    needsWork: drift.fieldServiceOnly,
   });
 
   return { asOf: options.startTime, company, customers: customerList, technicians: technicianList, catalog, history, drift };

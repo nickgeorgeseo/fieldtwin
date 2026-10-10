@@ -27,6 +27,22 @@ describe("drift between the field-service and accounting systems", () => {
     expect(generateWorld(new SeededRandom(21), { startTime: START, size: { customers: 30 }, drift: {} })).toEqual(plain);
   });
 
+  it("gives every customer who is only in the field-service system work the books have never seen, whatever the seed", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const world = generateWorld(new SeededRandom(seed), { startTime: START, size: { customers: 30 }, drift });
+      for (const key of world.drift.fieldServiceOnly) {
+        expect(
+          world.history.jobs.some((job) => job.customerKey === key),
+          `seed ${seed}: ${key} has a job`,
+        ).toBe(true);
+        expect(
+          world.history.invoices.some((invoice) => invoice.customerKey === key),
+          `seed ${seed}: ${key} has an invoice`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("chooses distinct customers for each kind of drift, and respells names plausibly", () => {
     const world = driftedWorld();
     const renamed = Object.keys(world.drift.accountingSpellings);
