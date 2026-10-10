@@ -2,6 +2,12 @@
 
 All notable changes to fieldtwin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- QuickBooks honors `requestid` on customer, invoice, and payment writes, as documented: a repeated request gets the first answer again, word for word, and writes nothing. The answer travels on the write's event, so rewinding forgets it along with the write.
+
 ## 0.1.0 - 2026-10-09
 
 The twins grow from customers and clients into the money: QuickBooks invoices, payments, items, queries, and change data capture; Jobber jobs, visits, quotes, and invoices with a history behind them; real OAuth on both; scenarios that play out over twin time; and a reference integration that syncs one into the other.

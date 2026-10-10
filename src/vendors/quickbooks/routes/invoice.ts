@@ -6,6 +6,7 @@ import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
 import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { checkRequestId } from "./request-id.ts";
 
 /** Invoice: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice */
 export function invoiceRoutes(app: Hono, twin: Twin): void {
@@ -24,14 +25,16 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
     if (operation) {
       return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Invoice by the twin yet.`, now()), 400);
     }
+    const checked = checkRequestId(c, state(), now());
+    if ("answer" in checked) return checked.answer;
     const body = (await c.req.json()) as UpdateBody<QboInvoice>;
-    const result = body.Id ? updateInvoice(twin, body) : createInvoice(twin, body);
+    const result = body.Id ? updateInvoice(twin, body, checked.requestId) : createInvoice(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Invoice: asResponse(result), time: now() });
   });
 }
 
-function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | QboFault {
+function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: string | undefined): QboInvoice | QboFault {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields: InvoiceFields = pickWritable(body, WRITABLE_INVOICE_FIELDS);
@@ -47,11 +50,11 @@ function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | Q
     LinkedTxn: [],
     MetaData: { CreateTime: now, LastUpdatedTime: now },
   };
-  twin.record({ vendor: "quickbooks", type: "InvoiceCreated", data: { invoice } }, "api");
+  twin.record({ vendor: "quickbooks", type: "InvoiceCreated", data: { invoice, ...(requestId && { requestId }) } }, "api");
   return invoice;
 }
 
-function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | QboFault {
+function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: string | undefined): QboInvoice | QboFault {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const existing = state.invoices.get(String(body.Id));
@@ -80,6 +83,6 @@ function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>): QboInvoice | Q
     Balance: fromCents(balanceCents),
     LinkedTxn: existing.LinkedTxn, // read only: payment links survive updates
   };
-  twin.record({ vendor: "quickbooks", type: "InvoiceUpdated", data: { invoice } }, "api");
+  twin.record({ vendor: "quickbooks", type: "InvoiceUpdated", data: { invoice, ...(requestId && { requestId }) } }, "api");
   return invoice;
 }

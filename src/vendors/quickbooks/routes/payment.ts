@@ -5,6 +5,7 @@ import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
 import { asResponse, COMPANY, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { checkRequestId } from "./request-id.ts";
 
 /**
  * Payment: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment
@@ -27,13 +28,15 @@ export function paymentRoutes(app: Hono, twin: Twin): void {
     if (operation) {
       return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Payment by the twin yet.`, now()), 400);
     }
-    const result = createPayment(twin, body);
+    const checked = checkRequestId(c, state(), now());
+    if ("answer" in checked) return checked.answer;
+    const result = createPayment(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Payment: asResponse(result), time: now() });
   });
 }
 
-function createPayment(twin: Twin, body: UpdateBody<QboPayment>): QboPayment | QboFault {
+function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: string | undefined): QboPayment | QboFault {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_PAYMENT_FIELDS);
@@ -94,7 +97,7 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>): QboPayment | Q
     ProcessPayment: false,
     MetaData: { CreateTime: now, LastUpdatedTime: now },
   };
-  twin.record({ vendor: "quickbooks", type: "PaymentCreated", data: { payment } }, "api");
+  twin.record({ vendor: "quickbooks", type: "PaymentCreated", data: { payment, ...(requestId && { requestId }) } }, "api");
 
   // Each paid invoice changes: a lower Balance, a link to this payment, and a new SyncToken.
   for (const [invoiceId, balanceCents] of balances) {

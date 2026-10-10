@@ -8,12 +8,20 @@ import type { QboCustomer, QboInvoice, QboItem, QboPayment } from "./types.ts";
  */
 export type QboEventData =
   | { type: "CompanyCreated"; realmId: string }
-  | { type: "CustomerCreated"; customer: QboCustomer }
-  | { type: "CustomerUpdated"; customer: QboCustomer }
+  | ({ type: "CustomerCreated"; customer: QboCustomer } & RequestIdentified)
+  | ({ type: "CustomerUpdated"; customer: QboCustomer } & RequestIdentified)
   | { type: "ItemCreated"; item: QboItem }
-  | { type: "InvoiceCreated"; invoice: QboInvoice }
-  | { type: "InvoiceUpdated"; invoice: QboInvoice }
-  | { type: "PaymentCreated"; payment: QboPayment };
+  | ({ type: "InvoiceCreated"; invoice: QboInvoice } & RequestIdentified)
+  | ({ type: "InvoiceUpdated"; invoice: QboInvoice } & RequestIdentified)
+  | ({ type: "PaymentCreated"; payment: QboPayment } & RequestIdentified);
+
+/**
+ * A write's requestid travels on the event the write records, so the answer it got is rebuilt from the log
+ * like everything else, and a rewind forgets the requestids of the writes it undoes.
+ */
+export interface RequestIdentified {
+  requestId?: string;
+}
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asQboEvent(event: TwinEvent): QboEventData {

@@ -4,6 +4,7 @@ import { qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
 import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { checkRequestId } from "./request-id.ts";
 
 /** Customer: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer */
 export function customerRoutes(app: Hono, twin: Twin): void {
@@ -18,14 +19,16 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 
   // QuickBooks uses one POST endpoint for both create and update. An Id in the body means update.
   app.post(`${COMPANY}/customer`, async (c) => {
+    const checked = checkRequestId(c, state(), now());
+    if ("answer" in checked) return checked.answer;
     const body = (await c.req.json()) as UpdateBody<QboCustomer>;
-    const result = body.Id ? updateCustomer(twin, body) : createCustomer(twin, body);
+    const result = body.Id ? updateCustomer(twin, body, checked.requestId) : createCustomer(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Customer: asResponse(result), time: now() });
   });
 }
 
-function createCustomer(twin: Twin, body: Partial<QboCustomer>) {
+function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: string | undefined) {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const fields = pickWritable(body, WRITABLE_CUSTOMER_FIELDS);
@@ -37,11 +40,11 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>) {
   if (taken) return qboErrors.duplicateName(taken.Id, now);
 
   const customer = newCustomerRecord(state, { ...fields, DisplayName: fields.DisplayName }, now);
-  twin.record({ vendor: "quickbooks", type: "CustomerCreated", data: { customer } }, "api");
+  twin.record({ vendor: "quickbooks", type: "CustomerCreated", data: { customer, ...(requestId && { requestId }) } }, "api");
   return customer;
 }
 
-function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>) {
+function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: string | undefined) {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
   const existing = state.customers.get(String(body.Id));
@@ -56,7 +59,7 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>) {
   if (taken && taken.Id !== existing.Id) return qboErrors.duplicateName(taken.Id, now);
 
   const customer: QboCustomer = { Active: true, ...fields, DisplayName: fields.DisplayName, ...nextVersion(existing, now) };
-  twin.record({ vendor: "quickbooks", type: "CustomerUpdated", data: { customer } }, "api");
+  twin.record({ vendor: "quickbooks", type: "CustomerUpdated", data: { customer, ...(requestId && { requestId }) } }, "api");
   return customer;
 }
 

@@ -160,4 +160,15 @@ export interface QboState {
   invoices: Map<string, QboInvoice>;
   payments: Map<string, QboPayment>;
   nextId: Record<QboEntityName, number>;
+  answered: Map<string, QboAnswer>; // by requestid: how each write that sent one was answered
+}
+
+/**
+ * The answer to a write that carried a requestid, kept so a repeat of the request gets it again.
+ * https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions (Request ID)
+ */
+export interface QboAnswer {
+  entity: "Customer" | "Invoice" | "Payment";
+  record: QboCustomer | QboInvoice | QboPayment; // as it was right after the write
+  time: string;
 }
