@@ -55,7 +55,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | CDC look-back over 30 days | Approximate | check | [CDC][qbo-cdc] | The docs limit look-back to 30 days but don't show the error. Twin answers 2190 `Invalid Date Range` |
 | CDC group with no changes | Approximate | check | [CDC][qbo-cdc] | Answered as `{}`; the docs only show groups with changes |
 | Deleted objects in CDC | Not yet | | [CDC][qbo-cdc] | The twin models no deletes, so `status: "Deleted"` entries never appear |
-| Webhooks | Not yet | | | Roadmap v0.2 |
+| Webhooks | Not yet | | | Jobber's are modeled (below); QuickBooks' aren't yet |
 
 ## Jobber
 
@@ -94,7 +94,9 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | `clientCreate` details | Approximate | check | Whether a company name alone is enough is unconfirmed (the twin requires a last name, as the docs' example error implies). Input and payload type names other than `ClientCreateInput` aren't public; only the `MAIN` email description is documented. Phones, addresses, and the app-name lead source are not modeled |
 | `jobCreate` and visit scheduling | Not yet | | `JobCreateAttributes` exists (changelog) but its fields aren't in the public docs, so the twin doesn't guess them |
 | Other mutations | Not yet | | |
-| Webhooks (HMAC-SHA256 signed) | Not yet | | Roadmap v0.2 |
+| Webhooks: `CLIENT_CREATE`, `INVOICE_UPDATE` | Modeled | docs only | Sent to the subscriptions set with `PUT /_twin/webhooks` (the Developer Center's equivalent) as JSON `{ data: { webHookEvent: { topic, appId, accountId, itemId, occurredAt } } }`, signed with `X-Jobber-Hmac-SHA256`: the base64 HMAC-SHA256 of the raw body with the app's client secret. Paying an invoice fires `INVOICE_UPDATE` twice, a second apart, as documented. `occurredAt` is the business's local time with its offset, like the docs' sample. Nothing is sent for the seeded world or for history a reset or scenario load rebuilds |
+| Webhook details the docs don't give | Approximate | check | Jobber assigns each app a UUID `appId`; the twin derives one from the client_id. Apps have 1 second to answer (documented); a delivery that isn't accepted is sent again up to 5 times, 1, 2, 3, then 4 minutes of twin time apart: the docs promise at-least-once delivery without a schedule. Jobber may disable webhooks that keep failing; the twin doesn't. The docs' sample signature matches neither sample secret, so the twin follows the documented algorithm |
+| Other webhook topics, `APP_CONNECT`, `APP_DISCONNECT` | Not yet | | `WebHookTopicEnum` isn't public, so the twin only sends the topics the docs name and it has events for |
 | OAuth 2.0 authorization (`GET /api/oauth/authorize`) | Modeled | docs only | Approved at once and redirected back with `code` and `state`. PKCE with S256 only, as documented |
 | OAuth 2.0 tokens (`POST /api/oauth/token`) | Modeled | docs only | Client credentials in the form body; `authorization_code` (with `code_verifier` when PKCE was used; a wrong one is 400 `invalid_grant`, as documented) and `refresh_token` grants; `{ access_token, refresh_token, token_type: "Bearer", expires_in: 3600 }`. Access tokens are HS256 JWTs whose payload carries `exp`. Codes last 10 minutes and work once |
 | Refresh token rotation | Modeled | docs only | On, as for apps created after January 2, 2024: each refresh returns a new refresh token and the old one fails at once with "The provided refresh token is not valid." The pre-2024 warning behavior and rotation-off mode are not modeled |

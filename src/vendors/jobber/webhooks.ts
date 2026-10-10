@@ -1,0 +1,62 @@
+import { createHash, createHmac } from "node:crypto";
+import type { VendorWebhooks, WebhookNotification } from "../../core/webhooks.ts";
+import { asJobberEvent } from "./events.ts";
+import type { JobberState } from "./types.ts";
+
+/**
+ * Jobber webhooks, as documented: https://developer.getjobber.com/docs/using_jobbers_api/setting_up_webhooks/
+ *
+ *   - Payload: { data: { webHookEvent: { topic, appId, accountId, itemId, occurredAt } } } as JSON (apps created
+ *     after April 11, 2022), with `occurredAt` spelled that way (apps created after December 8, 2023). It "does not
+ *     include the full object data": apps query the API for the itemId.
+ *   - Signature: "a base64 encoded X-Jobber-Hmac-SHA256 header, which is generated using your app's OAuth client
+ *     secret and the data sent in the webhook": HMAC-SHA256 over the raw JSON body.
+ *   - "Adding a payment to an invoice fires INVOICE_UPDATE twice: once for the payment being applied and once for
+ *     the invoice status changing", "typically about one second apart". Apps have to cope, so the twin does it.
+ *
+ * Only topics the docs name and the twin has events for are offered. The rest of WebHookTopicEnum isn't public.
+ */
+export const jobberWebhooks: VendorWebhooks<JobberState> = {
+  topics: ["CLIENT_CREATE", "INVOICE_UPDATE"],
+
+  notify(event): WebhookNotification[] {
+    const data = asJobberEvent(event);
+    const at = Date.parse(event.at);
+    if (data.type === "ClientCreated") return [{ topic: "CLIENT_CREATE", itemId: data.client.id, occurredAtMs: at }];
+    if (data.type !== "InvoiceUpdated") return [];
+    const update = { topic: "INVOICE_UPDATE", itemId: data.invoice.id, occurredAtMs: at };
+    // Paid by this very event: one update for the payment, and a second, a second later, for the status.
+    return data.invoice.paidAt === event.at ? [update, { ...update, occurredAtMs: at + 1000 }] : [update];
+  },
+
+  request(notification, subscription, state) {
+    const webHookEvent = {
+      topic: notification.topic,
+      appId: appIdFor(subscription.clientId),
+      accountId: state.account.id,
+      itemId: notification.itemId,
+      occurredAt: localTime(notification.occurredAtMs, state.account.utcOffsetHours),
+    };
+    const body = JSON.stringify({ data: { webHookEvent } });
+    const signature = createHmac("sha256", subscription.clientSecret).update(body).digest("base64");
+    return { headers: { "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }, body };
+  },
+};
+
+/**
+ * Jobber's appId is a UUID it gives each app. The twin has no app registry, so it derives a stable one from the
+ * app's client_id (see FIDELITY.md).
+ */
+function appIdFor(clientId: string): string {
+  const hex = createHash("sha256").update(clientId).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** "2026-07-16T16:31:31-06:00": the business's local time with its offset, like the documented sample. */
+function localTime(ms: number, utcOffsetHours: number): string {
+  const offsetMinutes = Math.round(utcOffsetHours * 60);
+  const local = new Date(ms + offsetMinutes * 60_000).toISOString().slice(0, 19);
+  const sign = offsetMinutes < 0 ? "-" : "+";
+  const hours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, "0");
+  return `${local}${sign}${hours}:${String(Math.abs(offsetMinutes) % 60).padStart(2, "0")}`;
+}

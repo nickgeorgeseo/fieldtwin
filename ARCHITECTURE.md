@@ -52,7 +52,7 @@ flowchart LR
 
 **1. All state changes go through `twin.record()`.** A route never edits state directly. It works out the new record, then records an event (`CustomerCreated`, `CustomerUpdated`) and the vendor's `apply()` function updates state. This single write path is what makes "what did my agent change?" and "rewind" possible, and it means there is exactly one place to look when state is wrong.
 
-The rule covers *business state*: anything the fake company would see in its own books or schedule. Request bookkeeping is different. Spending a rate-limit budget changes nothing about the business, so it lives outside the log, in the `Twin` itself (`twin.rateLimitBucket()`), and `reset()` and `rewind()` clear it rather than replay it. Keep that exception small: if a client could ever read it back as data, it belongs in the log.
+The rule covers *business state*: anything the fake company would see in its own books or schedule. Request bookkeeping is different. Spending a rate-limit budget changes nothing about the business, so it lives outside the log (`core/bookkeeping.ts`, behind `twin.rateLimitBucket()`), and `reset()` and `rewind()` clear it rather than replay it. OAuth grants and webhook subscriptions are your app's settings, so they live outside the log too and survive both; webhook deliveries are bookkeeping about requests, and a reset or rewind drops the ones still pending. Keep that exception small: if a client could ever read it back as data, it belongs in the log.
 
 **2. Time comes from `twin.clock`; randomness comes from `SeededRandom`.** `Date.now()` and `Math.random()` do not appear in this codebase. This is what makes runs reproducible and lets tests skip ahead in time instantly. Faults use their own random stream so turning a fault on never changes the generated world.
 
@@ -89,6 +89,7 @@ Every vendor has the same files, so once you have read one you can read them all
 | `seed.ts` | Turns the shared world into this vendor's starting events |
 | `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks has grown this into `routes/`, one file per entity |
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
+| `webhooks.ts` | Optional. The webhooks the vendor sends: its topics, which events announce what, and how a delivery is shaped and signed (`core/webhooks.ts` queues and sends them) |
 | `index.ts` | Exports one `VendorTwin` object. Nothing else |
 
 GraphQL vendors also have `schema.graphql` (a hand-written subset of the public schema), `resolvers.ts` (plain functions of state), and anything vendor-specific like Jobber's `cost.ts`. Jobber has grown both into folders: `schema/` holds one `.graphql` file per area (each `extend type Query` with its own lists), and `resolvers/` one file per object, plus `statuses.ts`, which derives time-dependent statuses from facts and the twin clock instead of storing them.
@@ -160,7 +161,7 @@ The goal is code a new contributor can read top to bottom without jumping around
 ## Roadmap
 
 - **v0.1 (released as 0.1.0).** QuickBooks Invoice, Payment, Item, and change data capture. Jobber Job, Visit, Quote, Invoice, and `clientCreate` (`jobCreate` waits until its input fields are in the public docs). Twin OAuth servers with expiring tokens. Scenario timelines and drifted books. A reference integration in `examples/`.
-- **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Timeline events are the natural trigger for them.
+- **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Timeline events are the natural trigger for them. Started: Jobber's `CLIENT_CREATE` and `INVOICE_UPDATE`, signed and retried.
 - **v0.3.** Conformance suite: record short sessions against the real vendor sandboxes and replay them against the twin, so drift shows up as a failing test with a fidelity score per endpoint. Started in `conformance/` with a case for every QuickBooks and Jobber `check` row it can reach; waiting on the first recordings.
 - **v0.4.** More vendors: Housecall Pro, Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
 - **v0.5.** A benchmark for dispatch and operations agents, built on these twins.

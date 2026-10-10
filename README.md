@@ -98,6 +98,18 @@ curl -s -X POST http://localhost:4010/api/oauth/token \
   -d code=$CODE -d redirect_uri=http://localhost:3000/callback
 ```
 
+## Webhooks
+
+The Jobber twin sends webhooks the way Jobber does. Jobber sets them up per app in its Developer Center; the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
+
+```bash
+curl -X PUT localhost:4010/_twin/webhooks -H "Content-Type: application/json" \
+  -d '[{"vendor":"jobber","url":"http://localhost:3000/webhooks/jobber","topics":["INVOICE_UPDATE"],"clientId":"my-app","clientSecret":"dev"}]'
+curl -X POST localhost:4010/_twin/actions/jobber/payInvoices -H "Content-Type: application/json" -d '2'
+```
+
+Deliveries carry Jobber's documented payload (`{ "data": { "webHookEvent": { "topic", "appId", "accountId", "itemId", "occurredAt" } } }`) and an `X-Jobber-Hmac-SHA256` signature made with the subscription's client secret, so your verification code runs unchanged. Like Jobber, the twin delivers at least once: paying an invoice fires `INVOICE_UPDATE` twice, and a delivery your app doesn't accept within a second is sent again later in twin time. `CLIENT_CREATE` and `INVOICE_UPDATE` are modeled so far. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
+
 ## The control plane
 
 Everything under `/_twin` controls the fake world rather than imitating a vendor.
@@ -106,7 +118,8 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 |---|---|
 | `GET /_twin` | Company, twin time, event count, auth mode, active faults |
 | `POST /_twin/reset` | Back to the seeded starting world |
-| `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move) |
+| `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move, scheduled events and their webhooks happen) |
+| `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2` |
 | `POST /_twin/checkpoints/:name` | Name this moment |
 | `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then |
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint |
@@ -116,6 +129,8 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `POST /_twin/scenarios/:name` | Load a ready-made scenario |
 | `POST /_twin/scenario` (YAML body) | Load your own scenario |
 | `GET /_twin/log.jsonl?since=:checkpoint` | The event log, one event per line (all of it without `since`) |
+| `PUT /_twin/webhooks` | Replace the webhook subscriptions (see [Webhooks](#webhooks)) |
+| `GET /_twin/webhooks` | The subscriptions, and each recent delivery with how your app answered |
 
 A typical agent test:
 
@@ -140,6 +155,8 @@ curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 | `twin_set_faults` | Make the APIs misbehave on purpose |
 | `twin_set_auth` | Accept any token, or check OAuth tokens for real |
 | `twin_export_log` | The event log as JSON Lines, all of it or since a checkpoint |
+| `twin_run_action` | Make something happen now: customers pay, clients call in |
+| `twin_set_webhooks`, `twin_webhooks` | Subscribe your app to webhooks; see what was delivered and how it answered |
 
 Claude Code:
 

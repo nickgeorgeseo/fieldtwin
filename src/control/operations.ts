@@ -1,6 +1,8 @@
+import { SeededRandom } from "../core/random.ts";
 import type { Twin } from "../core/twin.ts";
 import type { AuthMode, TwinEvent, VendorName } from "../core/types.ts";
-import { listScenarioFiles, parseFaultRules, parseScenario, readScenarioFile, resolveAt } from "./scenario.ts";
+import { scenarioActionOf } from "../core/vendor-twin.ts";
+import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscriptions, readScenarioFile, resolveAt } from "./scenario.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -17,6 +19,7 @@ export function describeTwin(twin: Twin) {
     vendors: twin.vendorNames(),
     authMode: twin.authMode,
     activeFaults: twin.faultRules.map((rule) => rule.name),
+    webhookSubscriptions: twin.webhooks.subscriptions.length,
     upcoming: twin.upcoming().map(({ atMs, vendor, action, params }) => ({ at: new Date(atMs).toISOString(), vendor, action, params })),
   };
 }
@@ -26,12 +29,67 @@ export function resetTwin(twin: Twin) {
   return describeTwin(twin);
 }
 
-/** Move twin time forward. Scheduled scenario events happen on the way, each at its own time. */
-export function advanceClock(twin: Twin, minutes: number) {
+/**
+ * Move twin time forward. Scheduled scenario events happen on the way, each at its own time, and the webhook
+ * deliveries they cause (and any retries now due) have been answered by the time this resolves.
+ */
+export async function advanceClock(twin: Twin, minutes: number) {
   if (typeof minutes !== "number" || !(minutes >= 0)) throw new Error("minutes must be a number, 0 or more");
   const before = twin.log.length;
   twin.advance(minutes * 60_000);
+  await twin.deliverWebhooks();
   return { twinTime: twin.clock.nowIso(), scenarioEvents: twin.log.length - before };
+}
+
+/**
+ * Make one of a vendor's scenario actions happen now, as if someone did it in the vendor's own app: customers pay
+ * (`jobber`, `payInvoices`, 2), clients call in. Recorded with source "control"; webhooks go out before this resolves.
+ */
+export async function runAction(twin: Twin, vendorName: string, action: string, params: unknown) {
+  const vendor = twin.vendor(knownVendor(twin, vendorName));
+  const scenarioAction = scenarioActionOf(vendor, action);
+  scenarioAction.check(params);
+  // Seeded by the history so far, so the same requests make the same clients.
+  const context = {
+    state: twin.state(vendor.name),
+    world: twin.world,
+    random: new SeededRandom(twin.log.length),
+    nowIso: twin.clock.nowIso(),
+  };
+  const recorded = scenarioAction.run(params, context).map((event) => twin.record(event, "control"));
+  await twin.deliverWebhooks();
+  return { events: recorded.map((event) => summarize(twin, event)) };
+}
+
+/**
+ * Replace the webhook subscriptions: the URLs and topics an app would set up in each vendor's developer settings.
+ * Like OAuth connections, they belong to the app, so they survive reset and rewind.
+ */
+export function setWebhooks(twin: Twin, value: unknown) {
+  const subscriptions = parseWebhookSubscriptions(value);
+  for (const subscription of subscriptions) {
+    const topics = twin.vendor(knownVendor(twin, subscription.vendor)).webhooks?.topics ?? [];
+    const unknown = subscription.topics.filter((topic) => !topics.includes(topic));
+    if (unknown.length) {
+      throw new Error(`${subscription.vendor} can't send ${unknown.join(", ")}. Topics the twin sends: ${topics.join(", ") || "none yet"}`);
+    }
+  }
+  twin.webhooks.subscriptions = subscriptions;
+  return describeWebhooks(twin);
+}
+
+/** The subscriptions (without their secrets) and the latest deliveries, with how each one went. */
+export function describeWebhooks(twin: Twin) {
+  return {
+    subscriptions: twin.webhooks.subscriptions.map(({ clientSecret: _secret, ...subscription }) => subscription),
+    deliveries: twin.webhooks.deliveries(),
+  };
+}
+
+function knownVendor(twin: Twin, name: string): VendorName {
+  const vendor = twin.vendorNames().find((candidate) => candidate === name);
+  if (!vendor) throw new Error(`No vendor named "${name}". Vendors: ${twin.vendorNames().join(", ")}`);
+  return vendor;
 }
 
 export function createCheckpoint(twin: Twin, name: string) {

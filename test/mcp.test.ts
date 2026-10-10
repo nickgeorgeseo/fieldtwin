@@ -28,6 +28,7 @@ describe("MCP server", () => {
       "twin_status",
       "twin_reset",
       "twin_advance_clock",
+      "twin_run_action",
       "twin_checkpoint",
       "twin_changes",
       "twin_rewind",
@@ -35,6 +36,8 @@ describe("MCP server", () => {
       "twin_load_scenario",
       "twin_set_faults",
       "twin_set_auth",
+      "twin_set_webhooks",
+      "twin_webhooks",
       "twin_export_log",
     ]);
   });
@@ -106,5 +109,26 @@ describe("MCP server: scenarios, faults, auth, and the log", () => {
     const since = (await exportLog({ checkpoint: "before" })).split("\n");
     expect(since).toHaveLength(1);
     expect(JSON.parse(since[0]!)).toMatchObject({ type: "CustomerCreated", source: "api" });
+  });
+
+  it("subscribes to webhooks, makes customers pay, and shows the deliveries", async () => {
+    const { call, twin } = await connectAgent();
+    const subscription = {
+      vendor: "jobber",
+      url: "http://127.0.0.1:9/hooks",
+      topics: ["INVOICE_UPDATE"],
+      clientId: "app",
+      clientSecret: "s",
+    };
+    expect((await call("twin_set_webhooks", { subscriptions: [subscription] })).subscriptions).toEqual([
+      { vendor: "jobber", url: "http://127.0.0.1:9/hooks", topics: ["INVOICE_UPDATE"], clientId: "app" },
+    ]);
+
+    const { events } = await call("twin_run_action", { vendor: "jobber", action: "payInvoices", params: 1 });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toContain("(control)");
+    await twin.webhooks.idle();
+    const { deliveries } = await call("twin_webhooks");
+    expect(deliveries.map((delivery: { topic: string }) => delivery.topic)).toEqual(["INVOICE_UPDATE", "INVOICE_UPDATE"]);
   });
 });

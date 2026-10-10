@@ -6,12 +6,15 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Jobber webhooks (roadmap v0.2): `CLIENT_CREATE` and `INVOICE_UPDATE` in the documented payload, signed with `X-Jobber-Hmac-SHA256`, sent to the subscriptions set with `PUT /_twin/webhooks` (or the `twin_set_webhooks` MCP tool) after the request or clock advance that caused them. Paying an invoice fires `INVOICE_UPDATE` twice, a second apart, as documented; a delivery the app doesn't accept within a second is retried on twin time; `GET /_twin/webhooks` shows each delivery and how the app answered. Subscriptions survive reset and rewind; nothing is sent for the seeded world or rebuilt history. `VendorTwin` gains an optional `webhooks`.
+- `POST /_twin/actions/:vendor/:action` and the `twin_run_action` MCP tool make a vendor's scenario action happen now (`jobber/payInvoices`, `jobber/newClients`), recorded with source `control`.
 - A `lostResponse` fault effect: the twin does the work, then answers with the rule's error anyway, the way a gateway timeout hides a write that succeeded. It is the failure that makes a retried write happen twice unless it is idempotent.
 - The conformance suite (`conformance/`, roadmap v0.3): 22 cases for the QuickBooks and Jobber behaviors FIDELITY.md marks `check`, run against an in-process twin by `npm test`. `npm run conformance:record` records them against a QuickBooks sandbox company and a Jobber testing account using your tokens (and refuses production QuickBooks); recorded cases must then match, and `npm run conformance` scores a running twin per case, per endpoint, and overall. Nothing is recorded yet, so the cases show as todos.
 - QuickBooks honors `requestid` on customer, invoice, and payment writes, as documented: a repeated request gets the first answer again, word for word, and writes nothing. The answer travels on the write's event, so rewinding forgets it along with the write.
 
 ### Changed
 
+- Advancing the clock (`POST /_twin/clock/advance`, the MCP tool, `advanceClock()`) now resolves once the webhooks it caused have been delivered, so `advanceClock()` returns a promise.
 - `flaky-apis` also loses the answer to 15% of QuickBooks writes after making them (504), so retry logic has to be idempotent to pass it. The sync example sends a `requestid` with every write and settles to a clean run's books; its tests show a client without one making eight copies of an invoice.
 
 ## 0.1.0 - 2026-10-09

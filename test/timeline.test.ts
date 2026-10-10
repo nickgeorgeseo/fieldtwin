@@ -21,9 +21,9 @@ describe("scenario timelines", () => {
     createCheckpoint(harness.twin, "loaded");
     expect(await clientCount(harness)).toBe(25);
 
-    advanceClock(harness.twin, 30);
+    await advanceClock(harness.twin, 30);
     expect(await clientCount(harness)).toBe(25);
-    advanceClock(harness.twin, 30);
+    await advanceClock(harness.twin, 30);
     expect(await clientCount(harness)).toBe(28);
 
     const changes = listChanges(harness.twin, "loaded");
@@ -34,7 +34,7 @@ describe("scenario timelines", () => {
     ]);
   });
 
-  it("understands +offsets, the business's local HH:MM, and ISO times, and runs each at its own time", () => {
+  it("understands +offsets, the business's local HH:MM, and ISO times, and runs each at its own time", async () => {
     const harness = setup();
     // Seed 42's business is in Texas (UTC-5 in summer), so 09:00 local is 14:00 UTC.
     loadScenario(
@@ -48,7 +48,7 @@ describe("scenario timelines", () => {
       ),
     );
     createCheckpoint(harness.twin, "loaded");
-    advanceClock(harness.twin, 8 * 60);
+    await advanceClock(harness.twin, 8 * 60);
     expect(listChanges(harness.twin, "loaded").map((change) => change.at)).toEqual([
       "2026-07-13T12:30:00.000Z",
       "2026-07-13T14:00:00.000Z",
@@ -57,16 +57,16 @@ describe("scenario timelines", () => {
     expect(harness.twin.clock.nowIso()).toBe("2026-07-13T19:00:00.000Z");
   });
 
-  it("re-arms events after a rewind to before them, without ever applying them twice", () => {
+  it("re-arms events after a rewind to before them, without ever applying them twice", async () => {
     const harness = setup();
     loadScenario(harness.twin, scenario(`  - at: "+1h"\n    jobber: { newClients: 2 }`));
     createCheckpoint(harness.twin, "start");
-    advanceClock(harness.twin, 120);
+    await advanceClock(harness.twin, 120);
     expect(listChanges(harness.twin, "start")).toHaveLength(2);
 
     rewindTo(harness.twin, "start");
     expect(listChanges(harness.twin, "start")).toHaveLength(0);
-    advanceClock(harness.twin, 120);
+    await advanceClock(harness.twin, 120);
     expect(listChanges(harness.twin, "start")).toHaveLength(2);
   });
 
@@ -78,7 +78,7 @@ describe("scenario timelines", () => {
         await (await harness.jobber("{ invoices(first: 50) { nodes { invoiceNumber invoiceStatus updatedAt } } }")).json()
       ).data.invoices.nodes.filter((invoice: { invoiceStatus: string }) => invoice.invoiceStatus !== "paid");
     const before = await open();
-    advanceClock(harness.twin, 60);
+    await advanceClock(harness.twin, 60);
     const after = await open();
     expect(after).toHaveLength(before.length - 2);
 
@@ -96,14 +96,14 @@ describe("scenario timelines", () => {
     }
   });
 
-  it("produces the same log from the same scenario, every time", () => {
-    const run = () => {
+  it("produces the same log from the same scenario, every time", async () => {
+    const run = async () => {
       const harness = setup();
       loadScenario(harness.twin, scenario(`  - at: "+1h"\n    jobber: { newClients: 5, payInvoices: 1 }`));
-      advanceClock(harness.twin, 90);
+      await advanceClock(harness.twin, 90);
       return harness.twin.log.toJsonl();
     };
-    expect(run()).toBe(run());
+    expect(await run()).toBe(await run());
   });
 
   it("shows what is scheduled next", () => {

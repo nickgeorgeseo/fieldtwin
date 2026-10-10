@@ -1,6 +1,7 @@
 import type { DriftOptions } from "../world/drift.ts";
 import { generateWorld, type World, type WorldSize } from "../world/generate-world.ts";
 import { Bookkeeping } from "./bookkeeping.ts";
+import { Checkpoints } from "./checkpoints.ts";
 import { TwinClock } from "./clock.ts";
 import { EventLog } from "./event-log.ts";
 import type { BucketLimits, LeakyBucket } from "./leaky-bucket.ts";
@@ -8,7 +9,8 @@ import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { SeededRandom } from "./random.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
-import type { VendorTwin } from "./vendor-twin.ts";
+import { scenarioActionOf, type VendorTwin } from "./vendor-twin.ts";
+import { WebhookDispatcher, type WebhookSender } from "./webhooks.ts";
 
 export interface TwinOptions {
   seed: number;
@@ -17,6 +19,7 @@ export interface TwinOptions {
   drift?: DriftOptions;
   auth?: AuthMode;
   vendors: VendorTwin[];
+  sendWebhook?: WebhookSender; // how deliveries reach your app: fetch, unless a test answers them itself
 }
 
 /**
@@ -37,7 +40,7 @@ export class Twin {
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
-  private checkpoints = new Map<string, Checkpoint>();
+  private checkpoints = new Checkpoints();
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   // Each vendor's OAuth server draws from its own stream, so issuing tokens never changes the world or the faults.
@@ -48,17 +51,29 @@ export class Twin {
   // A loaded scenario's schedule. See schedule() and advance().
   private timeline = new Timeline();
 
+  // Webhook subscriptions and deliveries: bookkeeping too. See core/webhooks.ts.
+  readonly webhooks: WebhookDispatcher;
+  private rebuilding = false; // while the world or its history is being rebuilt, nothing is news to anyone
+
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
     this.authMode = options.auth ?? "any-token";
+    this.webhooks = new WebhookDispatcher(options.sendWebhook ?? ((url, init) => fetch(url, init)));
     this.reset();
   }
 
   /** The single write path. Every change to every vendor's state goes through here. */
   record(event: NewEvent, source: EventSource): TwinEvent {
     const recorded = this.log.append({ ...event, at: this.clock.nowIso(), source });
-    this.vendor(event.vendor).apply(this.state(event.vendor), recorded);
+    const vendor = this.vendor(event.vendor);
+    vendor.apply(this.state(event.vendor), recorded);
+    if (!this.rebuilding) this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
     return recorded;
+  }
+
+  /** Send the webhook deliveries that are due by now. Resolves once they have been answered. */
+  deliverWebhooks(): Promise<void> {
+    return this.webhooks.deliverDue(this.clock.nowMs());
   }
 
   vendor(name: VendorName): VendorTwin {
@@ -85,9 +100,9 @@ export class Twin {
 
   /** Schedule a scenario's timeline, replacing any other, and apply the entries already due. */
   schedule(entries: TimelineEntry[]): void {
-    for (const entry of entries) this.scenarioAction(entry).check(entry.params);
+    for (const entry of entries) scenarioActionOf(this.vendor(entry.vendor), entry.action).check(entry.params);
     this.timeline.schedule(entries);
-    this.runDue(this.clock.nowMs());
+    this.catchUp();
   }
 
   /** Move twin time forward, applying scheduled entries at their own times on the way. */
@@ -109,18 +124,9 @@ export class Twin {
     for (const { entry, position } of this.timeline.takeDue(nowMs)) {
       const random = new SeededRandom(this.options.seed * 7919 + 1000 + position);
       const context = { state: this.state(entry.vendor), world: this.world, random, nowIso: this.clock.nowIso() };
-      for (const event of this.scenarioAction(entry).run(entry.params, context)) this.record(event, "scenario");
+      const action = scenarioActionOf(this.vendor(entry.vendor), entry.action);
+      for (const event of action.run(entry.params, context)) this.record(event, "scenario");
     }
-  }
-
-  private scenarioAction(entry: TimelineEntry) {
-    const actions = this.vendor(entry.vendor).scenarioActions ?? {};
-    const action = actions[entry.action];
-    if (!action) {
-      const available = Object.keys(actions).join(", ") || "none";
-      throw new Error(`${entry.vendor} has no scenario action "${entry.action}". Available: ${available}`);
-    }
-    return action;
   }
 
   /** Back to the seeded starting world. Same seed and options give a byte-identical log. */
@@ -133,13 +139,23 @@ export class Twin {
     this.faultRules = [];
     this.checkpoints.clear();
     this.bookkeeping.clearRateLimits();
+    this.webhooks.dropPending();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
 
+    this.rebuilding = true;
     for (const vendor of this.vendors.values()) {
       for (const event of vendor.seed(this.world)) this.record(event, "seed");
     }
+    this.rebuilding = false;
     this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
+    this.catchUp();
+  }
+
+  /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
+  private catchUp(): void {
+    this.rebuilding = true;
     this.runDue(this.clock.nowMs());
+    this.rebuilding = false;
   }
 
   /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
@@ -153,15 +169,11 @@ export class Twin {
   }
 
   checkpoint(name: string): Checkpoint {
-    const checkpoint = { name, seq: this.log.length, time: this.clock.nowIso() };
-    this.checkpoints.set(name, checkpoint);
-    return checkpoint;
+    return this.checkpoints.take(name, this.log.length, this.clock.nowIso());
   }
 
   getCheckpoint(name: string): Checkpoint {
-    const checkpoint = this.checkpoints.get(name);
-    if (!checkpoint) throw new Error(`No checkpoint named "${name}"`);
-    return checkpoint;
+    return this.checkpoints.get(name);
   }
 
   /** Everything recorded since a checkpoint. The answer to "what did my agent just do?" */
@@ -182,11 +194,8 @@ export class Twin {
     }
     this.clock = new TwinClock(checkpoint.time);
     this.bookkeeping.clearRateLimits();
+    this.webhooks.dropPending();
     this.timeline.rearmAfter(this.clock.nowMs());
-
-    // Checkpoints taken after this one point at history that no longer exists.
-    for (const [otherName, other] of this.checkpoints) {
-      if (other.seq > checkpoint.seq) this.checkpoints.delete(otherName);
-    }
+    this.checkpoints.forgetAfter(checkpoint.seq);
   }
 }

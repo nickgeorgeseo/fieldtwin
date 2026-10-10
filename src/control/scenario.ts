@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
 import { type FaultRule, isFaultStatus } from "../core/types.ts";
+import type { WebhookSubscription } from "../core/webhooks.ts";
 
 /**
  * A scenario is a YAML file describing a situation to test against: which world to generate, what time
@@ -66,6 +67,22 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
 /** Parse and validate a scenario. Errors name the exact field that is wrong. */
 export function parseScenario(yamlText: string): Scenario {
   return validate(ScenarioSchema, parse(yamlText), "Invalid scenario");
+}
+
+/** A webhook subscription: what an app would set up in the vendor's developer settings. */
+const WebhookSubscriptionSchema = z
+  .object({
+    vendor: z.enum(["quickbooks", "jobber"]),
+    url: z.string().url(),
+    topics: z.array(z.string()).min(1),
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+  })
+  .strict();
+
+/** Validate webhook subscriptions from the control plane or an MCP tool. The vendor checks the topics. */
+export function parseWebhookSubscriptions(value: unknown): WebhookSubscription[] {
+  return validate(z.array(WebhookSubscriptionSchema), value, "Invalid webhook subscriptions");
 }
 
 /** Validate fault rules from any source (a scenario, the control plane, an MCP tool) before they take effect. */

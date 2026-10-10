@@ -23,7 +23,18 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
   server.registerTool(
     "twin_advance_clock",
     { description: "Move twin time forward.", inputSchema: { minutes: z.number().positive() } },
-    ({ minutes }) => asText(ops.advanceClock(twin, minutes)),
+    async ({ minutes }) => asText(await ops.advanceClock(twin, minutes)),
+  );
+
+  server.registerTool(
+    "twin_run_action",
+    {
+      description:
+        "Make something happen now, as if someone did it in the vendor's own app: jobber payInvoices (params: how many) " +
+        "or newClients (params: how many). Webhooks for it go out before this answers.",
+      inputSchema: { vendor: z.string(), action: z.string(), params: z.unknown() },
+    },
+    async ({ vendor, action, params }) => asText(await ops.runAction(twin, vendor, action, params)),
   );
 
   server.registerTool(
@@ -85,6 +96,21 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
       inputSchema: { mode: z.enum(["any-token", "oauth"]) },
     },
     ({ mode }) => asText(ops.setAuthMode(twin, mode)),
+  );
+
+  server.registerTool(
+    "twin_set_webhooks",
+    {
+      description:
+        "Replace the webhook subscriptions, as an app would set them up in the vendor's developer settings. Each: " +
+        "{ vendor: jobber, url, topics: [CLIENT_CREATE | INVOICE_UPDATE], clientId, clientSecret (signs deliveries) }.",
+      inputSchema: { subscriptions: z.array(z.unknown()) },
+    },
+    ({ subscriptions }) => asText(ops.setWebhooks(twin, subscriptions)),
+  );
+
+  server.registerTool("twin_webhooks", { description: "The webhook subscriptions, and the latest deliveries with how each went." }, () =>
+    asText(ops.describeWebhooks(twin)),
   );
 
   server.registerTool(

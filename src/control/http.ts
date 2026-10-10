@@ -11,7 +11,12 @@ export function controlRoutes(twin: Twin): Hono {
 
   app.get("/_twin", (c) => c.json(ops.describeTwin(twin)));
   app.post("/_twin/reset", (c) => c.json(ops.resetTwin(twin)));
-  app.post("/_twin/clock/advance", async (c) => c.json(ops.advanceClock(twin, (await c.req.json()).minutes)));
+  app.post("/_twin/clock/advance", async (c) => c.json(await ops.advanceClock(twin, (await c.req.json()).minutes)));
+  app.post("/_twin/actions/:vendor/:action", async (c) =>
+    c.json(await ops.runAction(twin, c.req.param("vendor"), c.req.param("action"), await c.req.json())),
+  );
+  app.get("/_twin/webhooks", (c) => c.json(ops.describeWebhooks(twin)));
+  app.put("/_twin/webhooks", async (c) => c.json(ops.setWebhooks(twin, await c.req.json())));
   app.post("/_twin/checkpoints/:name", (c) => c.json(ops.createCheckpoint(twin, c.req.param("name"))));
   app.get("/_twin/checkpoints/:name/changes", (c) =>
     c.json(ops.listChanges(twin, c.req.param("name"), { onlyFromApi: c.req.query("source") === "api" })),

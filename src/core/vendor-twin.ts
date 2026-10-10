@@ -3,6 +3,7 @@ import type { World } from "../world/generate-world.ts";
 import type { SeededRandom } from "./random.ts";
 import type { Twin } from "./twin.ts";
 import type { NewEvent, TwinEvent, VendorName } from "./types.ts";
+import type { VendorWebhooks } from "./webhooks.ts";
 
 /**
  * The contract every vendor twin implements. Adding a vendor means adding one folder
@@ -45,6 +46,20 @@ export interface VendorTwin<State = unknown> {
    * Optional: a vendor without actions simply can't be scripted. See "Scenario timelines" in ARCHITECTURE.md.
    */
   scenarioActions?: Record<string, ScenarioAction<State>>;
+
+  /**
+   * The webhooks this vendor sends: its topics, which events announce what, and how a delivery is shaped and signed.
+   * Optional: a vendor without webhooks never sends any. See core/webhooks.ts.
+   */
+  webhooks?: VendorWebhooks<State>;
+}
+
+/** A vendor's scenario action by name, or an error naming the ones it has. */
+export function scenarioActionOf(vendor: VendorTwin, name: string): ScenarioAction {
+  const actions = vendor.scenarioActions ?? {};
+  const action = actions[name];
+  if (!action) throw new Error(`${vendor.name} has no scenario action "${name}". Available: ${Object.keys(actions).join(", ") || "none"}`);
+  return action;
 }
 
 /** One thing a scenario can make happen: check its parameters when the scenario loads, run it when it's due. */
