@@ -18,6 +18,9 @@ export const jobberTwin: VendorTwin<JobberState> = {
   scenarioActions: jobberScenarioActions,
   webhooks: jobberWebhooks,
   // Jobber's DDoS guard answers 429 with a plain HTTP error; other injected faults use GraphQL's error shape.
-  errorBody: (status, message) =>
-    status === 429 ? { message: "Too Many Requests" } : graphQLError(message, status >= 500 ? "INTERNAL_SERVER_ERROR" : "INJECTED_FAULT"),
+  errorBody: (status, message) => {
+    if (status === 429) return { message: "Too Many Requests" };
+    if (status === 413) return { errors: [{ message }] }; // like the twin's other answers to a body it can't use
+    return graphQLError(message, status >= 500 ? "INTERNAL_SERVER_ERROR" : "INJECTED_FAULT");
+  },
 };

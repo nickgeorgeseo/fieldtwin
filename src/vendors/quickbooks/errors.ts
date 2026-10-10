@@ -151,6 +151,7 @@ export function qboErrorForStatus(status: number, detail: string, now: string): 
   if (status === 401) return qboErrors.notAuthenticated(detail, now);
   if (status === 403) return qboErrors.notAuthorized(detail, now);
   if (status === 429) return qboErrors.throttled(detail, now);
+  if (status === 413) return qboFault({ code: "413", Message: "Request Entity Too Large", Detail: detail }, now);
   if (status >= 500) return qboErrors.serverError(detail, now);
   return qboFault({ code: String(status), Message: "Injected fault", Detail: detail }, now);
 }

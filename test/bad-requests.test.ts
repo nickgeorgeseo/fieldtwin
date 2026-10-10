@@ -132,3 +132,23 @@ describe("an error the twin didn't expect", () => {
     }
   });
 });
+
+describe("request bodies too big to be real", () => {
+  const huge = JSON.stringify({ DisplayName: "x".repeat(11 * 1024 * 1024) }); // 11 MB: no real request is this big
+
+  it("answer 413 in each vendor's own format, naming the limit, before the twin reads them", async () => {
+    const harness = setup();
+    const qbo = await qboRaw(harness, "/customer", huge);
+    expect(qbo.status).toBe(413);
+    expect((await qbo.json()).Fault.Error[0].Detail).toContain("10 MB");
+    const jobber = await jobberRaw(harness, huge);
+    expect(jobber.status).toBe(413);
+    expect((await jobber.json()).errors[0].message).toContain("10 MB");
+  });
+
+  it("answer 413 on the control plane too", async () => {
+    const response = await setup().app.request("/_twin/scenario", { method: "POST", body: huge });
+    expect(response.status).toBe(413);
+    expect((await response.json()).error).toContain("10 MB");
+  });
+});

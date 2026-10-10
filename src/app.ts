@@ -1,4 +1,5 @@
-import { type ErrorHandler, Hono } from "hono";
+import { type Context, type ErrorHandler, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { controlRoutes } from "./control/http.ts";
 import { Twin } from "./core/twin.ts";
 import type { AuthMode } from "./core/types.ts";
@@ -37,6 +38,9 @@ export function createApp(options: AppOptions = {}) {
   twin.webhooks.faults = webhookFaults(twin); // fault rules with `webhook:` make deliveries misbehave
 
   const app = new Hono();
+  // Neither vendor documents a size limit. The twin has one, far above any real request, so a runaway client can't
+  // use up its memory (FIDELITY.md).
+  app.use("*", bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => answerTooLarge(twin, c) }));
   app.get("/", (c) => c.json(startHere(twin, new URL(c.req.url).origin)));
   app.route("/", controlRoutes(twin));
   for (const vendor of ALL_VENDORS) {
@@ -52,6 +56,23 @@ export function createApp(options: AppOptions = {}) {
   app.onError(answerUnexpectedErrors(twin));
 
   return { app, twin };
+}
+
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/** 413 for a body over the limit: in the vendor's own error format on its paths, so its SDKs can read it. */
+function answerTooLarge(twin: Twin, c: Context) {
+  const message = "The request body is over the twin's 10 MB limit. No real request is that big: check what is being sent.";
+  const vendor = vendorAt(twin, c.req.path);
+  return c.json((vendor ? vendor.errorBody(413, message, twin) : { error: message }) as object, 413);
+}
+
+/** The vendor whose API a path belongs to, if any. */
+function vendorAt(twin: Twin, path: string) {
+  return twin
+    .vendorNames()
+    .map((name) => twin.vendor(name))
+    .find((candidate) => path.startsWith(`${candidate.pathPrefix}/`));
 }
 
 /** What GET / answers: where everything is, for whoever opens the twin's address in a browser first. */
@@ -77,10 +98,7 @@ export function answerUnexpectedErrors(twin: Twin): ErrorHandler {
   return (error, c) => {
     console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${error.stack ?? error.message}`);
     const message = "The twin hit an unexpected error. This is a bug in fieldtwin: the twin's log has the details.";
-    const vendor = twin
-      .vendorNames()
-      .map((name) => twin.vendor(name))
-      .find((candidate) => c.req.path.startsWith(`${candidate.pathPrefix}/`));
+    const vendor = vendorAt(twin, c.req.path);
     return c.json((vendor ? vendor.errorBody(500, message, twin) : { error: message }) as object, 500);
   };
 }
