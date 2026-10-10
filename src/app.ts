@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type ErrorHandler, Hono } from "hono";
 import { controlRoutes } from "./control/http.ts";
 import { Twin } from "./core/twin.ts";
 import type { AuthMode } from "./core/types.ts";
@@ -46,6 +46,23 @@ export function createApp(options: AppOptions = {}) {
     });
     app.route("/", vendor.routes(twin));
   }
+  app.onError(answerUnexpectedErrors(twin));
 
   return { app, twin };
+}
+
+/**
+ * The last line of defense. An error nothing expected is a bug in the twin: log it with its stack, and answer a
+ * 500 in the vendor's own error format, so the client sees a server error it can parse rather than plain text.
+ */
+export function answerUnexpectedErrors(twin: Twin): ErrorHandler {
+  return (error, c) => {
+    console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${error.stack ?? error.message}`);
+    const message = "The twin hit an unexpected error. This is a bug in fieldtwin: the twin's log has the details.";
+    const vendor = twin
+      .vendorNames()
+      .map((name) => twin.vendor(name))
+      .find((candidate) => c.req.path.startsWith(`${candidate.pathPrefix}/`));
+    return c.json((vendor ? vendor.errorBody(500, message, twin) : { error: message }) as object, 500);
+  };
 }

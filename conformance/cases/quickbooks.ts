@@ -68,6 +68,21 @@ export const quickbooksCases: ConformanceCase[] = [
     },
   },
   {
+    name: "body-not-json",
+    vendor: "quickbooks",
+    endpoint: "POST /customer",
+    fidelity: "A body that isn't a JSON object, or lines that aren't objects",
+    async observe(target) {
+      const { apiBase, realmId, accessToken } = target.quickbooks;
+      const response = await target.fetch(`${apiBase}/company/${realmId}/customer`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+        body: "{not json",
+      });
+      return faultOf({ status: response.status, body: await response.json().catch(() => null) });
+    },
+  },
+  {
     name: "range-operator-on-id",
     vendor: "quickbooks",
     endpoint: "GET /query",

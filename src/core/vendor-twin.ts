@@ -38,7 +38,7 @@ export interface VendorTwin<State = unknown> {
   /** HTTP routes shaped like the vendor's real API, mounted at the server root. */
   routes(twin: Twin): Hono;
 
-  /** An error body in the vendor's own format, so injected faults look real. */
+  /** An error body in the vendor's own format, so injected faults look real and the twin's own bugs stay readable. */
   errorBody(status: number, message: string, twin: Twin): unknown;
 
   /**

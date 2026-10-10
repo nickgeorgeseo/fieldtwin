@@ -1,10 +1,11 @@
 import type { Hono } from "hono";
 import { formatMoney, fromCents, toCents } from "../../../core/money.ts";
+import { isObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
 /**
@@ -23,7 +24,8 @@ export function paymentRoutes(app: Hono, twin: Twin): void {
   });
 
   app.post(`${COMPANY}/payment`, async (c) => {
-    const body = (await c.req.json()) as UpdateBody<QboPayment>;
+    const body = await readEntityBody<QboPayment>(c, '{"CustomerRef": {"value": "1"}, "TotalAmt": 25}', now());
+    if ("Fault" in body) return c.json(body, 400);
     const operation = c.req.query("operation") ?? (body.Id ? "update" : undefined);
     if (operation) {
       return c.json(qboErrors.unsupportedOperation(`Operation ${operation} is not supported for Payment by the twin yet.`, now()), 400);
@@ -52,9 +54,16 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   // Check every line before changing anything, so a bad line never leaves a payment half-applied.
   const lines: QboPaymentLine[] = [];
   const balances = new Map<string, number>(); // invoice Id -> balance in cents, after the lines so far
-  for (const line of (fields.Line ?? []) as Partial<QboPaymentLine>[]) {
+  const requested: unknown = fields.Line ?? [];
+  if (!Array.isArray(requested) || !requested.every(isObject)) {
+    return qboErrors.invalidProperty("Line", 'Line must be a list of lines, like [{"Amount": 25, "LinkedTxn": [...]}].', now);
+  }
+  for (const line of requested as Partial<QboPaymentLine>[]) {
     if (typeof line.Amount !== "number") return qboErrors.missingField("Line.Amount", now);
     if (line.Amount < 0) return qboErrors.negativeAmount("Line.Amount", now);
+    if (line.LinkedTxn !== undefined && !Array.isArray(line.LinkedTxn)) {
+      return qboErrors.invalidProperty("Line.LinkedTxn", 'LinkedTxn must be a list, like [{"TxnId": "130", "TxnType": "Invoice"}].', now);
+    }
     const [link] = line.LinkedTxn ?? [];
     if (!link?.TxnId) return qboErrors.missingField("Line.LinkedTxn", now);
     if (link.TxnType !== "Invoice") {

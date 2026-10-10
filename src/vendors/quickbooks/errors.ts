@@ -34,6 +34,10 @@ export const qboErrors = {
   notFound: (now: string) =>
     qboFault({ code: "610", Message: "Object Not Found", Detail: "The object ID you're requesting doesn't exist." }, now),
 
+  // Also the nearest documented code for a body that isn't a JSON object; the docs give none for that (see FIDELITY.md).
+  invalidProperty: (element: string | undefined, detail: string, now: string) =>
+    qboFault({ code: "2010", Message: "Request has invalid or unsupported property", Detail: detail, ...(element && { element }) }, now),
+
   missingField: (field: string, now: string) =>
     qboFault(
       {

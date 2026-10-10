@@ -12,6 +12,7 @@ import {
   type TypeNode,
   validate,
 } from "graphql";
+import { isObject } from "../../core/request-body.ts";
 import { invalidEncodedIdMessage, isEncodedId } from "./encoded-id.ts";
 
 /**
@@ -48,6 +49,20 @@ export interface GraphQLRequest {
   query: string;
   variables: Record<string, unknown>;
   operationName?: string;
+}
+
+/**
+ * The GraphQL request a parsed JSON body holds, or what's wrong with it. The docs don't show Jobber's answer to a
+ * malformed body; the twin answers 400 with a GraphQL error saying what to send (see FIDELITY.md).
+ */
+export function graphQLRequestFrom(body: Record<string, unknown>): GraphQLRequest | { problem: string } {
+  const { query, variables, operationName } = body;
+  if (typeof query !== "string") return { problem: 'query must be a string holding the GraphQL document, like "{ account { id } }".' };
+  if (variables != null && !isObject(variables)) {
+    return { problem: 'variables must be a JSON object, like {"id": "..."}, not a string or a list.' };
+  }
+  if (operationName != null && typeof operationName !== "string") return { problem: "operationName must be a string." };
+  return { query, variables: variables ?? {}, operationName: operationName ?? undefined };
 }
 
 export function prepare(request: GraphQLRequest): { document: DocumentNode } | { errors: GraphQLFormattedError[] } {

@@ -12,6 +12,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Fixed
 
+- A request body the twin can't use gets the vendor's own error, with a 400 that says what was wrong, instead of a plain-text 500 "Internal Server Error": malformed JSON, a body that isn't an object, QuickBooks lines that aren't objects, Jobber `variables` sent as a string, a `redirect_uri` that isn't an absolute URL, and an OAuth token request that isn't form-encoded. Anything else the twin didn't expect answers a 500 in the vendor's format and is logged with its stack, so bugs in the twin are visible.
+
 - QuickBooks change data capture reads a `changedSince` without a UTC offset as UTC. It used the time zone of the machine running the twin, so the same request found different changes on different machines.
 - Startup problems are one readable line instead of a crash: a port already in use says so and how to pick another, a scenario that can't be found lists the ones that exist, and `FIELDTWIN_PORT` or `FIELDTWIN_SEED` values that aren't numbers say what is expected. The "open for business" line now appears only once the twin is really listening.
 - `npm start` and `npm run example:sync` start from any folder. From a path with a space in it, or on Windows, they used to exit silently without starting anything.

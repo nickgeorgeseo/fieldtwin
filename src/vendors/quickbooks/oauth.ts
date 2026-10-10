@@ -1,5 +1,6 @@
 import type { Context, Hono } from "hono";
 import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
+import { readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import type { QboState } from "./types.ts";
 
@@ -30,6 +31,8 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     if (!clientId || !redirectUri) {
       return c.json({ error: "invalid_request", error_description: "client_id and redirect_uri are required" }, 400);
     }
+    const redirectProblem = redirectUriProblem(redirectUri);
+    if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const back = new URL(redirectUri);
     if (state !== undefined) back.searchParams.set("state", state);
     if (response_type !== "code") back.searchParams.set("error", "unsupported_response_type");
@@ -48,13 +51,14 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     const client = basicCredentials(c.req.header("Authorization"));
     if (!client)
       return c.json({ error: "invalid_client", error_description: "Send the app's client_id and client_secret as HTTP Basic auth" }, 401);
-    const form = await c.req.parseBody();
-    const field = (name: string) => (typeof form[name] === "string" ? (form[name] as string) : "");
+    const read = await readForm(c);
+    if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
+    const field = (name: string) => read.form[name] ?? "";
 
     let result: TokenSet | OAuthError;
-    if (form.grant_type === "authorization_code") {
+    if (field("grant_type") === "authorization_code") {
       result = oauth().exchange({ clientId: client.id, code: field("code"), redirectUri: field("redirect_uri") }, nowMs());
-    } else if (form.grant_type === "refresh_token") {
+    } else if (field("grant_type") === "refresh_token") {
       result = oauth().refresh({ clientId: client.id, refreshToken: field("refresh_token") }, nowMs());
     } else {
       return c.json({ error: "unsupported_grant_type", error_description: "grant_type must be authorization_code or refresh_token" }, 400);
@@ -66,7 +70,9 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
   app.post("/v2/oauth2/tokens/revoke", async (c) => {
     if (!basicCredentials(c.req.header("Authorization"))) return c.json({ error: "invalid_client" }, 401);
     const isJson = c.req.header("Content-Type")?.includes("json");
-    const token = isJson ? ((await c.req.json()) as { token?: string }).token : (await c.req.parseBody()).token;
+    const read = isJson ? await readJsonObject(c, '{"token": "..."}') : await readForm(c);
+    if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
+    const token = "body" in read ? read.body.token : read.form.token;
     if (typeof token !== "string" || !oauth().revoke(token)) {
       return c.json({ error: "invalid_request", error_description: "That token was never issued, or was already revoked" }, 400);
     }

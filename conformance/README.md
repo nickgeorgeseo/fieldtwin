@@ -52,9 +52,9 @@ Commit the recordings. They are the evidence behind the `Verified` column.
 
 ## What's covered
 
-QuickBooks: CDC with nothing changed and with a look-back over 30 days, the status of 610 on a read, an unknown token (and the casing of its fault), another company's realm, entity names in lower case, a range operator on Id, whether ORDERBY sorts text without regard to case, whether queries leave inactive customers out, whether paying an invoice moves its SyncToken, a stale SyncToken, duplicate DocNumbers, the default DueDate, and `requestid` replays and length.
+QuickBooks: CDC with nothing changed and with a look-back over 30 days, the status of 610 on a read, a body that isn't JSON, an unknown token (and the casing of its fault), another company's realm, entity names in lower case, a range operator on Id, whether ORDERBY sorts text without regard to case, whether queries leave inactive customers out, whether paying an invoice moves its SyncToken, a stale SyncToken, duplicate DocNumbers, the default DueDate, and `requestid` replays and length.
 
-Jobber: a missing and an unknown version header, an unknown token, a syntax error, the padding of encoded ids, the cost of `{ account { id name } }` and of connection extras, whether the root `invoices` and `users` queries exist, and `clientCreate` with only a company name.
+Jobber: a missing and an unknown version header, an unknown token, a syntax error, a body that isn't JSON, variables sent as a string, the padding of encoded ids, the cost of `{ account { id name } }` and of connection extras, whether the root `invoices` and `users` queries exist, and `clientCreate` with only a company name.
 
 Not covered: QuickBooks' 429 body (provoking a real throttle means flooding the sandbox; if you meet one, add it by hand).
 

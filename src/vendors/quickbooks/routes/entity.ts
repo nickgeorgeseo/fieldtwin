@@ -1,3 +1,5 @@
+import type { Context } from "hono";
+import { readJsonObject } from "../../../core/request-body.ts";
 import type { QboFault } from "../errors.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboEntityName, QboState } from "../types.ts";
@@ -18,6 +20,12 @@ export interface Versioned {
 
 /** What a client sends to update an entity: its Id, the SyncToken it last read, and `sparse`. */
 export type UpdateBody<T> = Partial<T> & { Id?: string; SyncToken?: string; sparse?: boolean };
+
+/** The JSON object a write sends, or the Fault for a body that isn't one. `example` shows the entity's shape. */
+export async function readEntityBody<T>(c: Context, example: string, now: string): Promise<UpdateBody<T> | QboFault> {
+  const read = await readJsonObject(c, example);
+  return "problem" in read ? qboErrors.invalidProperty(undefined, read.problem, now) : (read.body as UpdateBody<T>);
+}
 
 /**
  * The quirk that breaks real integrations: you must send the SyncToken you last read.

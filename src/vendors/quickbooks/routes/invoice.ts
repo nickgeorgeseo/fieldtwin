@@ -5,7 +5,7 @@ import { qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
-import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, type UpdateBody } from "./entity.ts";
+import { asResponse, COMPANY, checkSyncToken, mergeUpdate, nextVersion, pickWritable, readEntityBody, type UpdateBody } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
 /** Invoice: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice */
@@ -27,12 +27,15 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
     }
     const checked = checkRequestId(c, state(), now());
     if ("answer" in checked) return checked.answer;
-    const body = (await c.req.json()) as UpdateBody<QboInvoice>;
+    const body = await readEntityBody<QboInvoice>(c, INVOICE_EXAMPLE, now());
+    if ("Fault" in body) return c.json(body, 400);
     const result = body.Id ? updateInvoice(twin, body, checked.requestId) : createInvoice(twin, body, checked.requestId);
     if ("Fault" in result) return c.json(result, 400);
     return c.json({ Invoice: asResponse(result), time: now() });
   });
 }
+
+const INVOICE_EXAMPLE = '{"CustomerRef": {"value": "1"}, "Line": [{"DetailType": "SalesItemLineDetail", "Amount": 100, ...}]}';
 
 function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: string | undefined): QboInvoice | QboFault {
   const state = twin.state<QboState>("quickbooks");

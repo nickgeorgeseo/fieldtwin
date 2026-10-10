@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { Hono } from "hono";
 import type { AccessTokenClaims, OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
+import { readForm, redirectUriProblem } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 
 /**
@@ -29,6 +30,8 @@ export function jobberOAuthRoutes(app: Hono, twin: Twin): void {
     if (!clientId || !redirectUri || c.req.query("response_type") !== "code") {
       return c.json({ error: "invalid_request", error_description: "response_type=code, client_id, and redirect_uri are required" }, 400);
     }
+    const redirectProblem = redirectUriProblem(redirectUri);
+    if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const code = oauth().authorize(
       { clientId, redirectUri, codeChallenge: code_challenge, codeChallengeMethod: code_challenge_method },
       nowMs(),
@@ -43,8 +46,9 @@ export function jobberOAuthRoutes(app: Hono, twin: Twin): void {
 
   // Steps 4-5 and "Refreshing access tokens": the app sends its credentials in the form body.
   app.post("/api/oauth/token", async (c) => {
-    const form = await c.req.parseBody();
-    const field = (name: string) => (typeof form[name] === "string" ? (form[name] as string) : "");
+    const read = await readForm(c);
+    if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
+    const field = (name: string) => read.form[name] ?? "";
     if (!field("client_id") || !field("client_secret")) {
       return c.json({ error: "invalid_client", error_description: "client_id and client_secret are required" }, 401);
     }

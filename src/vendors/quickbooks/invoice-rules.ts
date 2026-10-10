@@ -1,4 +1,5 @@
 import { sameMoney, sumMoney } from "../../core/money.ts";
+import { isObject } from "../../core/request-body.ts";
 import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
@@ -65,6 +66,8 @@ export function draftInvoice(
 /** The sales lines of a request, validated, with Ids and LineNums assigned. */
 function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[], now: string): QboSalesItemLine[] | QboFault {
   if (!Array.isArray(input)) return qboErrors.missingField("Line", now);
+  if (!input.every(isObject))
+    return qboErrors.invalidProperty("Line", 'Each line must be an object, like {"DetailType": "SalesItemLineDetail", ...}.', now);
 
   // Clients often send back the SubTotalLine they read. QuickBooks recomputes it, so it is ignored here.
   const requested = (input as LineInput[]).filter((line) => line?.DetailType !== "SubTotalLineDetail");

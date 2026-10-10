@@ -2,9 +2,10 @@ import { execute } from "graphql";
 import { Hono } from "hono";
 import { checkBearer } from "../../core/auth.ts";
 import { LeakyBucket } from "../../core/leaky-bucket.ts";
+import { readJsonObject } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import { actualQueryCost, COST_LIMITS, requestedQueryCost } from "./cost.ts";
-import { type GraphQLRequest, prepare, schema } from "./graphql.ts";
+import { graphQLRequestFrom, prepare, schema } from "./graphql.ts";
 import { JOBBER_OAUTH_POLICY, jobberOAuthRoutes } from "./oauth.ts";
 import { createResolvers } from "./resolvers/index.ts";
 import type { JobberState } from "./types.ts";
@@ -38,8 +39,9 @@ export function jobberRoutes(twin: Twin): Hono {
     if ("error" in resolved) return c.json(graphQLError(resolved.error, "UNSUPPORTED_VERSION"), 400);
     const { version } = resolved;
 
-    const body = (await c.req.json()) as Partial<GraphQLRequest>;
-    const request: GraphQLRequest = { query: body.query ?? "", variables: body.variables ?? {}, operationName: body.operationName };
+    const read = await readJsonObject(c, '{"query": "{ account { id } }", "variables": {}}');
+    const request = "problem" in read ? read : graphQLRequestFrom(read.body);
+    if ("problem" in request) return c.json({ errors: [{ message: request.problem }] }, 400);
     const prepared = prepare(request);
     if ("errors" in prepared) return c.json({ errors: prepared.errors });
     const { document } = prepared;
