@@ -8,7 +8,7 @@ import type { OAuthPolicy, OAuthServer } from "./oauth.ts";
 import { copyFaultRandom, type FaultRandom, streams } from "./streams.ts";
 import { Timeline, type TimelineEntry } from "./timeline.ts";
 import type { AuthMode, Checkpoint, EventSource, FaultRule, NewEvent, TwinEvent, VendorName } from "./types.ts";
-import { scenarioActionOf, type VendorTwin } from "./vendor-twin.ts";
+import type { VendorTwin } from "./vendor-twin.ts";
 import { WebhookDispatcher, type WebhookSender } from "./webhooks.ts";
 
 export interface TwinOptions {
@@ -47,8 +47,8 @@ export class Twin {
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   private readonly bookkeeping = new Bookkeeping((vendor) => streams.oauth(this.options.seed, [...this.vendors.keys()].indexOf(vendor)));
 
-  // A loaded scenario's schedule. See schedule() and advance().
-  private timeline = new Timeline();
+  // A loaded scenario's schedule, run as advance() moves the clock. See timeline.ts.
+  private readonly timeline = new Timeline(this);
 
   // Webhook subscriptions and deliveries: bookkeeping too. See core/webhooks.ts.
   readonly webhooks: WebhookDispatcher;
@@ -123,33 +123,18 @@ export class Twin {
 
   /** Schedule a scenario's timeline, replacing any other, and apply the entries already due. */
   schedule(entries: TimelineEntry[]): void {
-    for (const entry of entries) scenarioActionOf(this.vendor(entry.vendor), entry.action).check(entry.params);
     this.timeline.schedule(entries);
     this.catchUp();
   }
 
   /** Move twin time forward, applying scheduled entries at their own times on the way. */
   advance(milliseconds: number): void {
-    const target = this.clock.nowMs() + milliseconds;
-    for (let due = this.timeline.nextAt(); due !== undefined && due <= target; due = this.timeline.nextAt()) {
-      this.clock.advance(Math.max(0, due - this.clock.nowMs()));
-      this.runDue(due);
-    }
-    this.clock.advance(target - this.clock.nowMs());
+    this.timeline.advanceTo(this.clock.nowMs() + milliseconds);
   }
 
   /** The next few scheduled entries, for status displays. */
   upcoming(limit = 5): TimelineEntry[] {
     return this.timeline.upcoming(limit);
-  }
-
-  private runDue(nowMs: number): void {
-    for (const { entry, position } of this.timeline.takeDue(nowMs)) {
-      const random = streams.timelineEntry(this.options.seed, position);
-      const context = { state: this.state(entry.vendor), world: this.world, random, nowIso: this.clock.nowIso() };
-      const action = scenarioActionOf(this.vendor(entry.vendor), entry.action);
-      for (const event of action.run(entry.params, context)) this.record(event, "scenario");
-    }
   }
 
   /** Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical log. */
@@ -184,7 +169,7 @@ export class Twin {
 
   /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
   private catchUp(): void {
-    this.asHistory(() => this.runDue(this.clock.nowMs()));
+    this.asHistory(() => this.timeline.runDue(this.clock.nowMs()));
   }
 
   /** Record history rather than news: nothing recorded meanwhile sends a webhook, even if something throws. */
