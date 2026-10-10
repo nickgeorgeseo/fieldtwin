@@ -6,6 +6,8 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- Reference integration: `TokenManager`'s `loadTokens` option, for processes that share one connection. Before refreshing, and once more after an `invalid_grant`, it reads the saved tokens and uses the set another process already rotated to, instead of telling the person to reconnect.
+
 - QuickBooks queries take the rest of the documented language: `AND`, `<`, `>`, `<=`, `>=`, `LIKE` with `%`, and `ORDERBY` with `ASC`/`DESC` on several properties. `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '2026-07-01T00:00:00-05:00' ORDERBY TxnDate DESC` now works instead of answering "Unsupported operation". Numbers compare by value, `MetaData` times as instants, and text without regard to case.
 - QuickBooks queries leave inactive customers and items out unless they filter on `Active`, as Intuit's docs imply. Code that looks a customer up before creating it now meets the inactive duplicate on the twin, as it would in production.
 - `npm start -- flaky-apis` starts a ready-made scenario by name; a path to a `.yaml` (or `.yml`) file still works.

@@ -16,7 +16,10 @@ import { REQUEST_TIMEOUT_MS, type Runtime } from "./runtime.ts";
  *     refresh token the winner had just invalidated;
  *   - always keeps the refresh token from the latest response, and hands every new set to onTokens to persist.
  *     Jobber's old refresh token stops working the moment a new one is issued. QuickBooks' documented sample
- *     returns the same one, but storing whatever comes back costs nothing.
+ *     returns the same one, but storing whatever comes back costs nothing;
+ *   - with loadTokens, works alongside other processes sharing the connection (a webhook server and a scheduled
+ *     job): before refreshing, and once more if the refresh token turns out to be dead, it reads the saved set, and
+ *     uses the one another process already rotated to instead of asking the person to reconnect.
  */
 
 export interface VendorOAuth {
@@ -35,6 +38,8 @@ export interface Tokens {
 export interface TokenManagerOptions {
   /** Persist new tokens here (a database row per connection). A refresh doesn't finish until this does. */
   onTokens?: (tokens: Tokens) => void | Promise<void>;
+  /** Read the saved tokens back (the row onTokens writes), for when other processes share this connection. */
+  loadTokens?: () => Tokens | undefined | Promise<Tokens | undefined>;
   refreshMarginMs?: number; // how early to refresh; 5 minutes by default
 }
 
@@ -75,9 +80,12 @@ export class TokenManager {
 
   /** An access token that won't expire in the next few minutes, refreshing first if needed. */
   async accessToken(): Promise<string> {
-    const marginMs = this.options.refreshMarginMs ?? 5 * 60_000;
-    if (this.runtime.now() < this.tokens.expiresAtMs - marginMs) return this.tokens.accessToken;
+    if (this.fresh(this.tokens)) return this.tokens.accessToken;
     return (await this.refresh()).accessToken;
+  }
+
+  private fresh(tokens: Tokens): boolean {
+    return this.runtime.now() < tokens.expiresAtMs - (this.options.refreshMarginMs ?? 5 * 60_000);
   }
 
   /** The API answered 401 for `rejected`. Refresh, unless another request already replaced that token. */
@@ -94,7 +102,28 @@ export class TokenManager {
   }
 
   private async refreshNow(): Promise<Tokens> {
-    const { refreshToken } = this.tokens;
+    // Another process may have refreshed already. If so, its saved set is the one Jobber still honors.
+    const saved = await this.newerSavedTokens();
+    if (saved && this.fresh(saved)) return saved;
+    try {
+      return await this.refreshWith(this.tokens.refreshToken);
+    } catch (error) {
+      // Dead refresh token: another process may have rotated it a moment ago. Try its saved set once, then give up.
+      const rotated = error instanceof OAuthError && error.code === "invalid_grant" ? await this.newerSavedTokens() : undefined;
+      if (!rotated) throw error;
+      return this.fresh(rotated) ? rotated : this.refreshWith(rotated.refreshToken);
+    }
+  }
+
+  /** The saved tokens, adopted, if another process has saved a different set since this one last looked. */
+  private async newerSavedTokens(): Promise<Tokens | undefined> {
+    const saved = await this.options.loadTokens?.();
+    if (!saved || saved.refreshToken === this.tokens.refreshToken) return undefined;
+    this.tokens = saved;
+    return saved;
+  }
+
+  private async refreshWith(refreshToken: string): Promise<Tokens> {
     const tokens = await requestTokens(
       this.oauth,
       { grant_type: "refresh_token", refresh_token: refreshToken },

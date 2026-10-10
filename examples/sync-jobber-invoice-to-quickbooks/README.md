@@ -49,7 +49,7 @@ The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, 
 | Retrying a write safely | [`quickbooks.ts`](src/quickbooks.ts) | Every QuickBooks write carries a [`requestid`](https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions) made from a hash of the write, the same on every retry, so a create whose answer was lost isn't applied twice |
 | Two syncs at once | [`quickbooks.ts`](src/quickbooks.ts) | The scheduled sync and a webhook's sync can reach the same invoice together. Both make the identical write with the identical requestid, so QuickBooks books it once, with no lock to manage |
 | Expiring tokens | [`oauth.ts`](src/oauth.ts) | Refreshes five minutes early, and once more after a 401 |
-| Rotating refresh tokens | [`oauth.ts`](src/oauth.ts) | One refresh at a time (Jobber [kills the old refresh token](https://developer.getjobber.com/docs/building_your_app/refresh_token_rotation/) the moment it issues a new one, so parallel refreshes race), and every new token set goes to `onTokens` to be saved |
+| Rotating refresh tokens | [`oauth.ts`](src/oauth.ts) | One refresh at a time (Jobber [kills the old refresh token](https://developer.getjobber.com/docs/building_your_app/refresh_token_rotation/) the moment it issues a new one, so parallel refreshes race), and every new token set goes to `onTokens` to be saved. With `loadTokens`, processes that share a connection pick up the set another one rotated to, instead of asking the person to reconnect |
 | Stale records | [`sync.ts`](src/sync.ts) | Recording a payment changes the invoice, so the stamp that follows meets 5010 (Stale Object). It reads the invoice again and retries |
 | Drifted names | [`sync-customers.ts`](src/sync-customers.ts) | Matches customers by email; never renames one; creates the ones the books don't have, as "Name (email)" if the name is taken |
 | Running twice | [`sync.ts`](src/sync.ts) | Every step looks before it writes. A second run changes nothing; a run that died halfway is finished by the next |
@@ -75,6 +75,7 @@ Four things change, and none of them is in the sync itself:
 const runtime = systemRuntime();
 const jobberTokens = new TokenManager(jobberOAuth, await db.tokens("jobber"), runtime, {
   onTokens: (tokens) => db.saveTokens("jobber", tokens), // Jobber's old refresh token is already dead
+  loadTokens: () => db.tokens("jobber"), // another process (the webhook server, say) may have refreshed first
 });
 // ...the same for QuickBooks, then createJobberClient and createQuickBooksClient as in main.ts
 

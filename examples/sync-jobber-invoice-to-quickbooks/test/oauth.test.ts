@@ -105,3 +105,31 @@ describe("connecting and keeping tokens fresh", () => {
     expect((failure as OAuthError).message).toMatch(/Reconnect/);
   });
 });
+
+describe("several processes sharing one connection", () => {
+  /** Two processes (a webhook server and a scheduled job, say), each loading the saved Jobber tokens at start. */
+  async function twoProcesses(options: { sharedStore: boolean }) {
+    const { target, jobberTokens } = await connected();
+    let saved = jobberTokens.current; // the database row both processes read and write
+    const onTokens = (tokens: typeof saved) => {
+      saved = tokens;
+    };
+    const store = options.sharedStore ? { onTokens, loadTokens: async () => saved } : { onTokens };
+    const jobberOAuth = { ...JOBBER_APP, tokenUrl: ENDPOINTS.jobber.tokenUrl };
+    const processA = new TokenManager(jobberOAuth, saved, inProcessRuntime(target), store);
+    const processB = new TokenManager(jobberOAuth, saved, inProcessRuntime(target), store);
+    target.twin.advance(60 * MINUTE); // both access tokens have expired
+    await processA.accessToken(); // A refreshes, and Jobber rotates the refresh token B still holds
+    return { processB, saved: () => saved };
+  }
+
+  it("lets the second process pick up the tokens the first one saved, instead of being told to reconnect", async () => {
+    const { processB, saved } = await twoProcesses({ sharedStore: true });
+    expect(await processB.accessToken()).toBe(saved().accessToken);
+  });
+
+  it("can't recover without a way to read the saved tokens: the stale refresh token is dead", async () => {
+    const { processB } = await twoProcesses({ sharedStore: false });
+    await expect(processB.accessToken()).rejects.toThrow(OAuthError);
+  });
+});
