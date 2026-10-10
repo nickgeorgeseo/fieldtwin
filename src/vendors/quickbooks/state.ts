@@ -1,6 +1,6 @@
 import type { TwinEvent } from "../../core/types.ts";
 import { asQboEvent } from "./events.ts";
-import type { QboAnswer, QboCustomer, QboEntityName, QboState } from "./types.ts";
+import type { QboAnswer, QboCustomer, QboEntityName, QboRef, QboState } from "./types.ts";
 
 export function createQboState(): QboState {
   return {
@@ -30,6 +30,8 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
       state.customers.set(data.customer.Id, data.customer);
       claimId(state, "Customer", data.customer.Id);
       remember(state, data.requestId, { entity: "Customer", record: data.customer, time: event.at });
+      renameReferences(state.invoices, data.customer);
+      renameReferences(state.payments, data.customer);
       return;
 
     case "ItemCreated":
@@ -52,6 +54,18 @@ export function applyQboEvent(state: QboState, event: TwinEvent): void {
 
     default:
       throw new Error(`QuickBooks twin does not know how to apply "${event.type}"`);
+  }
+}
+
+/**
+ * References are by Id, so an invoice or payment shows its customer's current name. Records are replaced, not
+ * edited, so an answer kept for a requestid replay stays word for word what was first sent.
+ */
+function renameReferences<T extends { CustomerRef: QboRef }>(records: Map<string, T>, customer: QboCustomer): void {
+  for (const [id, record] of records) {
+    if (record.CustomerRef.value === customer.Id && record.CustomerRef.name !== customer.DisplayName) {
+      records.set(id, { ...record, CustomerRef: { ...record.CustomerRef, name: customer.DisplayName } });
+    }
   }
 }
 

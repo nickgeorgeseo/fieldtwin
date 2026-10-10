@@ -41,3 +41,23 @@ describe("QuickBooks twin: customer names", () => {
     }
   });
 });
+
+describe("QuickBooks twin: references after a rename", () => {
+  it("shows a customer's current name on its invoices and payments", async () => {
+    const harness = setup();
+    const sale = { DetailType: "SalesItemLineDetail", Amount: 20, SalesItemLineDetail: { ItemRef: { value: "1" } } };
+    const { Invoice } = await (await harness.qboPost("/invoice", { CustomerRef: { value: "4" }, Line: [sale] })).json();
+    const { Payment } = await (await harness.qboPost("/payment", { CustomerRef: { value: "4" }, TotalAmt: 5 })).json();
+    const { Customer } = await (await harness.qboGet("/customer/4")).json();
+    await harness.qboPost("/customer", { Id: "4", SyncToken: Customer.SyncToken, sparse: true, DisplayName: "Taylor Brooks LLC" });
+
+    expect((await (await harness.qboGet(`/invoice/${Invoice.Id}`)).json()).Invoice.CustomerRef).toEqual({
+      value: "4",
+      name: "Taylor Brooks LLC",
+    });
+    expect((await (await harness.qboGet(`/payment/${Payment.Id}`)).json()).Payment.CustomerRef).toEqual({
+      value: "4",
+      name: "Taylor Brooks LLC",
+    });
+  });
+});
