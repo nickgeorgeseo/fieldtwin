@@ -2,7 +2,9 @@
 
 All notable changes to fieldtwin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.3.0 - 2026-10-10
+
+A production review of every area. QuickBooks queries take the whole documented language (`AND`, comparisons, `LIKE`, `ORDERBY`) and leave inactive records out, as Intuit's docs imply. The README leads with what fieldtwin is for and is tested like code, and `GET /` says where everything is. The reference integration is ready for several processes sharing one connection and survives lost connections, token endpoint outages, inactive customers, and two syncs at once. The conformance recorder can't save bad evidence. And more than fifty fixes, from webhooks that no longer wait on each other to faults that repeat after a rewind.
 
 ### Added
 
