@@ -20,6 +20,8 @@
     "dev": "tsx watch src/server.ts",
     "mcp": "tsx src/mcp.ts",
     "example:sync": "tsx examples/sync-jobber-invoice-to-quickbooks/src/main.ts",
+    "conformance": "tsx conformance/cli.ts score",
+    "conformance:record": "tsx conformance/cli.ts record",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

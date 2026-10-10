@@ -6,7 +6,7 @@ What each twin models, how closely, and whether it has been checked against the 
 
 Scenarios can make the two twins disagree on purpose (`world.drift`: respelled customers, customers in only one system), the way real businesses' systems drift.
 
-**Verified** means checked against a live vendor sandbox, with the date. Until the conformance suite exists (roadmap v0.3), everything is built from public documentation and marked "docs only". Anything marked "check" is our best reading of the docs and should be confirmed first.
+**Verified** means checked against a live vendor sandbox, with the date. The [conformance suite](conformance/README.md) does the checking: it records what a real sandbox does for the rows marked "check" and fails a test wherever the twin differs. Nothing has been recorded yet, so everything is built from public documentation and marked "docs only". Anything marked "check" is our best reading of the docs and should be confirmed first.
 
 ## QuickBooks Online
 

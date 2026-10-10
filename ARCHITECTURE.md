@@ -69,8 +69,8 @@ control/      imports core/ only; HTTP and MCP adapters both go through operatio
 app.ts        the only file that knows every piece exists
 server.ts     entry points: start the HTTP server (server.ts) or the HTTP server plus
 mcp.ts          MCP over stdio (mcp.ts). They import app.ts and control/, nothing else needs them
-examples/     (beside src/) imports nothing from src/: examples reach the twin over HTTP, like any
-                client. Their .test.ts files may import src/, to run a twin in process
+examples/     (beside src/) import nothing from src/: they reach the twin over HTTP, like any
+conformance/    client. Their .test.ts files may import src/, to run a twin in process
 ```
 
 If two vendors need the same helper, it moves to `core/`. If you find yourself importing a vendor from `faults/` or `control/`, the vendor contract is missing something; add it to `VendorTwin` instead.
@@ -161,6 +161,6 @@ The goal is code a new contributor can read top to bottom without jumping around
 
 - **v0.1 (released as 0.1.0).** QuickBooks Invoice, Payment, Item, and change data capture. Jobber Job, Visit, Quote, Invoice, and `clientCreate` (`jobCreate` waits until its input fields are in the public docs). Twin OAuth servers with expiring tokens. Scenario timelines and drifted books. A reference integration in `examples/`.
 - **v0.2.** Webhooks: signed deliveries, plus faults for duplicate, delayed, and out-of-order delivery. Timeline events are the natural trigger for them.
-- **v0.3.** Conformance suite: record short sessions against the real vendor sandboxes and replay them against the twin, so drift shows up as a failing test with a fidelity score per endpoint.
+- **v0.3.** Conformance suite: record short sessions against the real vendor sandboxes and replay them against the twin, so drift shows up as a failing test with a fidelity score per endpoint. Started in `conformance/` with a case for every QuickBooks and Jobber `check` row it can reach; waiting on the first recordings.
 - **v0.4.** More vendors: Housecall Pro, Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
 - **v0.5.** A benchmark for dispatch and operations agents, built on these twins.

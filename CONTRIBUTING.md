@@ -51,7 +51,7 @@ See "Adding a vendor" in [ARCHITECTURE.md](ARCHITECTURE.md). Open an issue first
 - One more field on an existing record, with its docs link.
 - An error case the twin doesn't return yet.
 - A scenario in `scenarios/` that reproduces a situation you've hit in production.
-- Turning a `check` row in FIDELITY.md into a confirmed one, with a link to the docs that settle it.
+- Turning a `check` row in FIDELITY.md into a confirmed one, with a link to the docs that settle it, or with a conformance recording from a real sandbox (see [conformance/README.md](conformance/README.md)).
 
 ## Pull requests
 

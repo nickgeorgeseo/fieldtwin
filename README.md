@@ -213,6 +213,7 @@ src/
 scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-apis)
 examples/      code that uses the twins the way yours will: over HTTP, never importing src/
   sync-jobber-invoice-to-quickbooks/   the reference integration, its demo, and its tests
+conformance/   the same scripted sessions against a real sandbox and the twin, compared and scored
 test/          tests by vendor and area, plus core and the architecture guards
 ```
 
@@ -220,7 +221,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing anything in `core/`.
 
 ## Contributing
 
-Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row. Build only from public documentation; never paste vendor code, private docs, or real customer data.
+Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row. If you have a QuickBooks sandbox company or a Jobber testing account, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
 
 ## Disclaimer and license
 

@@ -7,6 +7,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 ### Added
 
 - A `lostResponse` fault effect: the twin does the work, then answers with the rule's error anyway, the way a gateway timeout hides a write that succeeded. It is the failure that makes a retried write happen twice unless it is idempotent.
+- The conformance suite (`conformance/`, roadmap v0.3): 22 cases for the QuickBooks and Jobber behaviors FIDELITY.md marks `check`, run against an in-process twin by `npm test`. `npm run conformance:record` records them against a QuickBooks sandbox company and a Jobber testing account using your tokens (and refuses production QuickBooks); recorded cases must then match, and `npm run conformance` scores a running twin per case, per endpoint, and overall. Nothing is recorded yet, so the cases show as todos.
 - QuickBooks honors `requestid` on customer, invoice, and payment writes, as documented: a repeated request gets the first answer again, word for word, and writes nothing. The answer travels on the write's event, so rewinding forgets it along with the write.
 
 ### Changed

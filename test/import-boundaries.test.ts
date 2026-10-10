@@ -5,6 +5,7 @@ import { findImports, isAllowedImport, listTypeScriptFiles, projectImports } fro
 
 const SRC = join(import.meta.dirname, "..", "src");
 const EXAMPLES = join(import.meta.dirname, "..", "examples");
+const CONFORMANCE = join(import.meta.dirname, "..", "conformance");
 
 describe("import boundaries (ARCHITECTURE.md, 'Layers and who may import whom')", () => {
   it("knows the rules", () => {
@@ -38,12 +39,16 @@ describe("import boundaries (ARCHITECTURE.md, 'Layers and who may import whom')"
     expect(importsProjectSrc(example, "vitest")).toBe(false);
   });
 
-  it("keeps examples honest: they reach the twin over HTTP and never import src/", () => {
-    const files = existsSync(EXAMPLES) ? listTypeScriptFiles(EXAMPLES).filter((path) => !path.endsWith(".test.ts")) : [];
+  it.each([
+    ["examples", EXAMPLES],
+    ["conformance", CONFORMANCE],
+  ])("keeps %s/ honest: it reaches the twin over HTTP and never imports src/ (its tests may)", (folder, root) => {
+    const files = existsSync(root) ? listTypeScriptFiles(root).filter((path) => !path.endsWith(".test.ts")) : [];
+    expect(files.length).toBeGreaterThan(0);
     const violations = files.flatMap((path) =>
-      findImports(readFileSync(join(EXAMPLES, path), "utf8"))
-        .filter((specifier) => importsProjectSrc(join(EXAMPLES, path), specifier))
-        .map((specifier) => `examples/${path} imports ${specifier}`),
+      findImports(readFileSync(join(root, path), "utf8"))
+        .filter((specifier) => importsProjectSrc(join(root, path), specifier))
+        .map((specifier) => `${folder}/${path} imports ${specifier}`),
     );
     expect(violations).toEqual([]);
   });
