@@ -16,6 +16,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 - QuickBooks queries leave inactive customers and items out unless they filter on `Active`, as Intuit's docs imply. Code that looks a customer up before creating it now meets the inactive duplicate on the twin, as it would in production.
 - `npm start -- flaky-apis` starts a ready-made scenario by name; a path to a `.yaml` (or `.yml`) file still works.
 
+### Changed
+
+- The README leads with what fieldtwin is for: a checkpoint, change list, and rewind in the first screen; how it compares with live accounts, vendor sandboxes, and mocks; what each twin models; a configuration table; a section on testing AI agents; and what common errors mean. Every `curl` in it now runs in the tests, in order, and the scenarios and settings it names are checked against the code.
+
 ### Fixed
 
 - `POST /_twin/clock/advance` counts only the scenario events it recorded. An API write that arrived while its webhooks were going out was counted too.
