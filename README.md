@@ -64,7 +64,7 @@ Requires Node 22+.
 
 ```bash
 git clone https://github.com/nickgeorgeseo/fieldtwin && cd fieldtwin
-npm install
+npm ci
 npm start
 ```
 
