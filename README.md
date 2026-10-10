@@ -132,7 +132,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 
 | Request | What it does |
 |---|---|
-| `GET /_twin` | Company, twin time, event count, auth mode, active faults |
+| `GET /_twin` | Company, twin time, event count, auth mode, active faults, webhook subscriptions, what's scheduled next |
 | `POST /_twin/reset` | Back to the seeded starting world |
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, timestamps move, scheduled events and their webhooks happen) |
 | `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2` |
