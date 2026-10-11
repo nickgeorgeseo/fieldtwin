@@ -37,7 +37,7 @@ export function WebhooksPanel() {
     run(async () => {
       const result = await twinSend<WebhookReport>("PUT", "/webhooks", subscriptions);
       return result.subscriptions.length
-        ? `${result.subscriptions.length} subscription(s) set.`
+        ? `${result.subscriptions.length} subscription${result.subscriptions.length === 1 ? "" : "s"} set.`
         : "No subscriptions: the twin sends no webhooks.";
     });
   const deliveries = [...(report?.deliveries ?? [])].sort((a, b) => b.id - a.id).slice(0, 50);
