@@ -55,6 +55,17 @@ fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't. Whe
 
 **The businesses themselves**, though they never run it. They get syncs that don't create duplicate customers, leave invoices out of the books, or record a payment twice, and AI assistants that made their mistakes in a copy of the business instead of in theirs.
 
+### What you get
+
+| You get | Instead of |
+|---|---|
+| A working fake business, in Jobber and QuickBooks at once, from one command | Developer accounts, app setup, and test data typed in by hand |
+| Throttling, outages, lost answers, and duplicate webhooks whenever you ask | Meeting them for the first time in production |
+| Hours of retry waits and token expiry, in seconds | Tests that sleep, or that never cover it |
+| The same results from the same seed, every run | "Works on my machine" |
+| An exact list of what your code or agent changed, and an undo | Guessing from logs, on an account you can never reset |
+| [Tests that run on every commit](#testing-on-every-commit), offline, with no vendor account | Checking by hand in a sandbox before each release |
+
 **What it isn't:** the real APIs. It is modeled from the vendors' public docs, and [FIDELITY.md](FIDELITY.md) says how closely, behavior by behavior. Do a final check against the vendor's sandbox before you go live. Two vendors so far, with more on the [roadmap](ARCHITECTURE.md#roadmap).
 
 fieldtwin is built by Nick George. More of his work, and how to reach him, at [nickgeorgeai.com](https://nickgeorgeai.com).
@@ -127,6 +138,112 @@ Both twins enforce the vendors' documented rate limits in twin time: Jobber answ
 | `FIELDTWIN_HOST` | `127.0.0.1` | The address to listen on. `0.0.0.0` reaches it from a container or another machine: only on a network you trust, since anyone who can reach the twin can control it ([SECURITY.md](SECURITY.md)) |
 | `FIELDTWIN_AUTH` | `any-token` | `oauth` makes the vendor APIs check tokens the way the real ones do |
 | `FIELDTWIN_SEED` | `42` | Which fake business to generate. The same seed always builds the same one |
+
+## Testing on every commit
+
+Your tests reach the twin the way your app does. Each test loads a fresh world, runs your code against it, and checks the change list: what your code really did, not what it logged. Twin time skips the waiting, so retries and token expiry take seconds, and every world comes from a seed, so a test that fails in CI fails the same way on your laptop.
+
+**1. Write a test.** This one checks for the bug a lost answer causes. QuickBooks accepts two invoices with the same number, so code that retries a create after a timeout, without a `requestid`, books the same work twice:
+
+```ts
+// test/sync.test.ts in your project. Run it with a twin at FIELDTWIN_URL (npm start in the fieldtwin folder).
+import assert from "node:assert/strict";
+import { beforeEach, test } from "node:test";
+import { syncPaidInvoices } from "../src/sync.ts"; // your code
+
+const TWIN = process.env.FIELDTWIN_URL ?? "http://localhost:4010";
+
+/** Something the twin recorded: what changed, in which vendor, with the whole record as that vendor's API returns it. */
+interface Change {
+  vendor: string;
+  type: string;
+  data: any;
+}
+
+/** A request to the twin's control plane, failing the test with the twin's reason if it refuses. */
+async function twin(method: string, path: string) {
+  const response = await fetch(`${TWIN}/_twin${path}`, { method });
+  if (!response.ok) throw new Error(`${method} /_twin${path}: ${await response.text()}`);
+  return response.json();
+}
+
+beforeEach(async () => {
+  await twin("POST", "/scenarios/flaky-apis"); // a fresh world for each test: 429s, 503s, and writes whose answer is lost
+  await twin("POST", "/checkpoints/before-sync");
+});
+
+test("books each invoice once, even when QuickBooks loses the answer to a write", async () => {
+  await syncPaidInvoices({ jobberUrl: TWIN, quickbooksUrl: TWIN });
+
+  const changes: Change[] = await twin("GET", "/checkpoints/before-sync/changes?source=api"); // what your code did
+  const booked = changes
+    .filter((change) => change.vendor === "quickbooks" && change.type === "InvoiceCreated")
+    .map((change) => change.data.invoice.DocNumber);
+
+  assert.ok(booked.length > 0, "the sync booked no invoices");
+  assert.equal(new Set(booked).size, booked.length, `an invoice was booked twice: ${booked.join(", ")}`);
+});
+```
+
+It uses Node's built-in test runner; Vitest and Jest work the same way. Against a sync that retries without a `requestid`, it fails with the duplicate it found:
+
+```text
+✖ books each invoice once, even when QuickBooks loses the answer to a write
+  AssertionError [ERR_ASSERTION]: an invoice was booked twice: 41, 41
+```
+
+**2. Run it locally.**
+
+```bash
+npm start                                         # in the fieldtwin folder
+FIELDTWIN_URL=http://localhost:4010 npm test      # in your project
+```
+
+**3. Run it on every commit.** In GitHub Actions, check out fieldtwin beside your code, start it, and wait until it answers:
+
+```yaml
+# .github/workflows/test.yml in your project
+name: Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: nickgeorgeseo/fieldtwin
+          path: fieldtwin # pin `ref:` to a commit for repeatable runs
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Start the twin
+        working-directory: fieldtwin
+        run: |
+          npm ci
+          nohup npm start > twin.log 2>&1 &
+          timeout 60 bash -c 'until curl -sf localhost:4010/_twin > /dev/null; do sleep 1; done'
+      - run: npm ci && npm test
+        env:
+          FIELDTWIN_URL: http://localhost:4010
+      - name: Keep the twin's event log
+        if: failure()
+        run: curl -s localhost:4010/_twin/log.jsonl > fieldtwin/log.jsonl
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fieldtwin-log
+          path: fieldtwin/log.jsonl
+```
+
+When a run fails, its event log is kept with it: everything your code did to the twin, to read or to replay.
+
+A few things to know:
+
+- **Tests that share a twin share its world.** Run the files that use it one at a time (`node --test --test-concurrency=1`, Vitest's `--no-file-parallelism`, Jest's `--runInBand`), or start a twin for each worker on its own `FIELDTWIN_PORT`.
+- **`flaky-apis` checks OAuth tokens for real**, so your code connects through the twin's [OAuth endpoints](#authentication), as it will in production. To test retries alone, follow the scenario with `PUT /_twin/auth` and `{"mode": "any-token"}`.
+- **For a stronger check**, the reference integration's [flaky test](examples/sync-jobber-invoice-to-quickbooks/test/sync-flaky.test.ts) syncs through `flaky-apis` and checks the books end exactly as a clean run leaves them.
 
 ## A worked example: Jobber to QuickBooks
 
