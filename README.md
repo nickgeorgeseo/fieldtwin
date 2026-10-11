@@ -45,6 +45,20 @@ If you build software for field-service and trades businesses, you know the opti
 
 fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't. When you have one, its [conformance suite](conformance/README.md) records what the real API does and scores the twin against it.
 
+## Who it's for
+
+**Developers building integrations for trades and field-service software.** The bugs that cost you are the ones you can't make happen on purpose: a throttled API, a write whose answer never came back, a webhook that arrives twice, a token that expires halfway through a sync. fieldtwin makes them happen whenever you ask, in a business that looks real in both systems, and twin time skips the waiting. The [reference integration](#a-worked-example-jobber-to-quickbooks) gets through more than a hundred retries and two hours of token expiry in a couple of seconds. Every run starts from a seed, so a failure replays exactly, in CI or on a teammate's laptop. You ship sooner, and you find the bad night in testing instead of in a customer's books.
+
+**Teams building AI agents that touch a business's money.** An agent needs somewhere to make mistakes, many times over, and you need proof of what it actually did. Mark a checkpoint, let the agent work, and judge it on the exact list of changes it made, not on what it says it did. Then rewind and run it again. Load `mismatched-books` to see whether it notices the two systems disagree, or `flaky-apis` to see whether it gives up. The [dashboard](#the-dashboard) shows all of it as it happens.
+
+**Agencies and integrators who sell to trades businesses.** "We test against a full simulation of your Jobber and QuickBooks before anything touches your account" is a promise you can keep, and a reason a cautious owner says yes.
+
+**The businesses themselves**, though they never run it. They get syncs that don't create duplicate customers, leave invoices out of the books, or record a payment twice, and AI assistants that made their mistakes in a copy of the business instead of in theirs.
+
+**What it isn't:** the real APIs. It is modeled from the vendors' public docs, and [FIDELITY.md](FIDELITY.md) says how closely, behavior by behavior. Do a final check against the vendor's sandbox before you go live. Two vendors so far, with more on the [roadmap](ARCHITECTURE.md#roadmap).
+
+fieldtwin is built by Nick George. More of his work, and how to reach him, at [nickgeorgeai.com](https://nickgeorgeai.com).
+
 ## What's modeled
 
 | | QuickBooks Online | Jobber |
@@ -353,4 +367,4 @@ Where it's going: more Jobber writes as their inputs reach the public docs, reco
 
 fieldtwin is an independent project. It is not affiliated with, endorsed by, or supported by Jobber or Intuit. Jobber and QuickBooks are trademarks of their respective owners.
 
-Copyright 2026 Nick George. Licensed under the [Apache License 2.0](LICENSE).
+Copyright 2026 [Nick George](https://nickgeorgeai.com). Licensed under the [Apache License 2.0](LICENSE).
