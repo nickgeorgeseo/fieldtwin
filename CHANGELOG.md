@@ -6,6 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
+- A web dashboard, in `dashboard/`: a Next.js package of its own (`cd dashboard && npm ci && npm run dev`, then http://localhost:4020). Its control room drives the clock, scenarios, actions, auth, faults, checkpoints, and webhook subscriptions, and shows each webhook delivery. Its Events page follows the event log live. Its Business page puts Jobber and QuickBooks side by side, with every customer and invoice marked as matching or drifted. It reads only the control plane, so watching spends no rate limit and draws no fault, and it serves this machine only.
 - A conformance case and a FIDELITY.md "check" row for an unquoted negative number in a QuickBooks query (`TotalAmt > -1`). The twin answers 4000, since the docs quote every value; quoted, `'-1'` works on both.
 - Worlds can have customers the bookkeeper made inactive in QuickBooks who have called again since (`world.drift.inactiveInAccounting`): each is inactive in the books and has a job paid in Jobber in the last week, newer than the books. `mismatched-books` has one, so a sync that looks up active customers only creates a duplicate there, as it would in production.
 

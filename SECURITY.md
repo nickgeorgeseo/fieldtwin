@@ -5,6 +5,7 @@ fieldtwin is a local test tool: it imitates vendor APIs over a generated, fake b
 ## Using it safely
 
 - **Keep it on your machine.** It listens on 127.0.0.1. Set `FIELDTWIN_HOST` only on a network you trust: anyone who can reach the twin can control it, and a webhook subscription makes it send requests to any URL.
+- **The dashboard serves this machine only.** `dashboard/` listens on 127.0.0.1, answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]`, and takes changes only from its own pages, so another site can't use it to reach the control plane. It forwards to `/_twin` and nowhere else.
 - **Never put real credentials or customer data in it.** It needs neither: the world is generated, and its OAuth servers accept any client id and secret.
 - **The conformance recorder is the one part that talks to real vendors.** `npm run conformance:record` reads your sandbox tokens from environment variables, never stores them, refuses production QuickBooks, and saves observations only, with no tokens, Ids, or business data. See [conformance/README.md](conformance/README.md).
 

@@ -272,6 +272,17 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `PUT /_twin/webhooks` | Replace the webhook subscriptions (see [Webhooks](#webhooks)) |
 | `GET /_twin/webhooks` | The subscriptions, and each recent delivery with how your app answered |
 
+## The dashboard
+
+[`dashboard/`](dashboard/README.md) is a web dashboard for a running twin: everything in the control plane from a browser, the event log as it grows, and Jobber and QuickBooks side by side with every customer and invoice marked as matching or drifted.
+
+```bash
+npm start                                   # terminal 1: the twin
+cd dashboard && npm ci && npm run dev       # terminal 2: http://localhost:4020
+```
+
+It is a Next.js package of its own and a client of the twin like any other: it uses only `/_twin`, so watching your code spends no rate limit and draws no fault.
+
 ## Using it from a coding agent (MCP)
 
 `npm run mcp` starts the twin and an MCP server over stdio. Its tools mirror the control plane:
@@ -326,6 +337,7 @@ scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-
 examples/      code that uses the twins the way yours will: over HTTP, never importing src/
   sync-jobber-invoice-to-quickbooks/   the reference integration, its demo, and its tests
 conformance/   the same scripted sessions against a real sandbox and the twin, compared and scored
+dashboard/     a web dashboard for a running twin (Next.js, a package of its own), over HTTP like examples/
 test/          tests by vendor and area, plus core and the architecture guards
 ```
 

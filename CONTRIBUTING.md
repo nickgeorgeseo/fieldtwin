@@ -18,6 +18,8 @@ npm run format      # let Biome fix formatting and import order for you
 
 CI runs typecheck, lint, and tests on Node 22 for every push and pull request. All three must pass before you open a pull request.
 
+The dashboard is a package of its own. If you change it, also run `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` in `dashboard/` ([dashboard/README.md](dashboard/README.md)); CI does.
+
 ## Ground rules
 
 1. **Public documentation only.** Every vendor behavior must come from the vendor's public docs ([developer.intuit.com](https://developer.intuit.com/app/developer/qbo/docs/get-started), [developer.getjobber.com](https://developer.getjobber.com/docs)), with a link in a code comment. Never paste vendor code, private or login-only docs, or anything resembling real customer data.
@@ -61,7 +63,7 @@ See "Adding a vendor" in [ARCHITECTURE.md](ARCHITECTURE.md). Open an issue first
 
 ## Dependencies
 
-Runtime dependencies are kept deliberately few (see "Small, boring dependencies" in ARCHITECTURE.md). Propose a new one in an issue first. Dev dependencies for tests and tooling are fine.
+Runtime dependencies are kept deliberately few (see "Small, boring dependencies" in ARCHITECTURE.md). Propose a new one in an issue first. Dev dependencies for tests and tooling are fine. The dashboard's Next.js, React, and Tailwind live in `dashboard/package.json`, never in the twin's.
 
 If you change dependencies, regenerate the lockfile with npm 11 or newer (`npx npm@11 install`): npm 10.9 crashes while resolving vitest 4's optional peer dependencies from scratch. Installing *from* the lockfile works on any npm.
 
