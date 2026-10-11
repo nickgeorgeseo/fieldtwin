@@ -84,6 +84,18 @@ export function VendorBadge({ vendor }: { vendor: string }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 
+/** Who made a change: your code through the APIs, the scenario's timeline, the control plane, or the seed. */
+export function SourceBadge({ source }: { source: string }) {
+  const known: Record<string, { tone: BadgeTone; label: string }> = {
+    api: { tone: "violet", label: "your code" },
+    scenario: { tone: "amber", label: "scenario" },
+    control: { tone: "sky", label: "control" },
+    seed: { tone: "neutral", label: "seed" },
+  };
+  const { tone, label } = known[source] ?? { tone: "neutral" as const, label: source };
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
 export interface Notice {
   ok: boolean;
   text: string;

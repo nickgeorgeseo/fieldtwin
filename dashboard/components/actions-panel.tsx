@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { twinSend } from "@/lib/twin-api.ts";
+import { ChangeList } from "./change-list.tsx";
 import { useTwin } from "./twin-provider.tsx";
 import { Button, Card, NoticeLine, TextInput, VendorBadge } from "./ui.tsx";
 import { useAction } from "./use-action.ts";
@@ -60,11 +61,9 @@ export function ActionsPanel() {
       </ul>
       <NoticeLine notice={notice} />
       {happened.length > 0 && (
-        <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto font-mono text-xs text-zinc-600 dark:text-zinc-400">
-          {happened.map((summary) => (
-            <li key={summary}>{summary.split("  ").slice(2, 3).join("") || summary}</li>
-          ))}
-        </ul>
+        <div className="mt-2 max-h-48 overflow-y-auto">
+          <ChangeList summaries={happened} utcOffsetHours={status?.company.utcOffsetHours ?? 0} empty="" />
+        </div>
       )}
     </Card>
   );

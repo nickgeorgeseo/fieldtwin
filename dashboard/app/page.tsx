@@ -1,5 +1,6 @@
 import { ActionsPanel } from "@/components/actions-panel.tsx";
 import { AuthPanel } from "@/components/auth-panel.tsx";
+import { CheckpointsPanel } from "@/components/checkpoints-panel.tsx";
 import { ClockPanel } from "@/components/clock-panel.tsx";
 import { PageTitle } from "@/components/page-title.tsx";
 import { ScenarioPanel } from "@/components/scenario-panel.tsx";
@@ -15,6 +16,7 @@ export default function ControlRoom() {
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <StatusPanel />
         <ClockPanel />
+        <CheckpointsPanel />
         <ScenarioPanel />
         <ActionsPanel />
         <AuthPanel />

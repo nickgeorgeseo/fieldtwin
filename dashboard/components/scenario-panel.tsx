@@ -36,7 +36,7 @@ export function ScenarioPanel() {
   const loaded = (twin: TwinStatus) => `Loaded "${twin.scenario}": seed ${twin.seed}, ${twin.eventCount} events, auth ${twin.authMode}.`;
   const reset = () => {
     const what = status?.scenario ? `the start of "${status.scenario}"` : "the default world";
-    if (!window.confirm(`Reset the twin to ${what}? Everything since is undone; checkpoints are kept.`)) return;
+    if (!window.confirm(`Reset the twin to ${what}? Everything since is undone, checkpoints included.`)) return;
     void run(async () => {
       await twinSend<TwinStatus>("POST", "/reset");
       return `Back to ${what}.`;
