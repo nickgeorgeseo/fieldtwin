@@ -28,7 +28,7 @@ jobs:
       - run: npm test
 
   dashboard:
-    name: Dashboard typecheck and build (Node 22)
+    name: Dashboard typecheck, test, build (Node 22)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,4 +42,5 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
