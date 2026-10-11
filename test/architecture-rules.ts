@@ -150,10 +150,16 @@ export function projectImports(srcRoot: string, pathFromSrc: string): string[] {
     .map((specifier) => relative(srcRoot, resolve(dirname(absolute), specifier)));
 }
 
-/** All .ts files under a directory, as paths relative to it. */
-export function listTypeScriptFiles(root: string): string[] {
-  return readdirSync(root, { recursive: true, encoding: "utf8" })
-    .filter((path) => path.endsWith(".ts"))
-    .map((path) => path.split("\\").join("/"))
+/** Folders that hold installed packages or build output, not the project's own source. */
+const NOT_SOURCE = new Set(["node_modules", ".next"]);
+
+/** All .ts and .tsx files under a directory, as paths relative to it. */
+export function listTypeScriptFiles(root: string, folder = ""): string[] {
+  return readdirSync(join(root, folder), { withFileTypes: true })
+    .flatMap((entry) => {
+      const path = folder ? `${folder}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) return NOT_SOURCE.has(entry.name) ? [] : listTypeScriptFiles(root, path);
+      return /\.tsx?$/.test(entry.name) ? [path] : [];
+    })
     .sort();
 }

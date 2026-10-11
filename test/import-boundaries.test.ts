@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findImports, isAllowedImport, listTypeScriptFiles, projectImports } from "./architecture-rules.ts";
@@ -6,6 +7,7 @@ import { findImports, isAllowedImport, listTypeScriptFiles, projectImports } fro
 const SRC = join(import.meta.dirname, "..", "src");
 const EXAMPLES = join(import.meta.dirname, "..", "examples");
 const CONFORMANCE = join(import.meta.dirname, "..", "conformance");
+const DASHBOARD = join(import.meta.dirname, "..", "dashboard");
 
 describe("import boundaries (ARCHITECTURE.md, 'Layers and who may import whom')", () => {
   it("knows the rules", () => {
@@ -39,14 +41,28 @@ describe("import boundaries (ARCHITECTURE.md, 'Layers and who may import whom')"
     expect(importsProjectSrc(example, "vitest")).toBe(false);
   });
 
+  it("lists .ts and .tsx files, but not installed packages or build output", () => {
+    const root = mkdtempSync(join(tmpdir(), "fieldtwin-files-"));
+    for (const path of ["app/page.tsx", "lib/twin.ts", "styles.css", "node_modules/next/index.ts", ".next/types/routes.ts"]) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), "");
+    }
+    try {
+      expect(listTypeScriptFiles(root)).toEqual(["app/page.tsx", "lib/twin.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     ["examples", EXAMPLES],
     ["conformance", CONFORMANCE],
+    ["dashboard", DASHBOARD],
   ])("keeps %s/ honest: it reaches the twin over HTTP and never imports src/ (its tests may)", (folder, root) => {
-    const files = existsSync(root) ? listTypeScriptFiles(root).filter((path) => !path.endsWith(".test.ts")) : [];
+    const files = existsSync(root) ? listTypeScriptFiles(root).filter((path) => !/\.test\.tsx?$/.test(path)) : [];
     expect(files.length).toBeGreaterThan(0);
     const violations = files.flatMap((path) =>
-      findImports(readFileSync(join(root, path), "utf8"))
+      findImports(readFileSync(join(root, path), "utf8"), path)
         .filter((specifier) => importsProjectSrc(join(root, path), specifier))
         .map((specifier) => `${folder}/${path} imports ${specifier}`),
     );
