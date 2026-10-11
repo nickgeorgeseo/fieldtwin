@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type EventFilter, filterEvents, parseLog } from "@/lib/events.ts";
-import { messageOf, twinLog } from "@/lib/twin-api.ts";
-import type { TwinEvent } from "@/lib/twin-types.ts";
+import { type EventFilter, filterEvents } from "@/lib/events.ts";
 import { EventRow } from "./event-row.tsx";
 import { useTwin } from "./twin-provider.tsx";
 import { Button, TextInput } from "./ui.tsx";
+import { useEventLog } from "./use-event-log.ts";
 
 const VENDORS = [
   { vendor: "", label: "All vendors" },
@@ -21,36 +20,22 @@ const SOURCES = [
 ];
 const PAGE = 200;
 
-/** The event log as it grows, newest first. Read again whenever the twin's status says it may have changed. */
+/** The event log as it grows, newest first. */
 export function EventFeed() {
-  const { status, logKey } = useTwin();
-  const [events, setEvents] = useState<TwinEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { status } = useTwin();
   const [paused, setPaused] = useState(false);
+  const { events, error } = useEventLog(paused);
   const [filter, setFilter] = useState<EventFilter>({ vendor: "", sources: ["api", "scenario", "control"], search: "" });
   const [shown, setShown] = useState(PAGE);
   const [freshAfter, setFreshAfter] = useState(Number.POSITIVE_INFINITY);
   const newestRead = useRef(0);
 
+  // Mark what arrived since the last read. After a rewind or reset nothing is new.
   useEffect(() => {
-    if (paused || !logKey) return;
-    let current = true;
-    twinLog().then(
-      (text) => {
-        if (!current) return;
-        const read = parseLog(text);
-        const newest = read.at(-1)?.seq ?? 0;
-        setFreshAfter(newestRead.current && newest > newestRead.current ? newestRead.current : Number.POSITIVE_INFINITY);
-        newestRead.current = newest;
-        setEvents(read);
-        setError(null);
-      },
-      (problem) => current && setError(messageOf(problem)),
-    );
-    return () => {
-      current = false;
-    };
-  }, [logKey, paused]);
+    const newest = events.at(-1)?.seq ?? 0;
+    setFreshAfter(newestRead.current && newest > newestRead.current ? newestRead.current : Number.POSITIVE_INFINITY);
+    newestRead.current = newest;
+  }, [events]);
 
   const visible = useMemo(() => filterEvents(events, filter).reverse(), [events, filter]);
   const counts = useMemo(
