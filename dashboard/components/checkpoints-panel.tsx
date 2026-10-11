@@ -58,7 +58,7 @@ export function CheckpointsPanel() {
   };
 
   return (
-    <Card title="Checkpoints" className="lg:col-span-2">
+    <Card title="Checkpoints">
       <form
         className="flex flex-wrap items-center gap-2"
         onSubmit={(event) => {

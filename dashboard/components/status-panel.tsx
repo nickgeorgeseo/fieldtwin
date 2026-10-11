@@ -9,7 +9,7 @@ export function StatusPanel() {
   const { status } = useTwin();
   if (!status) {
     return (
-      <Card title="Twin" className="lg:col-span-2">
+      <Card title="Twin">
         <p className="text-sm text-zinc-500">Waiting for the twin…</p>
       </Card>
     );
@@ -18,7 +18,7 @@ export function StatusPanel() {
   const time = formatTwinTime(status.twinTime, company.utcOffsetHours);
   const next = status.upcoming[0];
   return (
-    <Card title="Twin" className="lg:col-span-2">
+    <Card title="Twin">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xl font-semibold">{company.name}</p>
