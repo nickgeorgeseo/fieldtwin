@@ -45,7 +45,7 @@ If you build software for field-service and trades businesses, you know the opti
 | Offline, in CI, many copies in parallel | No | No | Yes | **Yes** |
 | Exactly like production | Yes | Nearly | No | **No. Modeled from the public docs, and [FIDELITY.md](FIDELITY.md) says how closely** |
 
-fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't. When you have one, its [conformance suite](conformance/README.md) records what the real API does and scores the twin against it.
+fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't, and a final check in one before you go live is still worth doing. When you have a sandbox, fieldtwin's [conformance suite](conformance/README.md) records what the real API does and scores the twin against it.
 
 ## Who it's for
 
@@ -67,8 +67,6 @@ fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't. Whe
 | The same results from the same seed, every run | "Works on my machine" |
 | An exact list of what your code or agent changed, and an undo | Guessing from logs, on an account you can never reset |
 | [Tests that run on every commit](#testing-on-every-commit), offline, with no vendor account | Checking by hand in a sandbox before each release |
-
-**What it isn't:** the real APIs. It is modeled from the vendors' public docs, and [FIDELITY.md](FIDELITY.md) says how closely, behavior by behavior. Do a final check against the vendor's sandbox before you go live. Two vendors so far, with more on the [roadmap](ARCHITECTURE.md#roadmap).
 
 fieldtwin is built by Nick George. Its page, with both demo videos, is at [nickgeorgeai.com/fieldtwin](https://nickgeorgeai.com/fieldtwin); more of his work, and how to reach him, at [nickgeorgeai.com](https://nickgeorgeai.com).
 
