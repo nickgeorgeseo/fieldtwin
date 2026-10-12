@@ -2,7 +2,7 @@
   "name": "fieldtwin",
   "version": "0.4.0",
   "private": true,
-  "description": "Local, stateful twins of the software trades and logistics businesses run on. Build and test integrations and AI agents without touching a real customer's account.",
+  "description": "Local, stateful twins of the Jobber and QuickBooks Online APIs. Build and test integrations and AI agents against a believable fake business, with resets, rewind, controllable time and failures on demand. No real accounts.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
