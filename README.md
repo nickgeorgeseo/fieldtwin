@@ -143,7 +143,7 @@ Both twins enforce the vendors' documented rate limits in twin time: Jobber answ
 
 Your tests reach the twin the way your app does. Each test loads a fresh world, runs your code against it, and checks the change list: what your code really did, not what it logged. Twin time skips the waiting, so retries and token expiry take seconds, and every world comes from a seed, so a test that fails in CI fails the same way on your laptop.
 
-**1. Write a test.** This one checks for the bug a lost answer causes. QuickBooks accepts two invoices with the same number, so code that retries a create after a timeout, without a `requestid`, books the same work twice:
+**1. Write a test.** This one checks for the bug a lost answer causes. QuickBooks can accept two invoices with the same number, so code that retries a create after a timeout, without a `requestid`, books the same work twice:
 
 ```ts
 // test/sync.test.ts in your project. Run it with a twin at FIELDTWIN_URL (npm start in the fieldtwin folder).
@@ -214,7 +214,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: nickgeorgeseo/fieldtwin
-          path: fieldtwin # pin `ref:` to a commit for repeatable runs
+          path: fieldtwin # pin `ref:` to a release tag, like v0.4.0, for repeatable runs
       - uses: actions/setup-node@v7
         with:
           node-version: 22
