@@ -67,12 +67,14 @@ vendors/x/    imports core/ and world/ only. Never another vendor.
 faults/       imports core/ only. Never a specific vendor.
 control/      imports core/ only; HTTP and MCP adapters both go through operations.ts
 app.ts        the only file that knows every piece exists
-server.ts     entry points: start the HTTP server (server.ts) or the HTTP server plus
-mcp.ts          MCP over stdio (mcp.ts). They import app.ts and control/, nothing else needs them
-examples/     (beside src/) import nothing from src/: they reach the twin over HTTP, like any
-conformance/    client. Their .test.ts files may import src/, to run a twin in process. The
-dashboard/      dashboard is a package of its own, and uses only /_twin
+server.ts     entry point for `npm start`: imports app.ts and control/, and nothing imports it
+mcp.ts        entry point for `npm run mcp`, the same plus MCP over stdio
+examples/     imports nothing from src/: it reaches the twin over HTTP, like any client
+conformance/  the same
+dashboard/    the same, as a package of its own that uses only /_twin
 ```
+
+The `.test.ts` files in `examples/`, `conformance/`, and `dashboard/` may import `src/`, to run a twin in process.
 
 If two vendors need the same helper, it moves to `core/`. If you find yourself importing a vendor from `faults/` or `control/`, the vendor contract is missing something; add it to `VendorTwin` instead.
 
@@ -90,6 +92,7 @@ Every vendor has the same files, so once you have read one you can read them all
 | `seed.ts` | Turns the shared world into this vendor's starting events |
 | `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks has grown this into `routes/`, one file per entity |
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
+| `oauth.ts` | The vendor's OAuth 2.0 server: its paths, how long codes and tokens last, and how refresh works (`core/oauth.ts` does the rest) |
 | `webhooks.ts` | Optional. The webhooks the vendor sends: its topics, which events announce what, how a delivery is shaped and signed, and how long an app has to answer before it is tried again (`core/webhook-dispatcher.ts` queues and sends them) |
 | `index.ts` | Exports one `VendorTwin` object. Nothing else |
 
@@ -142,7 +145,7 @@ The design is deliberately small:
 
 The goal is code a new contributor can read top to bottom without jumping around.
 
-- Plain functions and plain objects. A class only when it owns changing state (`Twin`, `TwinClock`, `CostBucket`).
+- Plain functions and plain objects. A class only when it owns changing state (`Twin`, `TwinClock`, `LeakyBucket`).
 - Name things the way the vendor's docs name them (`SyncToken`, `DisplayName`, `clients`, `pageInfo`), so code can be checked against the docs line by line.
 - A file does one job and stays under about 200 lines. When it grows, split it by job, not by type. When a file from the vendor anatomy outgrows that, it becomes a folder with the same name (`routes.ts` becomes `routes/index.ts` plus one file per entity), so every vendor's top level still reads the same.
 - Every vendor behavior gets a comment saying what the real API does and why it matters, with a docs link when there is one. Comments explain *why*; the code already says *what*.
