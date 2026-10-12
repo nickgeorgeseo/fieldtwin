@@ -6,6 +6,8 @@
 
 **Jobber and QuickBooks Online, running on your laptop: real API shapes, a believable fake business, and every failure on demand. Build and test integrations and AI agents without touching a customer's account.**
 
+[Watch the two-minute demo](https://nickgeorgeai.com/fieldtwin#demo): the dashboard drives a twin, an agent's changes are listed and rewound, and a sync brings drifted books back into line.
+
 Point your code at `http://localhost:4010` instead of `api.getjobber.com` or `quickbooks.api.intuit.com`. It gets the same paths, headers, and JSON back, from a fake trades business with customers, technicians, and months of jobs, quotes, invoices, and payments, kept in both systems at once. Then make it hard: throttle QuickBooks, lose the answer to a write, deliver a webhook twice, jump the clock past every token's expiry. Afterwards, see exactly what your code changed, and undo it.
 
 ```bash
@@ -68,7 +70,7 @@ fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't. Whe
 
 **What it isn't:** the real APIs. It is modeled from the vendors' public docs, and [FIDELITY.md](FIDELITY.md) says how closely, behavior by behavior. Do a final check against the vendor's sandbox before you go live. Two vendors so far, with more on the [roadmap](ARCHITECTURE.md#roadmap).
 
-fieldtwin is built by Nick George. More of his work, and how to reach him, at [nickgeorgeai.com](https://nickgeorgeai.com).
+fieldtwin is built by Nick George. Its page, with both demo videos, is at [nickgeorgeai.com/fieldtwin](https://nickgeorgeai.com/fieldtwin); more of his work, and how to reach him, at [nickgeorgeai.com](https://nickgeorgeai.com).
 
 ## What's modeled
 
