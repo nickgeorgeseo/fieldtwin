@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { type FollowedLog, followLog, NOT_READ } from "@/lib/events.ts";
+import { type Followed, follow, NOT_READ } from "@/lib/follow.ts";
 import { messageOf, twinLogAfter } from "@/lib/twin-api.ts";
 import type { TwinEvent } from "@/lib/twin-types.ts";
 import { useTwin } from "./twin-provider.tsx";
@@ -12,14 +12,14 @@ import { useTwin } from "./twin-provider.tsx";
  */
 export function useEventLog(paused = false): { events: TwinEvent[]; error: string | null } {
   const { status } = useTwin();
-  const [log, setLog] = useState<FollowedLog>(NOT_READ);
+  const [log, setLog] = useState<Followed<TwinEvent>>(NOT_READ);
   const [error, setError] = useState<string | null>(null);
-  const read = useRef(NOT_READ); // the log as of the last read, for the next one to go on from
+  const read = useRef<Followed<TwinEvent>>(NOT_READ); // the log as of the last read, for the next one to go on from
 
   useEffect(() => {
     if (paused || !status) return;
     let current = true;
-    followLog(read.current, twinLogAfter).then(
+    follow(read.current, twinLogAfter).then(
       (next) => {
         if (!current) return;
         read.current = next;
@@ -33,5 +33,5 @@ export function useEventLog(paused = false): { events: TwinEvent[]; error: strin
     };
   }, [status, paused]);
 
-  return { events: log.events, error };
+  return { events: log.items, error };
 }

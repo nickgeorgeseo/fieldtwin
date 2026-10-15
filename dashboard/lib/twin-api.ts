@@ -1,4 +1,6 @@
-import type { LogRead } from "./events.ts";
+import { parseLog } from "./events.ts";
+import type { Read } from "./follow.ts";
+import type { Change, TwinEvent } from "./twin-types.ts";
 
 /** The browser's calls to the twin's control plane, through the dashboard's /api/twin (lib/forward.ts). */
 
@@ -8,17 +10,23 @@ export async function twinGet<T>(path = ""): Promise<T> {
   return readAnswer<T>(await fetch(`${BASE}${path}`, { cache: "no-store" }));
 }
 
-/** The event log, JSON Lines, after a position an earlier read gave (all of it for null). See followLog in events.ts. */
-export async function twinLogAfter(position: string | null): Promise<LogRead> {
+/** The event log after a position an earlier read gave (all of it for null). See follow.ts. */
+export async function twinLogAfter(position: string | null): Promise<Read<TwinEvent>> {
   const query = position ? `?after=${encodeURIComponent(position)}` : "";
-  return readLogAnswer(await fetch(`${BASE}/log.jsonl${query}`, { cache: "no-store" }));
+  return readFollowed(await fetch(`${BASE}/log.jsonl${query}`, { cache: "no-store" }), parseLog);
 }
 
-/** A read of the log: its lines and where the log ends, or "changed" when it has changed since the position asked after. */
-export async function readLogAnswer(response: Response): Promise<LogRead> {
+/** What changed since a checkpoint (`path`, like "/checkpoints/before"), all of it or one source's, after a position. */
+export async function twinChangesAfter(path: string, source: string, position: string | null): Promise<Read<Change>> {
+  const query = new URLSearchParams({ ...(source && { source }), ...(position && { after: position }) }).toString();
+  return readFollowed(await fetch(`${BASE}${path}/changes${query && `?${query}`}`, { cache: "no-store" }), JSON.parse);
+}
+
+/** What a read of a followed list holds, and where the log ends; or "changed" when it has changed since the position asked after. */
+export async function readFollowed<T>(response: Response, parse: (text: string) => T[]): Promise<Read<T>> {
   if (response.status === 409) return "changed";
   const text = await readAnswer(response, "text");
-  return { text, position: response.headers.get("x-twin-log-position") };
+  return { items: parse(text), position: response.headers.get("x-twin-log-position") };
 }
 
 /** A change to the twin. `body` goes as JSON; a string with `contentType` (a scenario's YAML) goes as it is. */

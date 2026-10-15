@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { twinGet, twinSend } from "@/lib/twin-api.ts";
+import { useEffect, useRef, useState } from "react";
+import { type Followed, follow, NOT_READ } from "@/lib/follow.ts";
+import { twinChangesAfter, twinSend } from "@/lib/twin-api.ts";
 import { formatTwinTime } from "@/lib/twin-time.ts";
 import type { Change, TwinStatus } from "@/lib/twin-types.ts";
 import { ChangeList } from "./change-list.tsx";
@@ -18,29 +19,41 @@ const SOURCES = [
 
 /** Name a moment, see exactly what changed since (judge an agent on this, not on what it says it did), undo it. */
 export function CheckpointsPanel() {
-  const { status, logKey } = useTwin();
+  const { status } = useTwin();
   const { busy, notice, run } = useAction();
   const [name, setName] = useState("before-agent");
   const [chosen, setChosen] = useState<string | null>(null);
   const [source, setSource] = useState("");
   const [changes, setChanges] = useState<Change[]>([]);
+  const read = useRef<{ list: Followed<Change>; of: string } | null>(null); // the last read, and which checkpoint and source
   const checkpoints = status?.checkpoints ?? [];
   const selected = checkpoints.find((checkpoint) => checkpoint.name === chosen) ?? checkpoints.at(-1);
   const path = selected && `/checkpoints/${encodeURIComponent(selected.name)}`;
   const offset = status?.company.utcOffsetHours ?? 0;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: logKey changes when the log may have, which is when to read again
+  // Read on each time the twin's status is read: only what is new, so it costs nothing while nothing happens. Another
+  // checkpoint or source starts the list over.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: status is read every few seconds and after each change, which is when to read on
   useEffect(() => {
     if (!path) return setChanges([]);
+    const of = `${path}?source=${source}`;
     let current = true;
-    twinGet<Change[]>(`${path}/changes${source ? `?source=${source}` : ""}`).then(
-      (read) => current && setChanges(read),
-      () => current && setChanges([]),
+    follow(read.current?.of === of ? read.current.list : NOT_READ, (after) => twinChangesAfter(path, source, after)).then(
+      (list) => {
+        if (!current) return;
+        read.current = { list, of };
+        setChanges(list.items);
+      },
+      () => {
+        if (!current) return;
+        read.current = null;
+        setChanges([]);
+      },
     );
     return () => {
       current = false;
     };
-  }, [path, source, logKey]);
+  }, [path, source, status]);
 
   const mark = () =>
     run(async () => {

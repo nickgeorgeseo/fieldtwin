@@ -11,12 +11,12 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
-- The dashboard's Events and Business pages read only what is new in the event log, instead of all of it every time it grew. On a 400-customer world, each change cost a 2.7 MB read; now a look with nothing new reads nothing, and a new event costs its own few hundred bytes.
+- The dashboard reads only what is new, instead of all of it every time something changed: the Events and Business pages in the event log, and the control room in the changes since a checkpoint. On a 400-customer world, each change cost the Events page a 2.7 MB read; now a look with nothing new reads nothing, and a new event costs its own few hundred bytes.
 - Jobber queries no longer slow down as the business grows. Each job on a page read every visit and invoice in the business to find its own; the twin now gathers which records belong to which once per change. On a 400-customer world, a page of 100 clients with their balances, jobs, and invoices answers in 3.1 ms instead of 8.1 ms and a page of 100 jobs in 0.6 ms instead of 2.2 ms, the same as on a 120-customer world. The answers are byte for byte what they were.
 
 ### Fixed
 
-- The dashboard's Events and Business pages could go on showing events a rewind had undone, when as many new events arrived at the same twin time before their next look. They now see any change to the log's history, a restarted twin included, and read it again.
+- The dashboard could go on showing events a rewind had undone, on the Events and Business pages and in the changes since a checkpoint, when as many new events arrived at the same twin time before its next look. It now sees any change to the log's history, a restarted twin included, and reads it again.
 
 ## 0.4.0 - 2026-10-11
 
