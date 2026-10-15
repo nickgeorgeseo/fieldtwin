@@ -33,9 +33,9 @@ export function invoiceAmounts(invoice: JobberInvoice) {
 
 /** All invoices, one client's, or one job's, in invoice-number order. */
 export function invoicesFor(context: ResolverContext, filter: { clientId?: string; jobId?: string } = {}): JobberInvoice[] {
-  return [...context.state().invoices.values()].filter(
-    (invoice) => (!filter.clientId || invoice.clientId === filter.clientId) && (!filter.jobId || invoice.jobIds.includes(filter.jobId)),
-  );
+  if (filter.clientId) return context.lookups().invoicesOfClient.get(filter.clientId) ?? [];
+  if (filter.jobId) return context.lookups().invoicesOfJob.get(filter.jobId) ?? [];
+  return [...context.state().invoices.values()];
 }
 
 export function invoicesConnection(args: PageArgs, context: ResolverContext, filter: { clientId?: string; jobId?: string } = {}) {

@@ -11,7 +11,7 @@ import { userNode } from "./users.ts";
 /** Job and Visit: https://developer.getjobber.com/docs (Important Objects: Job, Visit) */
 
 export function jobNode(job: JobberJob, context: ResolverContext) {
-  const visits = visitsOf(job, context);
+  const visits = context.lookups().visitsOfJob.get(job.id) ?? []; // in the order they happen
   const { utcOffsetHours } = context.state().account;
   const finished = visits.length > 0 && visits.every((visit) => visit.completedAt);
   const invoices = invoicesFor(context, { jobId: job.id });
@@ -48,13 +48,8 @@ export function visitNode(visit: JobberVisit, context: ResolverContext) {
   };
 }
 
-/** A job's visits, in the order they happen. */
-function visitsOf(job: JobberJob, context: ResolverContext): JobberVisit[] {
-  return [...context.state().visits.values()].filter((visit) => visit.jobId === job.id).sort((a, b) => a.startAt.localeCompare(b.startAt));
-}
-
 /** All jobs, or one client's, in job-number order. */
 export function jobsConnection(args: PageArgs, context: ResolverContext, clientId?: string) {
-  const jobs = [...context.state().jobs.values()].filter((job) => !clientId || job.clientId === clientId);
+  const jobs = clientId ? (context.lookups().jobsOfClient.get(clientId) ?? []) : [...context.state().jobs.values()];
   return connection(jobs, args, (job) => jobNode(job, context));
 }

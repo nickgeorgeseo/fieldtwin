@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createCheckpoint, rewindTo, runAction } from "../src/control/operations.ts";
 import { setup } from "./helpers.ts";
 
 /** Invoice: https://developer.getjobber.com/docs (Important Objects: Invoice) */
@@ -103,6 +104,38 @@ describe("Jobber twin: invoices", () => {
       expect(client.balance).toBeCloseTo(owed, 2);
     }
     expect(clients.nodes.some((client: { balance: number }) => client.balance > 0)).toBe(true);
+  });
+
+  it("shows a payment at once wherever its invoice appears, and a rewind's undoing of it too", async () => {
+    const harness = setup();
+    type Read = { id: string; invoiceStatus: string };
+    type ClientRead = { id: string; balance: number; invoices: { nodes: Read[] }; jobs: { nodes: { invoices: { nodes: Read[] } }[] } };
+    const read = async (): Promise<ClientRead[]> =>
+      (
+        await data(
+          harness,
+          `{ clients(first: 25) { nodes { id balance invoices(first: 20) { nodes { id invoiceStatus } }
+            jobs(first: 20) { nodes { invoices(first: 5) { nodes { id invoiceStatus } } } } } } }`,
+        )
+      ).clients.nodes;
+    const statuses = (reads: Read[]) => Object.fromEntries(reads.map((invoice) => [invoice.id, invoice.invoiceStatus]));
+    const byClient = (clients: ClientRead[]) => statuses(clients.flatMap((client) => client.invoices.nodes));
+    const byJob = (clients: ClientRead[]) => statuses(clients.flatMap((client) => client.jobs.nodes.flatMap((job) => job.invoices.nodes)));
+
+    const before = await read();
+    createCheckpoint(harness.twin, "before");
+    await runAction(harness.twin, "jobber", "payInvoices", 1);
+    const after = await read();
+    const [paid, ...others] = Object.keys(byClient(after)).filter(
+      (id) => byClient(after)[id] === "paid" && byClient(before)[id] !== "paid",
+    );
+    expect(others).toEqual([]);
+    expect(byJob(after)[paid!]).toBe("paid");
+    const owner = (clients: ClientRead[]) => clients.find((client) => client.invoices.nodes.some((invoice) => invoice.id === paid))!;
+    expect(owner(after).balance).toBeLessThan(owner(before).balance);
+
+    rewindTo(harness.twin, "before");
+    expect(await read()).toEqual(before);
   });
 
   it("marks finished work that hasn't been invoiced yet as requires_invoicing", async () => {

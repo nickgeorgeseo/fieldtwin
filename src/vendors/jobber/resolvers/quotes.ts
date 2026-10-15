@@ -7,7 +7,7 @@ import { jobNode } from "./jobs.ts";
 
 /** Quote: https://developer.getjobber.com/docs (Important Objects: Quote) */
 export function quoteNode(quote: JobberQuote, context: ResolverContext) {
-  const jobs = [...context.state().jobs.values()].filter((job) => job.quoteId === quote.id);
+  const jobs = context.lookups().jobsOfQuote.get(quote.id) ?? [];
   const total = sumMoney(quote.lineItems.map((line) => line.totalPrice));
   const status = quoteStatus(quote, jobs.length > 0);
   return {
@@ -31,6 +31,6 @@ function quoteStatus(quote: JobberQuote, hasJobs: boolean): string {
 
 /** All quotes, or one client's, in quote-number order. */
 export function quotesConnection(args: PageArgs, context: ResolverContext, clientId?: string) {
-  const quotes = [...context.state().quotes.values()].filter((quote) => !clientId || quote.clientId === clientId);
+  const quotes = clientId ? (context.lookups().quotesOfClient.get(clientId) ?? []) : [...context.state().quotes.values()];
   return connection(quotes, args, (quote) => quoteNode(quote, context));
 }

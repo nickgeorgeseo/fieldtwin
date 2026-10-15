@@ -24,6 +24,7 @@ export function jobberRoutes(twin: Twin): Hono {
     () => twin.state<JobberState>("jobber"),
     () => twin.clock.nowMs(),
     (event) => twin.record(event, "api"),
+    () => twin.log.length,
   );
 
   jobberOAuthRoutes(app, twin);
