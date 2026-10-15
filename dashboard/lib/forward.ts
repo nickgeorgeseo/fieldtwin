@@ -33,11 +33,14 @@ export async function forwardToTwin(request: Request, segments: string[], option
   } catch {
     return problem(502, `Can't reach the twin at ${options.twinUrl}. Start it with npm start in the project folder, or set FIELDTWIN_URL.`);
   }
-  return new Response(answer.body, {
-    status: answer.status,
-    headers: { "content-type": answer.headers.get("content-type") ?? "application/json", "cache-control": "no-store" },
-  });
+  const headers = new Headers({ "content-type": answer.headers.get("content-type") ?? "application/json", "cache-control": "no-store" });
+  // Where the log ends, on a read of it: the page sends it back as ?after= to read only what came since.
+  const position = answer.headers.get(LOG_POSITION);
+  if (position) headers.set(LOG_POSITION, position);
+  return new Response(answer.body, { status: answer.status, headers });
 }
+
+const LOG_POSITION = "x-twin-log-position";
 
 /** "/_twin/checkpoints/before%20agent" for ["checkpoints", "before agent"]; null for a segment that could climb out. */
 export function controlPlanePath(segments: string[]): string | null {

@@ -71,6 +71,15 @@ describe("forwarding the dashboard's requests to the twin's control plane", () =
     assert.equal(answer.headers.get("cache-control"), "no-store");
   });
 
+  it("passes on where the log ends, so a page can read on from there next time", async () => {
+    const position = "283-5f0c3a9e81d27b46";
+    const twin = fakeTwin(() => new Response("{}", { headers: { "content-type": "text/plain", "x-twin-log-position": position } }));
+    const request = new Request("http://localhost:4020/api/twin/log.jsonl?after=282", { headers: { host: "localhost:4020" } });
+    const answer = await forwardToTwin(request, ["log.jsonl"], { twinUrl: TWIN, fetch: twin.fetch });
+    assert.equal(answer.headers.get("x-twin-log-position"), position);
+    assert.equal(twin.asked[0]?.url, `${TWIN}/_twin/log.jsonl?after=282`);
+  });
+
   it("says how to start the twin when it can't be reached", async () => {
     const fetch = async () => {
       throw new TypeError("fetch failed");
