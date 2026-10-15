@@ -50,10 +50,10 @@ export class EventLog {
   }
 
   /**
-   * The events after a position an earlier read gave, or after an event's seq (taken on trust). Throws LogChangedError
-   * when the log isn't the history that position is in any more.
+   * The seq of a position an earlier read gave, so a reader can ask for what came after it. An event's seq works too,
+   * taken on trust. Throws LogChangedError when the log isn't the history that position is in any more.
    */
-  afterPosition(position: string): TwinEvent[] {
+  seqAt(position: string): number {
     const match = /^(\d+)(-[0-9a-f]{16})?$/.exec(position);
     if (!match) {
       throw new Error(
@@ -66,7 +66,7 @@ export class EventLog {
         `The log has changed since ${position}: the twin was reset, rewound to before it, or started again, or a scenario was loaded. Read it again from the start.`,
       );
     }
-    return this.after(seq);
+    return seq;
   }
 }
 

@@ -7,6 +7,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 ### Added
 
 - `GET /_twin/log.jsonl?after=` reads only what was recorded since an earlier read, so following the log costs what is new rather than the whole history: on a 5,885-event log, one new event is 292 bytes to read instead of 3.2 MB. Every read says where the log ends in an `X-Twin-Log-Position` header, the last event's `seq` and a fingerprint of everything up to it; send that as `after` next time. If the log has changed in between (a reset, a rewind to before it, a scenario, or a restarted twin), the answer is 409, so a reader never mixes two histories.
+- `GET /_twin/checkpoints/:name/changes` takes `after=` too, and says where the log ends, so a list of what your code changed can be followed the same way while it runs.
 
 ### Changed
 

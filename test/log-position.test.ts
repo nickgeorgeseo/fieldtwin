@@ -110,3 +110,36 @@ describe("following the event log", () => {
     expect(JSON.parse(both.text).error).toBe("Give since (a checkpoint) or after (a position), not both.");
   });
 });
+
+describe("following the changes since a checkpoint", () => {
+  async function readChanges(app: App, query: string) {
+    const response = await app.request(`/_twin/checkpoints/before/changes${query}`);
+    const body = await response.json();
+    return { status: response.status, position: response.headers.get("X-Twin-Log-Position"), body };
+  }
+
+  it("answers only the changes after a position, from the source asked for, and where the log ends now", async () => {
+    const { app, qboPost } = setup();
+    await app.request("/_twin/checkpoints/before", { method: "POST" });
+    await qboPost("/customer", { DisplayName: "First Change" });
+    const first = await readChanges(app, "?source=api");
+    expect(first.position).toBe((await readLog(app)).position);
+
+    await qboPost("/customer", { DisplayName: "Second Change" });
+    await app.request("/_twin/actions/jobber/newClients", { method: "POST", body: "1" });
+    const next = await readChanges(app, `?source=api&after=${first.position}`);
+    expect(next.body.map((change: { summary: string }) => change.summary)).toEqual([expect.stringContaining("Second Change")]);
+    expect(next.position).toBe((await readLog(app)).position);
+  });
+
+  it("answers 409 once the log is another history, as a read of the log does", async () => {
+    const { app, qboPost } = setup();
+    await app.request("/_twin/checkpoints/before", { method: "POST" });
+    await qboPost("/customer", { DisplayName: "Rewound Away" });
+    const read = await readChanges(app, "");
+    await app.request("/_twin/checkpoints/before/rewind", { method: "POST" });
+    const afterRewind = await readChanges(app, `?after=${read.position}`);
+    expect(afterRewind.status).toBe(409);
+    expect(afterRewind.body.error).toContain("Read it again from the start");
+  });
+});

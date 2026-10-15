@@ -101,13 +101,14 @@ export function createCheckpoint(twin: Twin, name: string) {
 
 const SOURCES: readonly EventSource[] = ["seed", "scenario", "api", "control"];
 
-/** Plain-language list of what changed since a checkpoint, newest last: everything, or what one source did. */
-export function listChanges(twin: Twin, checkpointName: string, options: { onlyFromApi?: boolean; source?: string } = {}) {
+/** Plain-language list of what changed since a checkpoint, newest last: everything or one source's, after a position if given. */
+export function listChanges(twin: Twin, checkpointName: string, options: { onlyFromApi?: boolean; source?: string; after?: string } = {}) {
   const source = options.onlyFromApi ? "api" : options.source;
   if (source !== undefined && !SOURCES.includes(source as EventSource)) {
     throw new Error(`source must be one of ${SOURCES.join(", ")}, not "${source}"`);
   }
-  const changes = twin.changesSince(checkpointName).filter((event) => source === undefined || event.source === source);
+  const after = options.after ? twin.log.seqAt(options.after) : 0;
+  const changes = twin.changesSince(checkpointName, after).filter((event) => source === undefined || event.source === source);
   return changes.map((event) => ({ ...event, summary: summarize(twin, event) }));
 }
 
@@ -190,7 +191,7 @@ export function loadScenarioByName(twin: Twin, name: string) {
 /** The event log as JSON Lines (all of it, since a checkpoint, or after an earlier read's position), and where it ends. */
 export function exportLog(twin: Twin, { sinceCheckpoint, after }: { sinceCheckpoint?: string; after?: string } = {}) {
   if (sinceCheckpoint && after) throw new Error("Give since (a checkpoint) or after (a position), not both.");
-  const events = after ? twin.log.afterPosition(after) : sinceCheckpoint ? twin.changesSince(sinceCheckpoint) : twin.log.all();
+  const events = after ? twin.log.after(twin.log.seqAt(after)) : sinceCheckpoint ? twin.changesSince(sinceCheckpoint) : twin.log.all();
   return { jsonl: events.map((event) => JSON.stringify(event)).join("\n"), position: twin.log.position() };
 }
 

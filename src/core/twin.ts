@@ -184,9 +184,9 @@ export class Twin {
     return this.checkpoints.all();
   }
 
-  /** Everything recorded since a checkpoint. The answer to "what did my agent just do?" */
-  changesSince(name: string): TwinEvent[] {
-    return this.log.after(this.checkpoints.get(name).seq);
+  /** Everything recorded since a checkpoint (and after event `seq`, if later). The answer to "what did my agent just do?" */
+  changesSince(name: string, seq = 0): TwinEvent[] {
+    return this.log.after(Math.max(this.checkpoints.get(name).seq, seq));
   }
 
   /** Go back to a checkpoint by replaying the log up to that point. The same requests then meet the same faults. */

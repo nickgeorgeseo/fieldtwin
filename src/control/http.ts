@@ -24,7 +24,10 @@ export function controlRoutes(twin: Twin): Hono {
   app.get("/_twin/webhooks", (c) => c.json(ops.describeWebhooks(twin)));
   app.put("/_twin/webhooks", async (c) => c.json(ops.setWebhooks(twin, await body(c, SUBSCRIPTIONS_EXAMPLE))));
   app.post("/_twin/checkpoints/:name", (c) => c.json(ops.createCheckpoint(twin, c.req.param("name"))));
-  app.get("/_twin/checkpoints/:name/changes", (c) => c.json(ops.listChanges(twin, c.req.param("name"), { source: c.req.query("source") })));
+  app.get("/_twin/checkpoints/:name/changes", (c) => {
+    const changes = ops.listChanges(twin, c.req.param("name"), { source: c.req.query("source"), after: c.req.query("after") });
+    return c.json(changes, 200, { "X-Twin-Log-Position": twin.log.position() });
+  });
   app.post("/_twin/checkpoints/:name/rewind", (c) => c.json(ops.rewindTo(twin, c.req.param("name"))));
   app.put("/_twin/faults", async (c) => c.json(ops.setFaults(twin, await body(c, FAULTS_EXAMPLE))));
   app.put("/_twin/auth", async (c) => c.json(ops.setAuthMode(twin, (await objectBody(c, '{"mode": "oauth"}')).mode)));

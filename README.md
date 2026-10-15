@@ -392,7 +392,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, tokens expire, scheduled events and their webhooks happen) |
 | `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2`, `jobber/newClients` with `3` |
 | `POST /_twin/checkpoints/:name` | Name this moment |
-| `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then (or `seed`, `scenario`, `control`; everything without `source`): each event, with a one-line `summary` |
+| `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then (or `seed`, `scenario`, `control`; everything without `source`): each event, with a one-line `summary`. Like the log, it takes `after=` to read on from an earlier read |
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint. The same requests then meet the same faults |
 | `PUT /_twin/faults` | Replace the active fault rules |
 | `PUT /_twin/auth` `{"mode": "oauth"}` | Check bearer tokens for real (`oauth`) or accept any (`any-token`) |
