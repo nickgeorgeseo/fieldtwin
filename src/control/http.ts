@@ -1,4 +1,5 @@
 import { type Context, Hono } from "hono";
+import { LogChangedError } from "../core/event-log.ts";
 import { isObject } from "../core/request-body.ts";
 import type { Twin } from "../core/twin.ts";
 import * as ops from "./operations.ts";
@@ -30,10 +31,14 @@ export function controlRoutes(twin: Twin): Hono {
   app.post("/_twin/scenario", async (c) => c.json(ops.loadScenario(twin, await c.req.text())));
   app.get("/_twin/scenarios", (c) => c.json(ops.listScenarios()));
   app.post("/_twin/scenarios/:name", (c) => c.json(ops.loadScenarioByName(twin, c.req.param("name"))));
-  app.get("/_twin/log.jsonl", (c) => c.text(ops.exportLog(twin, { sinceCheckpoint: c.req.query("since") })));
+  app.get("/_twin/log.jsonl", (c) => {
+    const read = ops.exportLog(twin, { sinceCheckpoint: c.req.query("since"), after: c.req.query("after") });
+    return c.text(read.jsonl, 200, { "X-Twin-Log-Position": read.position });
+  });
 
   // Control-plane mistakes (unknown checkpoint, bad scenario) come back as readable 400s. A TypeError and its kin
-  // mean a bug in the twin, not the request: a 500, logged with its stack.
+  // mean a bug in the twin, not the request: a 500, logged with its stack. A log read after a position from another
+  // history is neither: a 409, so the reader knows to read the log again from the start.
   app.onError((error, c) => {
     if (error instanceof TypeError || error instanceof RangeError || error instanceof ReferenceError) {
       console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${error.stack ?? error.message}`);
@@ -42,7 +47,7 @@ export function controlRoutes(twin: Twin): Hono {
         500,
       );
     }
-    return c.json({ error: error.message }, 400);
+    return c.json({ error: error.message }, error instanceof LogChangedError ? 409 : 400);
   });
   return app;
 }

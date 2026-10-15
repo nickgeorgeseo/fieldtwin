@@ -187,10 +187,11 @@ export function loadScenarioByName(twin: Twin, name: string) {
   return loadScenario(twin, readScenarioFile(name));
 }
 
-/** The event log as JSON Lines: everything, or only what happened since a checkpoint. */
-export function exportLog(twin: Twin, options: { sinceCheckpoint?: string } = {}): string {
-  const events = options.sinceCheckpoint ? twin.changesSince(options.sinceCheckpoint) : twin.log.all();
-  return events.map((event) => JSON.stringify(event)).join("\n");
+/** The event log as JSON Lines (all of it, since a checkpoint, or after an earlier read's position), and where it ends. */
+export function exportLog(twin: Twin, { sinceCheckpoint, after }: { sinceCheckpoint?: string; after?: string } = {}) {
+  if (sinceCheckpoint && after) throw new Error("Give since (a checkpoint) or after (a position), not both.");
+  const events = after ? twin.log.afterPosition(after) : sinceCheckpoint ? twin.changesSince(sinceCheckpoint) : twin.log.all();
+  return { jsonl: events.map((event) => JSON.stringify(event)).join("\n"), position: twin.log.position() };
 }
 
 function summarize(twin: Twin, event: TwinEvent): string {

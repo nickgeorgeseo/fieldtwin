@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Added
+
+- `GET /_twin/log.jsonl?after=` reads only what was recorded since an earlier read, so following the log costs what is new rather than the whole history: on a 5,885-event log, one new event is 292 bytes to read instead of 3.2 MB. Every read says where the log ends in an `X-Twin-Log-Position` header, the last event's `seq` and a fingerprint of everything up to it; send that as `after` next time. If the log has changed in between (a reset, a rewind to before it, a scenario, or a restarted twin), the answer is 409, so a reader never mixes two histories.
+
 ## 0.4.0 - 2026-10-11
 
 A dashboard, and a README that says who fieldtwin is for. `dashboard/` drives a running twin from a browser, follows its event log live, and puts Jobber and QuickBooks side by side with every customer and invoice marked as matching or drifted, all without spending a rate limit or drawing a fault. The README shows what each kind of user gets and how to test on every commit, with a test that catches an invoice booked twice after a lost answer. Drifted books can now hold a customer the bookkeeper made inactive, and QuickBooks checks documented field lengths, reads payment text as text, and refuses request bodies over 10 MB.

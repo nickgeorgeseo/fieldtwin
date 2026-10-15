@@ -134,7 +134,7 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
       description: "The event log as JSON Lines, one event per line: everything, or only what happened since a checkpoint.",
       inputSchema: { checkpoint: z.string().optional() },
     },
-    ({ checkpoint }) => ({ content: [{ type: "text" as const, text: ops.exportLog(twin, { sinceCheckpoint: checkpoint }) }] }),
+    ({ checkpoint }) => ({ content: [{ type: "text" as const, text: ops.exportLog(twin, { sinceCheckpoint: checkpoint }).jsonl }] }),
   );
 
   return server;

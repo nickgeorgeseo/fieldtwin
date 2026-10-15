@@ -399,7 +399,8 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `GET /_twin/scenarios` | The ready-made scenarios and what each one tests |
 | `POST /_twin/scenarios/:name` | Load a ready-made scenario |
 | `POST /_twin/scenario` (YAML body) | Load your own scenario |
-| `GET /_twin/log.jsonl?since=:checkpoint` | The event log, one event per line (all of it without `since`). With the seed, it is everything a bug report needs |
+| `GET /_twin/log.jsonl?since=:checkpoint` | The event log, one event per line (all of it without `since`). With the seed, it is everything a bug report needs. Its `X-Twin-Log-Position` header says where the log ends |
+| `GET /_twin/log.jsonl?after=:position` | Only what was recorded after a position an earlier read gave (or after an event's `seq`): how to follow the log as it grows. A 409 means the log has changed in between (a reset, a rewind, a scenario, or a restarted twin): read it again from the start |
 | `PUT /_twin/webhooks` | Replace the webhook subscriptions (see [Webhooks](#webhooks)) |
 | `GET /_twin/webhooks` | The subscriptions, and each recent delivery with how your app answered |
 
