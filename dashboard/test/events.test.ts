@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { describeEvent, filterEvents, parseLog } from "../lib/events.ts";
+import { describeEvent, filterEvents, followLog, type LogReader, NOT_READ, parseLog } from "../lib/events.ts";
 import type { TwinEvent } from "../lib/twin-types.ts";
 
 function event(seq: number, vendor: string, type: string, data: unknown, source = "api"): TwinEvent {
@@ -15,6 +15,69 @@ describe("reading the event log", () => {
       [1, 2],
     );
     assert.deepEqual(parseLog(""), []);
+  });
+});
+
+describe("following the event log", () => {
+  const line = (seq: number) => JSON.stringify(event(seq, "jobber", "ClientCreated", { client: { id: String(seq) } }));
+
+  /**
+   * A twin's log of `count` events, as the dashboard reads it. Its positions are "count-history", so a read after a
+   * position from another history (a reset, a rewind, a restarted twin) is a 409, "changed", as the twin answers it.
+   */
+  function twinLog(history: string, count: number) {
+    const asked: (string | null)[] = [];
+    const read: LogReader = async (after) => {
+      asked.push(after);
+      const [seq, from] = after === null ? [0, history] : [Number(after.split("-")[0]), after.split("-")[1]];
+      if (from !== history || seq > count) return "changed";
+      const text = Array.from({ length: count - seq }, (_, i) => line(seq + i + 1)).join("\n");
+      return { text, position: `${count}-${history}` };
+    };
+    return { asked, read };
+  }
+  const seqs = (events: TwinEvent[]) => events.map((read) => read.seq);
+
+  it("reads the whole log the first time, and where it ends", async () => {
+    const twin = twinLog("a", 3);
+    const log = await followLog(NOT_READ, twin.read);
+    assert.deepEqual(seqs(log.events), [1, 2, 3]);
+    assert.equal(log.position, "3-a");
+    assert.deepEqual(twin.asked, [null]);
+  });
+
+  it("then reads only what was recorded since, and adds it to the end", async () => {
+    const first = await followLog(NOT_READ, twinLog("a", 3).read);
+    const twin = twinLog("a", 5);
+    const log = await followLog(first, twin.read);
+    assert.deepEqual(seqs(log.events), [1, 2, 3, 4, 5]);
+    assert.equal(log.position, "5-a");
+    assert.deepEqual(twin.asked, ["3-a"]);
+  });
+
+  it("keeps the very same log when nothing new was recorded, so the page doesn't draw it again", async () => {
+    const first = await followLog(NOT_READ, twinLog("a", 3).read);
+    assert.equal(await followLog(first, twinLog("a", 3).read), first);
+  });
+
+  it("reads the whole log again once it has changed: a reset, a rewind, or a restarted twin", async () => {
+    const first = await followLog(NOT_READ, twinLog("a", 3).read);
+    const twin = twinLog("b", 4);
+    const log = await followLog(first, twin.read);
+    assert.deepEqual(seqs(log.events), [1, 2, 3, 4]);
+    assert.equal(log.position, "4-b");
+    assert.deepEqual(twin.asked, ["3-a", null]);
+  });
+
+  it("reads the whole log each time from a twin too old to say where its log ends", async () => {
+    const asked: (string | null)[] = [];
+    const read: LogReader = async (after) => {
+      asked.push(after);
+      return { text: [1, 2].map(line).join("\n"), position: null };
+    };
+    const log = await followLog(await followLog(NOT_READ, read), read);
+    assert.deepEqual(seqs(log.events), [1, 2]);
+    assert.deepEqual(asked, [null, null]);
   });
 });
 

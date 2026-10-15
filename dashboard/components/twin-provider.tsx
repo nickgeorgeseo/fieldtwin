@@ -6,7 +6,7 @@ import type { TwinStatus } from "@/lib/twin-types.ts";
 
 /**
  * The twin's status (GET /_twin), read every POLL_MS and after every change the dashboard makes, shared by every
- * page. `logKey` changes whenever the log may have: pages that read the whole log refetch only then.
+ * page. `logKey` changes whenever the log may have: panels that read what changed refetch only then.
  */
 
 const POLL_MS = 1500;

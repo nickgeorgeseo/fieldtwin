@@ -1,3 +1,5 @@
+import type { LogRead } from "./events.ts";
+
 /** The browser's calls to the twin's control plane, through the dashboard's /api/twin (lib/forward.ts). */
 
 const BASE = "/api/twin";
@@ -6,10 +8,17 @@ export async function twinGet<T>(path = ""): Promise<T> {
   return readAnswer<T>(await fetch(`${BASE}${path}`, { cache: "no-store" }));
 }
 
-/** The event log, JSON Lines: everything, or since a checkpoint. */
-export async function twinLog(sinceCheckpoint?: string): Promise<string> {
-  const query = sinceCheckpoint ? `?since=${encodeURIComponent(sinceCheckpoint)}` : "";
-  return readAnswer(await fetch(`${BASE}/log.jsonl${query}`, { cache: "no-store" }), "text");
+/** The event log, JSON Lines, after a position an earlier read gave (all of it for null). See followLog in events.ts. */
+export async function twinLogAfter(position: string | null): Promise<LogRead> {
+  const query = position ? `?after=${encodeURIComponent(position)}` : "";
+  return readLogAnswer(await fetch(`${BASE}/log.jsonl${query}`, { cache: "no-store" }));
+}
+
+/** A read of the log: its lines and where the log ends, or "changed" when it has changed since the position asked after. */
+export async function readLogAnswer(response: Response): Promise<LogRead> {
+  if (response.status === 409) return "changed";
+  const text = await readAnswer(response, "text");
+  return { text, position: response.headers.get("x-twin-log-position") };
 }
 
 /** A change to the twin. `body` goes as JSON; a string with `contentType` (a scenario's YAML) goes as it is. */

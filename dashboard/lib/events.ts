@@ -12,6 +12,40 @@ export function parseLog(text: string): TwinEvent[] {
     .map((line) => JSON.parse(line) as TwinEvent);
 }
 
+/**
+ * The event log as far as a page has read it, and where the twin said it ended then (its X-Twin-Log-Position
+ * header). Null before the first read, and for a twin too old to say.
+ */
+export interface FollowedLog {
+  events: TwinEvent[];
+  position: string | null;
+}
+
+export const NOT_READ: FollowedLog = { events: [], position: null };
+
+/** One read of the log: its lines and where the log ends, or "changed" for the twin's 409. */
+export type LogRead = { text: string; position: string | null } | "changed";
+
+/** Reads the log after a position, or all of it for null. */
+export type LogReader = (after: string | null) => Promise<LogRead>;
+
+/**
+ * Read on from where `log` left off: only what was recorded since, added to the end, so following a long log costs
+ * what is new rather than all of it. If the log has changed in between (a reset, a rewind, a scenario, or a restarted
+ * twin), it is read again from the start. When nothing is new, this is the very same log, so pages don't redraw.
+ */
+export async function followLog(log: FollowedLog, read: LogReader): Promise<FollowedLog> {
+  if (log.position !== null) {
+    const since = await read(log.position);
+    // No position means a twin that ignores ?after= and answered with all of it: read that as the whole log instead.
+    if (since !== "changed" && since.position !== null) {
+      return since.text ? { events: [...log.events, ...parseLog(since.text)], position: since.position } : log;
+    }
+  }
+  const all = await read(null);
+  return all === "changed" ? NOT_READ : { events: parseLog(all.text), position: all.position };
+}
+
 type Fields = Record<string, unknown>;
 
 /** A short label for the record an event is about: 'Id=26 "Dana Whitfield"', '#13 "AC tune-up"'. */

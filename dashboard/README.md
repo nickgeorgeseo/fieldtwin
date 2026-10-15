@@ -23,6 +23,8 @@ Like `examples/`, the dashboard is a client of the twin and imports nothing from
 
 It never calls the vendor APIs. The Business page rebuilds both vendors' records from the event log instead, since every event carries the whole record it changed ([`lib/books.ts`](lib/books.ts)). Reading through the vendor APIs would spend their rate limits and draw from the seeded faults your own code meets, so watching would change what you're watching.
 
+The Events and Business pages read the whole log once, then only what is new: each read sends back where the last one ended (`?after=`, from its `X-Twin-Log-Position` header), so following a long run costs what changes rather than the whole log every time it grows. When the log is no longer the history that position is in (a reset, a rewind, a scenario, or a restarted twin), the twin answers 409 and the page reads it again from the start ([`lib/events.ts`](lib/events.ts)).
+
 The control plane has no authentication, so the dashboard won't lend it to anyone else ([`lib/request-guard.ts`](lib/request-guard.ts)). It listens on 127.0.0.1, answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]` (a site that rebinds its DNS name to this machine still sends its own name), and takes changes only from its own pages (browsers send `Origin` with every POST and PUT).
 
 Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the ones the Jobber twin has today (`payInvoices`, `newClients`).

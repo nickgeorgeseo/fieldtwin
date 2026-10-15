@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readAnswer } from "../lib/twin-api.ts";
+import { readAnswer, readLogAnswer } from "../lib/twin-api.ts";
 
 describe("reading the twin's answers", () => {
   it("returns the JSON of a successful answer", async () => {
@@ -21,5 +21,26 @@ describe("reading the twin's answers", () => {
       await readAnswer(new Response('{"seq":1}\n{"seq":2}', { headers: { "content-type": "text/plain" } }), "text"),
       '{"seq":1}\n{"seq":2}',
     );
+  });
+});
+
+describe("reading on in the event log", () => {
+  it("reads the lines and where the log ends", async () => {
+    const answer = new Response('{"seq":283}', {
+      headers: { "content-type": "text/plain", "x-twin-log-position": "283-5f0c3a9e81d27b46" },
+    });
+    assert.deepEqual(await readLogAnswer(answer), { text: '{"seq":283}', position: "283-5f0c3a9e81d27b46" });
+  });
+
+  it("knows the twin's 409: the log has changed since the position asked after", async () => {
+    const changed = Response.json({ error: "The log has changed since 283-5f0c3a9e81d27b46." }, { status: 409 });
+    assert.equal(await readLogAnswer(changed), "changed");
+  });
+
+  it("has no position from a twin too old to say where its log ends, and throws the twin's words otherwise", async () => {
+    assert.deepEqual(await readLogAnswer(new Response('{"seq":1}')), { text: '{"seq":1}', position: null });
+    await assert.rejects(readLogAnswer(Response.json({ error: 'No checkpoint named "x"' }, { status: 400 })), {
+      message: 'No checkpoint named "x"',
+    });
   });
 });
