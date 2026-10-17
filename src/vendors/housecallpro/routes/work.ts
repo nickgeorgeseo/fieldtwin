@@ -1,5 +1,6 @@
 import { localTime } from "../../../core/local-time.ts";
 import { lineAmount } from "../amounts.ts";
+import { zonedTime } from "../dates.ts";
 import type { HcpAppointment, HcpCompany, HcpLineItem, HcpState } from "../types/index.ts";
 import { customerResponse } from "./customers.ts";
 
@@ -37,13 +38,13 @@ export function workTimestamps(appointments: readonly HcpAppointment[]) {
 
 /**
  * The schedule runs from the first appointment's start to the last one's end, in UTC, and again in the company's time
- * zone (the `_local` fields). All null without an appointment.
+ * zone with that day's offset (the `_local` fields). All null without an appointment.
  */
 export function schedule(appointments: readonly HcpAppointment[], company: HcpCompany, withAppointments: boolean) {
   const first = appointments[0];
   const last = appointments.at(-1);
   const zone = first ? company.time_zone : null;
-  const local = (time: string) => localTime(Date.parse(time), company.utcOffsetHours);
+  const local = (time: string) => zonedTime(Date.parse(time), zone!);
   return {
     scheduled_start: first?.start_time ?? null,
     scheduled_end: last?.end_time ?? null,
@@ -57,9 +58,10 @@ export function schedule(appointments: readonly HcpAppointment[], company: HcpCo
 
 /** An appointment as the API answers with it. `start_date` is the day it starts, at the company. */
 export function appointmentResponse(appointment: HcpAppointment, company: HcpCompany) {
+  const start = Date.parse(appointment.start_time);
   return {
     id: appointment.id,
-    start_date: localTime(Date.parse(appointment.start_time), company.utcOffsetHours).slice(0, 10),
+    start_date: (company.time_zone ? zonedTime(start, company.time_zone) : localTime(start, company.utcOffsetHours)).slice(0, 10),
     start_time: appointment.start_time,
     end_time: appointment.end_time,
     anytime: false,

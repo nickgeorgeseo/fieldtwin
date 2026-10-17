@@ -56,6 +56,32 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect(appointments).toEqual([expect.objectContaining({ arrival_window_minutes: 60, dispatched_employees_ids: [employees[0]!.id] })]);
   });
 
+  it("writes the local schedule with the offset the company's time zone has that day, standard time in winter", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const company = await (await harness.hcpGet("/company")).json();
+    expect(company.time_zone).toBe("America/Chicago"); // seed 42's business is in Texas
+
+    const local = async (scheduled_start: string, scheduled_end: string) => {
+      const job = await (
+        await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule: { scheduled_start, scheduled_end } })
+      ).json();
+      const { appointments } = await (await harness.hcpGet(`/jobs/${job.id}/appointments`)).json();
+      return { start: job.schedule.scheduled_start_local, end: job.schedule.scheduled_end_local, date: appointments[0].start_date };
+    };
+    // 5:30 UTC on December 15 is still the evening of the 14th in Chicago, six hours behind in winter.
+    expect(await local("2026-12-15T05:30:00Z", "2026-12-15T06:30:00Z")).toEqual({
+      start: "2026-12-14T23:30:00-06:00",
+      end: "2026-12-15T00:30:00-06:00",
+      date: "2026-12-14",
+    });
+    expect(await local("2026-07-20T14:00:00Z", "2026-07-20T15:00:00Z")).toEqual({
+      start: "2026-07-20T09:00:00-05:00",
+      end: "2026-07-20T10:00:00-05:00",
+      date: "2026-07-20",
+    });
+  });
+
   it("keeps the employees assigned to a job without a schedule", async () => {
     const harness = setup();
     const { customerId, addressId, employees } = await cast(harness);
