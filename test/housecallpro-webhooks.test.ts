@@ -94,6 +94,7 @@ describe("Housecall Pro webhooks", () => {
     const job = payloads()[2].job;
     expect(job).toMatchObject({ work_status: "scheduled", schedule: { scheduled_start: schedule.scheduled_start } });
     expect(job.appointments).toEqual([expect.objectContaining({ start_time: schedule.scheduled_start, end_time: schedule.scheduled_end })]);
+    expect(job.attachments).toEqual([]); // the Job Webhook Protocol has them, as the API does only when expanded
   });
 
   it("send nothing for topics an app didn't subscribe to, or for the seeded world", async () => {

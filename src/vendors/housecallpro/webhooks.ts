@@ -65,7 +65,8 @@ function record(notification: WebhookNotification, state: HcpState) {
     end_time,
     arrival_window: arrival_window_minutes,
   }));
-  return { job: { ...jobResponse(job, state, NOTHING_EXPANDED), appointments } };
+  return { job: { ...jobResponse(job, state, WITH_ATTACHMENTS), appointments } };
 }
 
 const NOTHING_EXPANDED = new Set<string>();
+const WITH_ATTACHMENTS = new Set(["attachments"]); // the Job Webhook Protocol always has them; the API only when expanded
