@@ -162,6 +162,8 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | Defaults for a new customer | Approximate | check | [Create Customer][hcp-create-customer] | `notifications_enabled` false, no `tags`, and addresses of `type` `service`: the docs give no defaults. Phone numbers are kept as sent |
 | `PUT /customers/{id}` | Approximate | check | [Update Customer][hcp-update-customer] | Changes the fields sent and keeps the rest; `null` clears one. A PUT that changes nothing records nothing and leaves `updated_at` alone. Addresses can't be changed this way: CustomerUpdate has none |
 | A customer's addresses | Modeled | docs only | [Addresses][hcp-addresses] | Listed (paged, by `created_at` or `updated_at`, newest first), read one at a time, and created: `street`, `city`, `state`, `zip`, and `country` are required (422 without them), and the answer is 200, as documented. `latitude` and `longitude` are accepted and dropped |
+| `GET /employees` | Modeled | docs only | [Get Employees][hcp-employees] | The world's technicians, as `field tech`s with the email address Jobber has for them. Sorted by `created_at` (the default), `first_name`, `last_name`, or `email` |
+| Employee details | Approximate | | [Get Employees][hcp-employees] | The docs list each permission but not a field tech's defaults: the twin's techs can work, and take payment for, their own jobs, and nothing that runs the business. `mobile_number` and `avatar_url` are null, and `color_hex` is the twin's |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
@@ -195,3 +197,4 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [hcp-create-customer]: https://docs.housecallpro.com/docs/housecall-public-api/4e0bf8c4d65d7-create-customer
 [hcp-update-customer]: https://docs.housecallpro.com/docs/housecall-public-api/b1c3acd657849-update-customer
 [hcp-addresses]: https://docs.housecallpro.com/docs/housecall-public-api/abdc4e24d762b-get-all-of-a-customer-s-addresses
+[hcp-employees]: https://docs.housecallpro.com/docs/housecall-public-api/303ee235f23fa-get-employees
