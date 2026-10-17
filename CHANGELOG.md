@@ -6,7 +6,12 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Added
 
-- A Housecall Pro twin, served under `/housecallpro`: set your client's base URL to `http://localhost:4010/housecallpro` and keep the rest of the path. It takes API keys (`Authorization: Token <key>`) and OAuth access tokens (`Bearer`), answers errors in Housecall Pro's documented format, and serves `GET /company` and the business's customers: listed (paged, sorted, and searched with `q`), read, created, and updated, with their addresses; its employees; and its jobs, filtered as Get Jobs documents, with their line items, appointments, and a `work_status` that follows the work done, and new ones created, scheduled, and dispatched with `POST /jobs`; its invoices, paid or open, filtered as Get Invoices documents; and its estimates, approved or awaiting a response. Its webhooks (`customer.created`, `customer.updated`, `job.created`, `job.scheduled`) carry the whole record and are signed with `Api-Timestamp` and `Api-Signature`, as documented. Its OAuth 2.0 server issues 30-day access tokens and rotating refresh tokens at `/housecallpro/oauth/authorize` and `/housecallpro/oauth/token`. Endpoints it doesn't model yet answer 501.
+- A Housecall Pro twin, served under `/housecallpro`: set your client's base URL to `http://localhost:4010/housecallpro` and keep the rest of the path. It describes the same business as the other twins, as a field-service system like Jobber, and answers errors in Housecall Pro's documented format. Endpoints it doesn't model yet answer 501.
+  - Customers, listed (paged, sorted, and searched with `q`), read, created, and updated, with their addresses; and employees.
+  - Jobs, filtered as Get Jobs documents, with their line items, appointments, invoices, and a `work_status` that follows the work done. `POST /jobs` creates, schedules, and dispatches new ones.
+  - Invoices, paid or open, filtered as Get Invoices documents, and estimates, approved or awaiting a response.
+  - Webhooks (`customer.created`, `customer.updated`, `job.created`, `job.scheduled`) that carry the whole record, signed with `Api-Timestamp` and `Api-Signature` as documented.
+  - API keys (`Authorization: Token <key>`), and an OAuth 2.0 server with 30-day access tokens and rotating refresh tokens.
 
 ## 0.4.1 - 2026-10-15
 

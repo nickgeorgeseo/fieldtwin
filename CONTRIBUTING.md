@@ -22,7 +22,7 @@ The dashboard is a package of its own. If you change it, also run `npm ci`, `npm
 
 ## Ground rules
 
-1. **Public documentation only.** Every vendor behavior must come from the vendor's public docs ([developer.intuit.com](https://developer.intuit.com/app/developer/qbo/docs/get-started), [developer.getjobber.com](https://developer.getjobber.com/docs)), with a link in a code comment. Never paste vendor code, private or login-only docs, or anything resembling real customer data.
+1. **Public documentation only.** Every vendor behavior must come from the vendor's public docs ([developer.intuit.com](https://developer.intuit.com/app/developer/qbo/docs/get-started), [developer.getjobber.com](https://developer.getjobber.com/docs), [docs.housecallpro.com](https://docs.housecallpro.com/)), with a link in a code comment. Never paste vendor code, private or login-only docs, or anything resembling real customer data.
 2. **Don't invent silently.** If the docs don't settle a detail, pick the most conservative behavior, say so in a comment, and mark the FIDELITY.md row `Approximate` or `check`. A twin that is honest about its gaps is more useful than one that is confidently wrong.
 3. **Fake data stays obviously fake.** Emails at `example.com`, phone numbers starting `555`.
 4. **Keep the three rules.** All state changes go through `twin.record()`; time comes from `twin.clock` and randomness from `SeededRandom`; vendor state can always be rebuilt from the log. `test/determinism.test.ts` and `test/import-boundaries.test.ts` enforce the parts a machine can check.
@@ -33,7 +33,7 @@ This is the workflow for almost every contribution, whether it is a new QuickBoo
 
 1. **Find the docs page.** Read the endpoint's page on the vendor's developer site. Note the exact field names, which fields are required, read-only, or system-computed, the error codes, and the limits. Copy the URL; you will need it three times.
 2. **Add the FIDELITY.md row.** Before writing code, write the row: behavior, status (`Modeled`, `Approximate`, or `Not yet`), `docs only`, the docs link, and notes on anything the docs leave open. Writing it first keeps you honest about what you are claiming.
-3. **Write the failing test.** Name it as a sentence about the behavior, written so someone who has never seen the code knows what the vendor does: `it("rejects an update that sends an old SyncToken (Stale Object Error)")`, not `it("works")`. Drive it through HTTP, the way a real client would (`test/helpers.ts` has `qboGet`, `qboPost`, and `jobber`). Run it and watch it fail.
+3. **Write the failing test.** Name it as a sentence about the behavior, written so someone who has never seen the code knows what the vendor does: `it("rejects an update that sends an old SyncToken (Stale Object Error)")`, not `it("works")`. Drive it through HTTP, the way a real client would (`test/helpers.ts` has `qboGet`, `qboPost`, `jobber`, `hcpGet`, `hcpPost`, and `hcpPut`). Run it and watch it fail.
 4. **Types.** Add the record shape to the vendor's `types.ts`, named exactly as the vendor's docs name it (`SyncToken`, `DisplayName`, `invoiceStatus`), so the code can be checked against the docs line by line.
 5. **Events.** Add the event payloads to `events.ts` (past tense: `InvoiceCreated`, `PaymentApplied`) and a line in `describeEvent()`. Events carry complete records, never "field X changed".
 6. **`apply()`.** Teach `state.ts` to apply the new events. It must be deterministic and must not look at the clock, the network, or anything outside the event.

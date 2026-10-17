@@ -69,7 +69,7 @@ describe("the README quick start", () => {
     const response = await app.request(request.path, { method: request.method, headers: request.headers, body: request.body });
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.errors ?? body.Fault).toBeUndefined();
+    expect(body.errors ?? body.Fault ?? body.error).toBeUndefined(); // each vendor's error shape
   });
 });
 

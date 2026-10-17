@@ -4,7 +4,7 @@ What each twin models, how closely, and whether it has been checked against the 
 
 **Modeled** means it behaves like the public docs describe. **Approximate** means the shape is right but details differ. **Not yet** means calls fail clearly instead of returning wrong data.
 
-Scenarios can make the two twins disagree on purpose (`world.drift`: respelled customers, customers in only one system, customers the books made inactive who have paid for new work since), the way real businesses' systems drift.
+Scenarios can make the field-service twins (Jobber and Housecall Pro) and the books (QuickBooks) disagree on purpose (`world.drift`: respelled customers, customers in only one system, customers the books made inactive who have paid for new work since), the way real businesses' systems drift.
 
 **Verified** means checked against a live vendor sandbox, with the date. The [conformance suite](conformance/README.md) does the checking: it records what a real sandbox does for the rows marked "check" and fails a test wherever the twin differs. Nothing has been recorded yet, so everything is built from public documentation: a row says "docs only", or "check" where the docs leave room for doubt, and stays blank when a recording has nothing to settle (a known difference, or something not modeled yet). Anything marked "check" is our best reading of the docs and should be confirmed first.
 

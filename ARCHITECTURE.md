@@ -29,6 +29,7 @@ flowchart LR
     F[Fault middleware]
     Q[vendors/quickbooks]
     J[vendors/jobber]
+    H[vendors/housecallpro]
     C[control: HTTP + MCP]
     O[operations.ts]
     T[Twin runtime]
@@ -39,11 +40,13 @@ flowchart LR
   A -->|vendor-shaped HTTP| F
   F --> Q
   F --> J
+  F --> H
   B -->|/_twin or MCP tools| C
   C --> O
   O --> T
   Q -->|twin.record| T
   J -->|twin.record| T
+  H -->|twin.record| T
   T --> L
   W -->|seed| T
 ```
@@ -86,11 +89,11 @@ Every vendor has the same files, so once you have read one you can read them all
 
 | File | Holds |
 |---|---|
-| `types.ts` | Record shapes, named exactly as the vendor's docs name them |
+| `types.ts` | Record shapes, named exactly as the vendor's docs name them. Housecall Pro's has grown into `types/`: its people and its work |
 | `events.ts` | The event payloads this vendor records, and `describeEvent()`: one plain-language line per event |
 | `state.ts` | `createState()` and `apply()`, the only code that changes this vendor's state |
 | `seed.ts` | Turns the shared world into this vendor's starting events |
-| `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks has grown this into `routes/`, one file per entity |
+| `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks and Housecall Pro have grown this into `routes/`, one file per entity |
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
 | `oauth.ts` | The vendor's OAuth 2.0 server: its paths, how long codes and tokens last, and how refresh works (`core/oauth.ts` does the rest) |
 | `webhooks.ts` | Optional. The webhooks the vendor sends: its topics, which events announce what, how a delivery is shaped and signed, and how long an app has to answer before it is tried again (`core/webhook-dispatcher.ts` queues and sends them) |
@@ -166,5 +169,5 @@ The goal is code a new contributor can read top to bottom without jumping around
 
 - **Shipped.** v0.1 to v0.4, from the first twins to the dashboard: see [CHANGELOG.md](CHANGELOG.md).
 - **Next.** More Jobber writes (`jobCreate` and visit scheduling) as their inputs reach the public docs, and the first conformance recordings from real sandboxes.
-- **v0.5.** More vendors: Housecall Pro, Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
+- **v0.5.** More vendors: Housecall Pro (begun; the changelog's Unreleased section says how far), Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
 - **v0.6.** A benchmark for dispatch and operations agents, built on these twins.

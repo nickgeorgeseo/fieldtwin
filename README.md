@@ -8,7 +8,7 @@
 
 [Watch the two-minute demo](https://nickgeorgeai.com/fieldtwin#demo): the dashboard drives a twin, an agent's changes are listed and rewound, and a sync brings drifted books back into line.
 
-Point your code at `http://localhost:4010` instead of `api.getjobber.com` or `quickbooks.api.intuit.com`. It gets the same paths, headers, and JSON back, from a fake trades business with customers, technicians, and months of jobs, quotes, invoices, and payments, kept in both systems at once. Then make it hard: throttle QuickBooks, lose the answer to a write, deliver a webhook twice, jump the clock past every token's expiry. Afterwards, see exactly what your code changed, and undo it.
+Point your code at `http://localhost:4010` instead of `api.getjobber.com` or `quickbooks.api.intuit.com` (or at `http://localhost:4010/housecallpro` instead of `api.housecallpro.com`). It gets the same paths, headers, and JSON back, from a fake trades business with customers, technicians, and months of jobs, quotes, invoices, and payments, kept in both systems at once. Then make it hard: throttle QuickBooks, lose the answer to a write, deliver a webhook twice, jump the clock past every token's expiry. Afterwards, see exactly what your code changed, and undo it.
 
 ```bash
 curl -X POST localhost:4010/_twin/checkpoints/before-agent           # name this moment
@@ -72,14 +72,14 @@ fieldtwin is built by Nick George. Its page, with both demo videos, is at [nickg
 
 ## What's modeled
 
-| | QuickBooks Online | Jobber |
-|---|---|---|
-| Records | Customers, items, invoices, payments | Clients, jobs, visits, quotes, invoices, users |
-| Reading | By Id; the query language (`WHERE` with `=`, `<`, `>`, `LIKE`, `IN`, joined by `AND`; `ORDERBY`; paging; `COUNT(*)`); change data capture | GraphQL, with Relay pagination both ways, encoded ids, and dated API versions |
-| Writing | Customers and invoices created and updated with SyncTokens (5010 when stale), sparse or full; payments created and applied; `requestid` for safe retries | `clientCreate` |
-| Rate limits | 500 requests a minute per company: HTTP 429 | The query-cost budget: 10,000 points refilling 500 a second, `THROTTLED` |
-| Webhooks | CloudEvents, signed, retried on Intuit's schedule | HMAC-signed, delivered at least once, retried |
-| OAuth 2.0 | Authorize, tokens, refresh (rolling 100 days), revoke | Authorize with PKCE, tokens, refresh tokens that rotate |
+| | QuickBooks Online | Jobber | Housecall Pro |
+|---|---|---|---|
+| Records | Customers, items, invoices, payments | Clients, jobs, visits, quotes, invoices, users | Customers and their addresses, employees, jobs with appointments and line items, estimates, invoices |
+| Reading | By Id; the query language (`WHERE` with `=`, `<`, `>`, `LIKE`, `IN`, joined by `AND`; `ORDERBY`; paging; `COUNT(*)`); change data capture | GraphQL, with Relay pagination both ways, encoded ids, and dated API versions | REST lists with `page` and `page_size`, sorting, customer search, and the documented job and invoice filters |
+| Writing | Customers and invoices created and updated with SyncTokens (5010 when stale), sparse or full; payments created and applied; `requestid` for safe retries | `clientCreate` | Customers created and updated, addresses added; jobs created, scheduled, and dispatched |
+| Rate limits | 500 requests a minute per company: HTTP 429 | The query-cost budget: 10,000 points refilling 500 a second, `THROTTLED` | Not published, so only through fault rules |
+| Webhooks | CloudEvents, signed, retried on Intuit's schedule | HMAC-signed, delivered at least once, retried | The whole record, signed with `Api-Timestamp` and `Api-Signature`, tried once |
+| OAuth 2.0 | Authorize, tokens, refresh (rolling 100 days), revoke | Authorize with PKCE, tokens, refresh tokens that rotate | Authorize, tokens (30 days), refresh tokens that rotate; API keys as `Authorization: Token` |
 
 Anything not listed fails clearly in the vendor's own error format rather than returning made-up data. [FIDELITY.md](FIDELITY.md) has every behavior, how closely it matches, and the docs page it comes from.
 
@@ -115,6 +115,13 @@ curl -X POST http://localhost:4010/api/graphql \
   -d '{"query":"{ clients(first: 5) { nodes { id name } totalCount } }"}'
 ```
 
+List scheduled jobs from the Housecall Pro twin, with an API key (any key works):
+
+```bash
+curl -H "Authorization: Token dev" \
+  "http://localhost:4010/housecallpro/jobs?work_status[]=scheduled&page_size=5"
+```
+
 Start it in a ready-made situation instead: `npm start -- flaky-apis` (see [Scenarios and faults](#scenarios-and-faults)).
 
 ## Using it with your code
@@ -125,10 +132,11 @@ Change only the base URL. Paths, headers, and body shapes match the real APIs.
 |---|---|---|
 | QuickBooks Online | `https://quickbooks.api.intuit.com` | `http://localhost:4010` |
 | Jobber | `https://api.getjobber.com` | `http://localhost:4010` |
+| Housecall Pro | `https://api.housecallpro.com` | `http://localhost:4010/housecallpro` |
 
-The QuickBooks twin serves one company, realm `9341000000000001`.
+The QuickBooks twin serves one company, realm `9341000000000001`. The Housecall Pro twin serves the real paths under `/housecallpro`, because some of them (`/api/invoices/{uuid}`) start the way Jobber's do.
 
-Both twins enforce the vendors' documented rate limits in twin time: Jobber answers `THROTTLED` when a query costs more than its budget has left, and QuickBooks answers HTTP 429 after 500 requests in a minute. Advancing the clock lets them recover; a reset starts them full. Faults can add more throttling on top.
+The QuickBooks and Jobber twins enforce the vendors' documented rate limits in twin time: Jobber answers `THROTTLED` when a query costs more than its budget has left, and QuickBooks answers HTTP 429 after 500 requests in a minute. Advancing the clock lets them recover; a reset starts them full. Housecall Pro doesn't publish its limits, so its twin throttles only when a fault rule says so. Faults can add more throttling on top of any of them.
 
 ### Configuration
 
@@ -285,8 +293,12 @@ Each vendor has a twin OAuth 2.0 server at the vendor's own paths, so your OAuth
 | QuickBooks revoke | `https://developer.api.intuit.com/v2/oauth2/tokens/revoke` | `http://localhost:4010/v2/oauth2/tokens/revoke` |
 | Jobber authorize | `https://api.getjobber.com/api/oauth/authorize` | `http://localhost:4010/api/oauth/authorize` |
 | Jobber tokens | `https://api.getjobber.com/api/oauth/token` | `http://localhost:4010/api/oauth/token` |
+| Housecall Pro authorize | `https://pro.housecallpro.com/oauth/authorize` | `http://localhost:4010/housecallpro/oauth/authorize` |
+| Housecall Pro tokens | `https://api.housecallpro.com/oauth/token` | `http://localhost:4010/housecallpro/oauth/token` |
 
-The twin approves every authorization request at once (there is no consent page) and accepts any `client_id` and `client_secret`. Everything after that follows the vendors' docs: codes work once, access tokens last 60 minutes, Jobber rotates refresh tokens and rejects the old one, QuickBooks keeps the refresh token on a rolling 100 days. Tokens expire on twin time, so `POST /_twin/clock/advance {"minutes": 60}` tests your refresh path in a second. (Jobber's access tokens are JWTs whose `exp` is in twin time too, so compare it with the twin's clock, not your own.)
+The twin approves every authorization request at once (there is no consent page) and accepts any `client_id` and `client_secret`. Everything after that follows the vendors' docs: codes work once, access tokens last 60 minutes (30 days for Housecall Pro), Jobber and Housecall Pro rotate refresh tokens and reject the old one, QuickBooks keeps the refresh token on a rolling 100 days. Tokens expire on twin time, so `POST /_twin/clock/advance {"minutes": 60}` tests your refresh path in a second. (Jobber's access tokens are JWTs whose `exp` is in twin time too, so compare it with the twin's clock, not your own.)
+
+A Pro's own Housecall Pro integration uses an API key instead, sent as `Authorization: Token <key>`. The twin can't know which keys a Pro made, so it takes any key, in either auth mode.
 
 Getting a Jobber token from the command line:
 
@@ -301,7 +313,7 @@ curl -s -X POST http://localhost:4010/api/oauth/token \
 
 ## Webhooks
 
-Both twins send webhooks the way the vendors do. Each vendor sets them up per app in its developer portal; the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
+Every twin sends webhooks the way its vendor does. Each vendor sets them up per app (in a developer portal, or by email for Housecall Pro); the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
 
 ```bash
 curl -X PUT localhost:4010/_twin/webhooks -H "Content-Type: application/json" -d '[
@@ -314,6 +326,8 @@ curl -X POST localhost:4010/_twin/actions/jobber/payInvoices -H "Content-Type: a
 **Jobber** deliveries carry Jobber's documented payload (`{ "data": { "webHookEvent": { "topic", "appId", "accountId", "itemId", "occurredAt" } } }`) and an `X-Jobber-Hmac-SHA256` signature made with the subscription's client secret, so your verification code runs unchanged. Like Jobber, the twin delivers at least once: paying an invoice fires `INVOICE_UPDATE` twice, and a delivery your app doesn't accept within a second is sent again later in twin time. `CLIENT_CREATE` and `INVOICE_UPDATE` are modeled so far.
 
 **QuickBooks** deliveries are CloudEvents, the format Intuit sends today: a JSON array of events like `{ "specversion": "1.0", "type": "qbo.invoice.updated.v1", "intuitentityid": "130", "intuitaccountid": "9341000000000001", ... }`, signed in `intuit-signature` with the subscription's `clientSecret` standing in for your app's verifier token. Customers, invoices, and payments created or updated through the API are announced (`qbo.customer.created.v1`, `qbo.customer.updated.v1`, `qbo.invoice.created.v1`, `qbo.invoice.updated.v1`, `qbo.payment.created.v1`), and a payment also announces each invoice it pays. Your app has 3 seconds to answer HTTP 200; otherwise the twin tries again on Intuit's schedule, from 10 seconds up to every 6 hours of twin time.
+
+**Housecall Pro** deliveries carry the documented shared fields (`event`, `company_id`, `event_occurred_at`, `event_created_at`) and the whole record, as the event left it: `{ "event": "job.created", ..., "job": { ... } }`. `Api-Timestamp` and `Api-Signature` follow the docs' verification steps, an HMAC-SHA256 of the timestamp, a dot, and the payload, keyed with the subscription's `clientSecret` as your signing secret. `customer.created`, `customer.updated`, `job.created`, and `job.scheduled` are modeled so far. The docs promise no retries, so the twin tries each delivery once.
 
 Each URL gets its deliveries one at a time, in order; an app that is slow to answer doesn't hold up deliveries to another. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
@@ -460,6 +474,7 @@ src/
   vendors/
     quickbooks/  one folder per vendor, all with the same shape
     jobber/
+    housecallpro/
   faults/      makes vendor APIs misbehave on purpose
   control/     /_twin HTTP routes, MCP tools, scenarios (one shared operations.ts)
   app.ts       wires it together
@@ -479,10 +494,10 @@ test/          tests by vendor and area, plus core and the architecture guards
 
 Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row; every vendor folder has the same shape, so once you've read one you can read them all. If you have a QuickBooks sandbox company or a Jobber testing account, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
 
-Where it's going: more Jobber writes as their inputs reach the public docs, recordings from real sandboxes, then more vendors (Housecall Pro, Samsara or Motive, EDI trading partners) and a benchmark for dispatch and operations agents. [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) has the roadmap.
+Where it's going: more Jobber writes as their inputs reach the public docs, recordings from real sandboxes, more of Housecall Pro, then more vendors (Samsara or Motive, EDI trading partners) and a benchmark for dispatch and operations agents. [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) has the roadmap.
 
 ## Disclaimer and license
 
-fieldtwin is an independent project. It is not affiliated with, endorsed by, or supported by Jobber or Intuit. Jobber and QuickBooks are trademarks of their respective owners.
+fieldtwin is an independent project. It is not affiliated with, endorsed by, or supported by Jobber, Intuit, or Housecall Pro. Jobber, QuickBooks, and Housecall Pro are trademarks of their respective owners.
 
 Copyright 2026 [Nick George](https://nickgeorgeai.com). Licensed under the [Apache License 2.0](LICENSE).

@@ -11,7 +11,7 @@ import type { WorldCustomer } from "./generate-world.ts";
  *   inactiveInAccounting customers the bookkeeper made inactive in the books, who have called again since: each has
  *                        a job finished and paid in the last week, newer than the books
  *
- * Systems are named by role, not vendor: Jobber is the field-service system, QuickBooks the accounting one.
+ * Systems are named by role, not vendor: Jobber and Housecall Pro are field-service systems, QuickBooks the accounting one.
  * Drift picks customers by position, not by random draw, so a world without drift is exactly as before.
  */
 export interface DriftOptions {
