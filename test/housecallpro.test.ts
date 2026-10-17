@@ -106,6 +106,16 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
     expect((await response.json()).error.message).toMatch(/doesn't model GET \/leads yet.*company/);
   });
 
+  it("lists exactly the operations it serves when it answers 501, so a write it doesn't model isn't claimed", async () => {
+    const { hcpPost } = setup();
+    const response = await hcpPost("/jobs/job_x/line_items", { name: "Extra" });
+    expect(response.status).toBe(501);
+    const { message } = (await response.json()).error;
+    expect(message).toContain("GET /jobs/{id}/line_items");
+    expect(message).toContain("GET, PUT /customers/{id}");
+    expect(message).not.toMatch(/create|update/);
+  });
+
   it("injects a fault in Housecall Pro's error format, without touching the other vendors", async () => {
     const { twin, hcpGet, qboGet } = setup();
     twin.faultRules = [{ name: "outage", vendor: "housecallpro", rate: 1, effect: { status: 503 } }];

@@ -50,7 +50,22 @@ export function housecallproRoutes(twin: Twin): Hono {
   return app;
 }
 
-const SERVED =
-  "GET /company, customers and their addresses (list, get, create, update), GET /employees, jobs with their line items, " +
-  "appointments, and invoices (list, get, create), invoices (GET /invoices, GET /api/invoices/{uuid}), and estimates with " +
-  "their options' line items (list, get)";
+// Every operation the twin serves, so a client can tell at once whether the one it called is coming.
+const SERVED = [
+  "GET /company",
+  "GET, POST /customers",
+  "GET, PUT /customers/{id}",
+  "GET, POST /customers/{id}/addresses",
+  "GET /customers/{id}/addresses/{address_id}",
+  "GET /employees",
+  "GET, POST /jobs",
+  "GET /jobs/{id}",
+  "GET /jobs/{id}/line_items",
+  "GET /jobs/{id}/appointments",
+  "GET /jobs/{id}/invoices",
+  "GET /invoices",
+  "GET /api/invoices/{uuid}",
+  "GET /estimates",
+  "GET /estimates/{id}",
+  "GET /estimates/{id}/options/{option_id}/line_items",
+].join("; ");
