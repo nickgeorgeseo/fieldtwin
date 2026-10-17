@@ -121,7 +121,7 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
         "INVOICE_UPDATE; clientSecret is the app's OAuth client secret. QuickBooks topics: CloudEvents types qbo.customer.created.v1, " +
         "qbo.customer.updated.v1, qbo.invoice.created.v1, qbo.invoice.updated.v1, qbo.payment.created.v1; clientSecret is the verifier token. " +
         "Housecall Pro topics: customer.created, customer.updated, job.created, job.scheduled, job.completed, job.paid, " +
-        "invoice.payment.succeeded, invoice.paid; clientSecret is the signing secret.",
+        "invoice.created, invoice.sent, invoice.payment.succeeded, invoice.paid; clientSecret is the signing secret.",
       inputSchema: { subscriptions: z.array(z.unknown()) },
     },
     ({ subscriptions }) => asText(ops.setWebhooks(twin, subscriptions)),

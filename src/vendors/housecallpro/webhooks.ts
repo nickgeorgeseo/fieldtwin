@@ -22,9 +22,10 @@ import type { HcpState } from "./types/index.ts";
  *     the stricter reading: code that needs every event has to cope with one it missed.
  *
  * Only event keys the twin has events for are offered: customers created or updated, jobs created (and scheduled,
- * when created with a schedule), jobs completed, once all their work is done, and invoices paid: each payment that
- * succeeds, the invoice once it is paid in full, and its job once nothing is owed on it. The docs don't give an
- * order; the twin sends them in that one. The other keys need writes the twin doesn't model yet.
+ * when created with a schedule), jobs completed, once all their work is done, invoices created (and sent, when sent as
+ * they are made), and invoices paid: each payment that succeeds, the invoice once it is paid in full, and its job once
+ * nothing is owed on it. The docs don't give an order; the twin sends them in those. The other keys need writes the
+ * twin doesn't model yet.
  */
 export const housecallproWebhooks: VendorWebhooks<HcpState> = {
   topics: [
@@ -34,6 +35,8 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
     "job.scheduled",
     "job.completed",
     "job.paid",
+    "invoice.created",
+    "invoice.sent",
     "invoice.payment.succeeded",
     "invoice.paid",
   ],
@@ -54,6 +57,11 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
     if (data.type === "JobUpdated") {
       const { completed_at } = workTimestamps(data.job.appointments);
       return completed_at === hcpTime(event.at) ? [announce("job.completed", data.job.id)] : [];
+    }
+    // "Invoice created", and "Invoice sent to customer" too if it was sent as it was made.
+    if (data.type === "InvoiceCreated") {
+      const created = announce("invoice.created", data.invoice.id);
+      return data.invoice.sent_at === hcpTime(event.at) ? [created, announce("invoice.sent", data.invoice.id)] : [created];
     }
     // Paid by this very update: each payment made just now, the invoice if they cover it, and then its job if nothing
     // more is owed on it.

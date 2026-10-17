@@ -146,9 +146,34 @@ describe("Housecall Pro webhooks", () => {
     expect(payloads()[2].job).toMatchObject({ id: invoice.job_id, outstanding_balance: 0 });
   });
 
+  it("deliver invoice.created and then invoice.sent when finished work is invoiced, with the invoice as it was sent", async () => {
+    const { twin, subscribe, payloads } = twinWithEndpoint();
+    await subscribe(["invoice.created", "invoice.sent", "invoice.paid"]);
+    await runAction(twin, "housecallpro", "invoiceJobs", 1);
+
+    const invoice = [...twin.state<HcpState>("housecallpro").invoices.values()].at(-1)!;
+    expect(payloads().map((payload) => [payload.event, payload.invoice.id])).toEqual([
+      ["invoice.created", invoice.id],
+      ["invoice.sent", invoice.id],
+    ]);
+    expect(payloads()[0]).toMatchObject({
+      event_occurred_at: "2026-07-13T11:00:00Z",
+      invoice: {
+        invoice_number: "35",
+        job_id: invoice.job_id,
+        status: "open",
+        sent_at: "2026-07-13T11:00:00Z",
+        due_at: "2026-08-12T11:00:00Z",
+        paid_at: null,
+        payments: [],
+      },
+    });
+    expect(payloads()[1].invoice).toEqual(payloads()[0].invoice);
+  });
+
   it("send nothing for topics an app didn't subscribe to, or for the seeded world", async () => {
     const { twin, received, subscribe, hcp } = twinWithEndpoint();
-    await subscribe(["job.created"]);
+    await subscribe(["job.created", "invoice.created", "invoice.sent"]); // the world has invoices, sent long ago
     await hcp("POST", "/customers", { first_name: "Wren" });
     twin.reset();
     await twin.webhooks.idle();
