@@ -329,7 +329,7 @@ curl -X POST localhost:4010/_twin/actions/housecallpro/payInvoices -H "Content-T
 
 **QuickBooks** deliveries are CloudEvents, the format Intuit sends today: a JSON array of events like `{ "specversion": "1.0", "type": "qbo.invoice.updated.v1", "intuitentityid": "130", "intuitaccountid": "9341000000000001", ... }`, signed in `intuit-signature` with the subscription's `clientSecret` standing in for your app's verifier token. Customers, invoices, and payments created or updated through the API are announced (`qbo.customer.created.v1`, `qbo.customer.updated.v1`, `qbo.invoice.created.v1`, `qbo.invoice.updated.v1`, `qbo.payment.created.v1`), and a payment also announces each invoice it pays. Your app has 3 seconds to answer HTTP 200; otherwise the twin tries again on Intuit's schedule, from 10 seconds up to every 6 hours of twin time.
 
-**Housecall Pro** deliveries carry the documented shared fields (`event`, `company_id`, `event_occurred_at`, `event_created_at`) and the whole record, as the event left it: `{ "event": "job.created", ..., "job": { ... } }`. `Api-Timestamp` and `Api-Signature` follow the docs' verification steps, an HMAC-SHA256 of the timestamp, a dot, and the payload, keyed with the subscription's `clientSecret` as your signing secret. `customer.created`, `customer.updated`, `job.created`, `job.scheduled`, `job.completed`, `job.paid`, `invoice.payment.succeeded`, and `invoice.paid` are modeled so far. Jobs get finished and invoices paid by the `completeJobs` and `payInvoices` actions, in a scenario's timeline or through the control plane: paying an invoice sends `invoice.payment.succeeded`, `invoice.paid`, and `job.paid`, in that order. The docs promise no retries, so the twin tries each delivery once.
+**Housecall Pro** deliveries carry the documented shared fields (`event`, `company_id`, `event_occurred_at`, `event_created_at`) and the whole record, as the event left it: `{ "event": "job.created", ..., "job": { ... } }`. `Api-Timestamp` and `Api-Signature` follow the docs' verification steps, an HMAC-SHA256 of the timestamp, a dot, and the payload, keyed with the subscription's `clientSecret` as your signing secret. `customer.created`, `customer.updated`, `job.created`, `job.scheduled`, `job.completed`, `job.paid`, `invoice.created`, `invoice.sent`, `invoice.payment.succeeded`, and `invoice.paid` are modeled so far. Jobs get finished, invoiced, and paid by the `completeJobs`, `invoiceJobs`, and `payInvoices` actions, in a scenario's timeline or through the control plane: invoicing a job sends `invoice.created` and then `invoice.sent`, and paying an invoice sends `invoice.payment.succeeded`, `invoice.paid`, and `job.paid`, in that order. The docs promise no retries, so the twin tries each delivery once.
 
 Each URL gets its deliveries one at a time, in order; an app that is slow to answer doesn't hold up deliveries to another. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
@@ -394,10 +394,10 @@ timeline:
   - at: "13:00"
     jobber: { payInvoices: 4 }   # the longest-open invoices get paid
   - at: "16:00"
-    housecallpro: { completeJobs: 2, payInvoices: 1 }   # techs finish the work that began first; a customer pays
+    housecallpro: { completeJobs: 2, invoiceJobs: 2, payInvoices: 1 }   # techs finish work, the Pro invoices it, a customer pays
 ```
 
-Housecall Pro has `newCustomers` too, like Jobber's `newClients`. A job is finished only once all of its visits have begun, so `completeJobs` never marks work done before its time.
+Housecall Pro has `newCustomers` too, like Jobber's `newClients`. A job is finished only once all of its visits have begun, so `completeJobs` never marks work done before its time. Finishing a job doesn't invoice it: `invoiceJobs` invoices finished work, the work finished longest ago first, and from then on `payInvoices` can pay it.
 
 A scenario with a typo, an unknown key, or a time without a UTC offset is refused when it loads, with the reason, and the twin stays as it was.
 
@@ -449,7 +449,7 @@ It is a Next.js package of its own and a client of the twin like any other: it u
 | `twin_set_faults` | Make the APIs misbehave on purpose |
 | `twin_set_auth` | Accept any token, or check OAuth tokens for real |
 | `twin_export_log` | The event log as JSON Lines, all of it or since a checkpoint |
-| `twin_run_action` | Make something happen now: customers pay, clients call in, techs finish jobs |
+| `twin_run_action` | Make something happen now: customers pay, clients call in, techs finish jobs, finished work is invoiced |
 | `twin_set_webhooks`, `twin_webhooks` | Subscribe your app to webhooks; see what was delivered and how it answered |
 
 Claude Code:
