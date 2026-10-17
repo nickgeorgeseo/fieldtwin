@@ -7,13 +7,14 @@ import type { VendorTwin } from "./core/vendor-twin.ts";
 import type { WebhookSender } from "./core/webhooks.ts";
 import { faultMiddleware } from "./faults/fault-middleware.ts";
 import { webhookFaults } from "./faults/webhook-faults.ts";
+import { housecallproTwin } from "./vendors/housecallpro/index.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
 import { ACTIVE_VERSIONS } from "./vendors/jobber/versions.ts";
 import { quickbooksTwin } from "./vendors/quickbooks/index.ts";
 import { TWIN_REALM_ID } from "./vendors/quickbooks/seed.ts";
 
 /** Every vendor twin this build serves. Adding a vendor = one import and one entry here. */
-export const ALL_VENDORS: VendorTwin[] = [quickbooksTwin, jobberTwin];
+export const ALL_VENDORS: VendorTwin[] = [quickbooksTwin, jobberTwin, housecallproTwin];
 
 const prefixes = ALL_VENDORS.map((vendor) => vendor.pathPrefix);
 if (new Set(prefixes).size !== prefixes.length) throw new Error(`Two vendors share a pathPrefix: ${prefixes.join(", ")}`);
@@ -81,9 +82,10 @@ function startHere(twin: Twin, origin: string) {
     fieldtwin: `${twin.world.company.name} is open for business`,
     quickbooks: { baseUrl: origin, realmId: TWIN_REALM_ID, try: `GET ${origin}/v3/company/${TWIN_REALM_ID}/customer/1` },
     jobber: { graphql: `POST ${origin}/api/graphql`, headers: { "X-JOBBER-GRAPHQL-VERSION": ACTIVE_VERSIONS[0] } },
+    housecallpro: { baseUrl: `${origin}/housecallpro`, try: `GET ${origin}/housecallpro/company`, headers: { Authorization: "Token dev" } },
     auth:
       twin.authMode === "any-token"
-        ? "Any bearer token works: Authorization: Bearer dev"
+        ? "Any bearer token works: Authorization: Bearer dev (and any Housecall Pro API key: Authorization: Token dev)"
         : "Get a token from each vendor's OAuth endpoints; the docs show how",
     controlPlane: `GET ${origin}/_twin`,
     docs: "https://github.com/nickgeorgeseo/fieldtwin#readme",

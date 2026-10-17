@@ -144,6 +144,9 @@ describe("request bodies too big to be real", () => {
     const jobber = await jobberRaw(harness, huge);
     expect(jobber.status).toBe(413);
     expect((await jobber.json()).errors[0].message).toContain("10 MB");
+    const housecallpro = await harness.hcpPost("/customers", { first_name: "x".repeat(11 * 1024 * 1024) });
+    expect(housecallpro.status).toBe(413);
+    expect((await housecallpro.json()).error.message).toContain("10 MB");
   });
 
   it("answer 413 on the control plane too", async () => {

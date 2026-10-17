@@ -134,6 +134,21 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | Expired or unknown token on the API | Approximate | check | [App authorization][jobber-auth] | In `auth: oauth` mode, 401 `{ "message": "Invalid Token Error" }`. The docs name the error but don't show the body. Any `client_id` and `client_secret` are accepted; scopes are not enforced |
 | Cost budget per app | Modeled | docs only | [Rate limits][jobber-limits] | Every token issued to one `client_id` shares one budget, so refreshing doesn't refill it. In any-token mode an unknown token counts as its own app |
 
+## Housecall Pro
+
+| Behavior | Status | Verified | Docs | Notes |
+|---|---|---|---|---|
+| Base URL | Approximate | | [API reference][hcp-v1] | The real API is at `https://api.housecallpro.com`, with paths straight after the host. The twin serves the same paths under `/housecallpro`, because `/api/invoices/{uuid}` would share Jobber's `/api` prefix: set the base URL to `http://localhost:4010/housecallpro` |
+| `Authorization: Token <API key>` and `Bearer <access token>` | Modeled | docs only | [Authentication][hcp-auth] | Exactly those formats, as "the headers must follow these exact formats" says; anything else answers 401 |
+| API keys | Approximate | | [Authentication][hcp-auth] | Any key works, in both auth modes: a Pro makes keys in Housecall Pro's settings, which the twin doesn't have. In `auth: oauth` mode only OAuth access tokens are checked |
+| Error bodies | Approximate | check | [API reference][hcp-v1] | `{ "error": { "message" } }`, the documented ErrorResponse. A few endpoints document other shapes: Update a single line item's 400 is `{ "message", <field>: ... }`, and several 404s are `{}` |
+| 401 body | Approximate | check | [API reference][hcp-v1] | `{ "message" }`, the only 401 body the reference shows (Get Pipeline Statuses) |
+| Endpoints not modeled yet | Not yet | | [API reference][hcp-v1] | Answer 501, which the real API never sends, with an `error.message` naming the endpoint and what the twin serves |
+| Request bodies over 10 MB | Approximate | | | 413 with an `error.message` naming the limit. Housecall Pro documents no size limit; the twin has one, far above any real request, so a runaway client can't use up its memory |
+| An error the twin didn't expect | Approximate | | | 500 with an `error.message`, and the twin logs the stack: it is a bug in the twin |
+| Rate limits | Via faults | | [Overview][hcp-home] | The docs give no numbers, only "a status 429" whose `RateLimit-Reset` header is "the time (in epoch format) that the user rate limit will be reset". Fault rules make 429s, without that header |
+| `GET /company` | Modeled | docs only | [Get Company][hcp-company] | Name, `time_zone` (an IANA zone), and the address's city, state, and country, from the world. What the world doesn't describe (phone, support email, logo, website, street, zip) is null. `service_areas_data`, `locations`, and `franchise_info` are left out |
+
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
 [qbo-errors]: https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
@@ -156,3 +171,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [jobber-rotation]: https://developer.getjobber.com/docs/building_your_app/refresh_token_rotation/
 [jobber-versioning]: https://developer.getjobber.com/docs/using_jobbers_api/api_versioning/
 [jobber-webhooks]: https://developer.getjobber.com/docs/using_jobbers_api/setting_up_webhooks/
+[hcp-home]: https://docs.housecallpro.com/
+[hcp-v1]: https://docs.housecallpro.com/docs/housecall-public-api/a4ca20a18010c-housecall-v1-api
+[hcp-auth]: https://docs.housecallpro.com/docs/housecall-public-api/b87d37ae48a0d-authentication
+[hcp-company]: https://docs.housecallpro.com/docs/housecall-public-api/24a5d891a80a8-get-company

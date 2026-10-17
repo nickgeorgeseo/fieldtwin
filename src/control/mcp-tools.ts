@@ -93,7 +93,7 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     "twin_set_faults",
     {
       description:
-        "Replace the active fault rules. Each rule: { name, vendor: quickbooks|jobber, method?, pathIncludes?, rate: 0-1, " +
+        "Replace the active fault rules. Each rule: { name, vendor: quickbooks|jobber|housecallpro, method?, pathIncludes?, rate: 0-1, " +
         "effect: { status?: HTTP error status, latencyMs?, message?, lostResponse?: do the work, then answer with status } }. " +
         'A rule with webhook: TOPIC or "*" (and no method or pathIncludes) affects webhook deliveries instead: effect { duplicate?: true, delayMs? }. An empty list turns faults off.',
       inputSchema: { rules: z.array(z.unknown()) },

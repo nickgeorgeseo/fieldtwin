@@ -8,7 +8,7 @@ import type { ClientErrorStatusCode, ServerErrorStatusCode } from "hono/utils/ht
  * Every vendor twin has a short name, used in URLs, logs, fault rules, and scenarios. Adding a vendor starts here:
  * scenarios, fault rules, and webhook subscriptions accept exactly these names.
  */
-export const VENDOR_NAMES = ["quickbooks", "jobber"] as const;
+export const VENDOR_NAMES = ["quickbooks", "jobber", "housecallpro"] as const;
 export type VendorName = (typeof VENDOR_NAMES)[number];
 
 /**
