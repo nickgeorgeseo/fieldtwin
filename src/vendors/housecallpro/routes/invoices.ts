@@ -4,7 +4,7 @@ import { hcpError } from "../errors.ts";
 import type { HcpInvoice, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
-import { amountRange, oneOf, type Test, timeRange } from "./filters.ts";
+import { amountRange, listParam, oneOf, type Test, timeRange } from "./filters.ts";
 import { dueAmount, invoiceResponse, invoiceStatus } from "./invoice-response.ts";
 import { invoiceNumberOrder, type ListRequest, pageOf, readList, sorted } from "./lists.ts";
 
@@ -62,7 +62,7 @@ function readInvoiceFilter(req: ListRequest): Test<HcpInvoice> | { problem: stri
     timeRange<HcpInvoice>(req, "paid_at", (invoice) => invoice.paid_at, tests) ??
     amountRange<HcpInvoice>(req, "amount_due", dueAmount, tests);
   if (problem) return { problem };
-  const customers = [...(req.queries("customer_uuid[]") ?? []), ...(req.queries("customer_uuid") ?? [])];
+  const customers = listParam(req, "customer_uuid");
   if (customers.length) tests.push((invoice) => customers.includes(invoice.customer_id));
   return (invoice) => tests.every((test) => test(invoice));
 }

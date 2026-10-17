@@ -92,6 +92,11 @@ describe("Housecall Pro twin: invoices", () => {
     expect(paidSince.every((invoice) => invoice.paid_at! >= "2026-07-01")).toBe(true);
   });
 
+  it("ignores an empty customer_uuid[], as Rails sends an empty list, the way the other filters ignore empties", async () => {
+    const harness = setup();
+    expect(await allInvoices(harness, "&customer_uuid[]=")).toHaveLength(harness.twin.world.history.invoices.length);
+  });
+
   it("sorts invoices by invoice_number as numbers, so 2 comes before 10", async () => {
     const harness = setup();
     const numbers = (await allInvoices(harness, "&sort_by=invoice_number&sort_direction=asc")).map((invoice) =>
