@@ -284,7 +284,7 @@ Load `flaky-apis` to see how it copes when the APIs fight back, or `mismatched-b
 > with `FIELDTWIN_AUTH=oauth npm start`, put `auth: oauth` in a scenario, or switch a running twin:
 > `curl -X PUT localhost:4010/_twin/auth -H "Content-Type: application/json" -d '{"mode":"oauth"}'`.
 
-Each vendor has a twin OAuth 2.0 server at the vendor's own paths, so your OAuth client only needs new URLs:
+Each vendor has a twin OAuth 2.0 server at the vendor's own paths (under `/housecallpro` for Housecall Pro), so your OAuth client only needs new URLs:
 
 | Endpoint | Real URL | Twin URL |
 |---|---|---|
@@ -313,7 +313,7 @@ curl -s -X POST http://localhost:4010/api/oauth/token \
 
 ## Webhooks
 
-Every twin sends webhooks the way its vendor does. Each vendor sets them up per app (in a developer portal, or by email for Housecall Pro); the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
+Every twin sends webhooks the way its vendor does. Each vendor sets them up per app (in a developer portal, or in a Pro's own settings for Housecall Pro); the twin's equivalent is the control plane (or the `twin_set_webhooks` MCP tool):
 
 ```bash
 curl -X PUT localhost:4010/_twin/webhooks -H "Content-Type: application/json" -d '[
@@ -459,7 +459,7 @@ The MCP tools only control the test world. Your agent still calls the vendor API
 | You see | What it means |
 |---|---|
 | `fieldtwin: port 4010 is already in use` | Another twin (or something else) has the port. `FIELDTWIN_PORT=4011 npm start` |
-| HTTP 401 from either vendor | The twin is checking tokens (`auth` is `oauth`, from `FIELDTWIN_AUTH`, a scenario, or `PUT /_twin/auth`). Get a token from the twin's OAuth endpoints, or switch back to `any-token` |
+| HTTP 401 from any vendor | The twin is checking tokens (`auth` is `oauth`, from `FIELDTWIN_AUTH`, a scenario, or `PUT /_twin/auth`). Get a token from the twin's OAuth endpoints, or switch back to `any-token`. Housecall Pro also answers 401 for an `Authorization` header not written exactly `Token <key>` or `Bearer <token>` |
 | Jobber `THROTTLED` on every try | The query asks for more than the whole 10,000-point budget, so it can never run. Ask for fewer nodes with `first` or `last` |
 | QuickBooks 5010 `Stale Object` | Your update sent an old `SyncToken`, as the real API would refuse too. Read the record again and retry |
 | An `X-Twin-Fault` header | A fault rule fired, on purpose. `GET /_twin` lists the active ones |
