@@ -3,6 +3,7 @@ import { hcpErrorForStatus, hcpErrorHeaders } from "./errors.ts";
 import { describeHcpEvent } from "./events.ts";
 import { HCP } from "./routes/base.ts";
 import { housecallproRoutes } from "./routes/index.ts";
+import { housecallproScenarioActions } from "./scenario-actions.ts";
 import { seedHousecallPro } from "./seed.ts";
 import { applyHcpEvent, createHcpState } from "./state.ts";
 import type { HcpState } from "./types/index.ts";
@@ -16,6 +17,7 @@ export const housecallproTwin: VendorTwin<HcpState> = {
   describeEvent: describeHcpEvent,
   seed: seedHousecallPro,
   routes: housecallproRoutes,
+  scenarioActions: housecallproScenarioActions,
   webhooks: housecallproWebhooks,
   errorBody: (status, message) => hcpErrorForStatus(status, message),
   errorHeaders: (status, twin) => hcpErrorHeaders(status, twin.clock.nowMs()),

@@ -40,7 +40,7 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     {
       description:
         "Make something happen now, as if someone did it in the vendor's own app: jobber payInvoices (params: how many) " +
-        "or newClients (params: how many). Webhooks for it go out before this answers.",
+        "or newClients (params: how many); housecallpro newCustomers (params: how many). Webhooks for it go out before this answers.",
       inputSchema: { vendor: z.string(), action: z.string(), params: z.unknown() },
     },
     async ({ vendor, action, params }) => asText(await ops.runAction(twin, vendor, action, params)),
