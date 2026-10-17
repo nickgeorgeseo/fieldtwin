@@ -6,6 +6,7 @@ import { housecallproRoutes } from "./routes/index.ts";
 import { seedHousecallPro } from "./seed.ts";
 import { applyHcpEvent, createHcpState } from "./state.ts";
 import type { HcpState } from "./types/index.ts";
+import { housecallproWebhooks } from "./webhooks.ts";
 
 export const housecallproTwin: VendorTwin<HcpState> = {
   name: "housecallpro",
@@ -15,5 +16,6 @@ export const housecallproTwin: VendorTwin<HcpState> = {
   describeEvent: describeHcpEvent,
   seed: seedHousecallPro,
   routes: housecallproRoutes,
+  webhooks: housecallproWebhooks,
   errorBody: (status, message) => hcpErrorForStatus(status, message),
 };

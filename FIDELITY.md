@@ -196,6 +196,12 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | Option approval | Approximate | check | [Get Estimates][hcp-estimates] | `approval_status` is `approved` once the customer approved and `awaiting response` once it was sent, and `approval_status_updated_at` is when it last changed. `status` is `created job from estimate` once a job was copied from it, `open` before. The docs list the values but not when each applies |
 | Estimate to job | Modeled | docs only | [Get a Job][hcp-job] | A job copied from an estimate names it in `original_estimate_id` and `original_estimate_uuids` |
 | `GET /estimates/{id}/options/{option_id}/line_items` | Modeled | docs only | [Option line items][hcp-option-lines] | Paged, in cents, as a job's are |
+| Subscribing to webhooks | Approximate | | [Webhooks][hcp-webhooks] | Through the control plane (`PUT /_twin/webhooks` with `vendor: "housecallpro"`), as a real app's URL is set by email or in a Pro's settings. `POST /webhooks/subscription`, which turns a company's webhooks on, isn't modeled yet (501) |
+| Webhook topics | Approximate | | [Webhooks][hcp-webhooks] | `customer.created`, `customer.updated`, `job.created`, and `job.scheduled`, which comes with `job.created` for a job created with a schedule. The other event keys need writes the twin doesn't model yet. Adding an address sends nothing: the docs don't say whether it is a `customer.updated` |
+| Webhook payloads | Modeled | docs only | [Webhooks][hcp-webhooks] | `event`, `company_id`, `event_occurred_at`, and `event_created_at` (added November 13, 2025), then the record as the event left it: `customer`, or `job` with its `appointments` beside the schedule. Records are as the API answers with them, with more fields than the docs' samples |
+| Webhook signatures | Approximate | check | [Webhooks][hcp-webhooks] | `Api-Timestamp` in seconds, and `Api-Signature`, an HMAC-SHA256 of `timestamp + "." + payload` keyed with the subscription's `clientSecret` (the signing secret). The docs don't say how the hash is written out; the twin writes hex |
+| Webhook delivery | Approximate | check | [Webhooks][hcp-webhooks] | One try, with 3 seconds to answer with a 2xx: the docs promise no retries and give no deadline, so code that needs every event has to cope with one it missed |
+| Duplicate, late, and out-of-order deliveries | Via faults | | [Webhooks][hcp-webhooks] | Fault rules with `webhook: "job.created"` (or `"*"`) and `effect: { duplicate: true }` or `{ delayMs }` |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
@@ -240,3 +246,4 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [hcp-estimates]: https://docs.housecallpro.com/docs/housecall-public-api/e430ba3d520a0-get-estimates
 [hcp-option-lines]: https://docs.housecallpro.com/docs/housecall-public-api/781468fb5da47-list-estimate-option-line-items
 [hcp-create-job]: https://docs.housecallpro.com/docs/housecall-public-api/2dcf481ed7d69-create-a-job
+[hcp-webhooks]: https://docs.housecallpro.com/docs/housecall-public-api/46e9e1be07621-webhooks

@@ -116,9 +116,10 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     {
       description:
         "Replace the webhook subscriptions, as an app would set them up in the vendor's developer settings. Each: " +
-        "{ vendor: jobber | quickbooks, url, topics, clientId, clientSecret (signs deliveries) }. Jobber topics: CLIENT_CREATE, " +
+        "{ vendor: jobber | quickbooks | housecallpro, url, topics, clientId, clientSecret (signs deliveries) }. Jobber topics: CLIENT_CREATE, " +
         "INVOICE_UPDATE; clientSecret is the app's OAuth client secret. QuickBooks topics: CloudEvents types qbo.customer.created.v1, " +
-        "qbo.customer.updated.v1, qbo.invoice.created.v1, qbo.invoice.updated.v1, qbo.payment.created.v1; clientSecret is the verifier token.",
+        "qbo.customer.updated.v1, qbo.invoice.created.v1, qbo.invoice.updated.v1, qbo.payment.created.v1; clientSecret is the verifier token. " +
+        "Housecall Pro topics: customer.created, customer.updated, job.created, job.scheduled; clientSecret is the signing secret.",
       inputSchema: { subscriptions: z.array(z.unknown()) },
     },
     ({ subscriptions }) => asText(ops.setWebhooks(twin, subscriptions)),
