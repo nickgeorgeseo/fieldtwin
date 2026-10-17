@@ -33,7 +33,7 @@ export class SeedIds {
   }
 
   /** A numbered world record ("job-0012", "quote-0003") by its number, which is its order of creation. */
-  numbered(prefix: "job" | "est", key: string): string {
+  numbered(prefix: "job" | "est" | "invoice", key: string): string {
     return hcpId(prefix, Number(key.slice(key.lastIndexOf("-") + 1)));
   }
 

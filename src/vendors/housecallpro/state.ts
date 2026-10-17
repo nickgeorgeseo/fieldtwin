@@ -18,7 +18,9 @@ export function createHcpState(): HcpState {
     customers: new Map(),
     employees: new Map(),
     jobs: new Map(),
-    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0 },
+    invoices: new Map(),
+    invoicesByJob: new Map(),
+    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0, invoices: 0, payments: 0 },
   };
 }
 
@@ -59,6 +61,15 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
       state.counts.lineItems += data.job.line_items.length;
       state.counts.appointments += data.job.appointments.length;
       return;
+
+    case "InvoiceCreated": {
+      const { invoice } = data;
+      state.invoices.set(invoice.id, invoice);
+      state.invoicesByJob.set(invoice.job_id, [...(state.invoicesByJob.get(invoice.job_id) ?? []), invoice.id]);
+      state.counts.invoices += 1;
+      state.counts.payments += invoice.payments.length;
+      return;
+    }
 
     default:
       throw new Error(`Housecall Pro twin does not know how to apply "${event.type}"`);

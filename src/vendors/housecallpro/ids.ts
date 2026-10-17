@@ -2,13 +2,13 @@ import { stableUuid } from "../../core/ids.ts";
 
 /**
  * Housecall Pro ids are opaque strings. The reference's samples show a prefix and 32 hex digits for employees
- * (`pro_b9d8d7384b894851b03c1df9a748f653`) and `cus_` for customers, so the twin makes every id that way, with prefixes
- * of its own where the docs show none (FIDELITY.md). Treat them as opaque.
+ * (`pro_b9d8d7384b894851b03c1df9a748f653`), `cus_` for customers, and `invoice_` for invoices, so the twin makes every id
+ * that way, with prefixes of its own where the docs show none (FIDELITY.md). Treat them as opaque.
  *
  * An id is derived from its kind and number, never drawn, so the same world and the same requests give the same ids.
  * Numbers count up per kind in the order records are created (state.ts keeps the counts).
  */
-export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "est";
+export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "est" | "invoice" | "pmt";
 
 export function hcpId(prefix: HcpIdPrefix, n: number): string {
   return `${prefix}_${stableUuid(`housecallpro/${prefix}/${n}`).replaceAll("-", "")}`;

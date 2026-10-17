@@ -148,7 +148,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | An error the twin didn't expect | Approximate | | | 500 with an `error.message`, and the twin logs the stack: it is a bug in the twin |
 | Rate limits | Via faults | | [Overview][hcp-home] | The docs give no numbers, only "a status 429" whose `RateLimit-Reset` header is "the time (in epoch format) that the user rate limit will be reset". Fault rules make 429s, without that header |
 | `GET /company` | Modeled | docs only | [Get Company][hcp-company] | Name, `time_zone` (an IANA zone), and the address's city, state, and country, from the world. What the world doesn't describe (phone, support email, logo, website, street, zip) is null. `service_areas_data`, `locations`, and `franchise_info` are left out |
-| Ids | Approximate | | [API reference][hcp-v1] | A prefix and 32 hex digits, as the docs' samples show for employees (`pro_`) and customers (`cus_`). Other prefixes are the twin's (`adr_`, `job_`, `li_`, `appt_`, `est_`). Treat ids as opaque |
+| Ids | Approximate | | [API reference][hcp-v1] | A prefix and 32 hex digits, as the docs' samples show for employees (`pro_`) and customers (`cus_`). The docs' webhook sample shows `invoice_` for invoices. Other prefixes are the twin's (`adr_`, `job_`, `li_`, `appt_`, `est_`, `pmt_`). Treat ids as opaque |
 | Timestamps | Approximate | | [Changelog][hcp-changelog] | UTC ISO 8601 to the second (`2026-07-13T11:00:00Z`), like the docs' samples |
 | Lists: `page`, `page_size`, and the counts | Modeled | docs only | [Get Customers][hcp-customers] | `page` counts from 1 and `page_size` is 10 unless asked; the answer carries `page`, `page_size`, `total_pages`, and `total_items` beside the records. `location_ids` is ignored: the twin has one location |
 | Paging limits | Approximate | check | [Get Customers][hcp-customers] | A `page` or `page_size` below 1, or not a whole number, answers 400, so code that counts pages from 0 finds out; the docs don't say what Housecall Pro does. They give no largest `page_size`, so the twin has none |
@@ -171,11 +171,20 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | `work_timestamps` | Approximate | check | [Get a Job][hcp-job] | `started_at` is the first appointment's start once any work is done, and `completed_at` when the last of it was. `on_my_way_at` is null: the world doesn't record it |
 | Jobs with more than one visit | Approximate | check | [Get Appointments][hcp-appointments] | A two-visit job is one job with two appointments, and its `schedule` runs from the first one's start to the last one's end. The docs don't say how the two relate |
 | `schedule` | Modeled | docs only | [Changelog][hcp-changelog] | `scheduled_start` and `scheduled_end` in UTC, and `time_zone` with the `_local` fields in the company's zone and offset (no daylight saving changes); all null for an unscheduled job. `arrival_window` is 0 |
-| Job money | Approximate | | [Get a Job][hcp-job] | `total_amount` and `subtotal` are the sum of the lines, in cents: the world has no tax rate or discounts. `outstanding_balance` is the total until invoices are modeled |
+| Job money | Approximate | | [Get a Job][hcp-job] | `total_amount` and `subtotal` are the sum of the lines, in cents: the world has no tax rate or discounts. `outstanding_balance` is the total less what has been paid on the job's invoices |
 | The customer on a job | Approximate | check | [Get a Job][hcp-job] | As Get Customer answers with it, without addresses. The Job schema types the customer's `notes` as a list of Notes and the Customer schema as a string; the twin sends the string |
 | Job fields the world doesn't fill | Approximate | | [Get a Job][hcp-job] | `job_fields` (no job types or business units), `tags`, `notes`, `lead_source`, the recurrence fields, `locked_at`, `canceled_at`, and `deleted_at` are empty or null |
 | `GET /jobs/{id}/line_items` | Approximate | check | [Line items][hcp-line-items] | `{ url, data }`: services as `labor`, parts as taxable `materials`, prices in cents, and `amount` the quantity times the unit price. `unit_cost` is 0, the documented default. `order_index` counts from 0 and `url` is the list's own path: the docs say what neither holds |
 | `GET /jobs/{id}/appointments` | Modeled | docs only | [Get Appointments][hcp-appointments] | Each visit, with `start_date` the day it starts at the company, `anytime` false, and the employees dispatched to it |
+| `GET /invoices` | Modeled | docs only | [Get Invoices][hcp-invoices] | The world's invoices, one per invoiced job, each with its job's id. Filters on `status`, `customer_uuid`, the `created_at`, `due_at`, and `paid_at` ranges, `amount_due_min` and `_max`, and `payment_method`, and sorts by every documented `sort_by` |
+| Invoice amounts | Modeled | docs only | [Get Invoices][hcp-invoices] | In cents. `amount` and `subtotal` are the sum of the lines (the world has no taxes or discounts), `due_amount` is what payments haven't covered, and each item's `invoiced_amount` equals its `amount`, as for "a standalone invoice" |
+| `amount_due_min` and `_max` | Approximate | check | [Get Invoices][hcp-invoices] | Read as cents, like every amount the API sends; the docs' example (`10`) doesn't settle it |
+| Invoice status | Approximate | | [Get Invoices][hcp-invoices] | `paid` once payments cover the amount, `open` before. `pending_payment`, `voided`, `uncollectible`, and `canceled` aren't modeled yet |
+| An invoice's number | Approximate | check | [Get Invoices][hcp-invoices] | The job's own `invoice_number`. The docs don't say whether split or progress invoices add to it |
+| Payments | Approximate | check | [Get Invoices][hcp-invoices] | A paid invoice has one payment for all of it, `status` `succeeded` and `payment_method` `external`: the world doesn't say how customers paid. `category` and `note` are null |
+| Invoice fields the docs don't explain | Approximate | check | [Get Invoices][hcp-invoices] | `due_concept` and `display_due_concept` are null. `sent_at` and `invoice_date` are when the world issued the invoice, and `service_date` when the work was done. Items have the job's line item ids |
+| `GET /api/invoices/{uuid}` | Modeled | docs only | [Get Invoice by UUID][hcp-invoice] | The invoice by its id, with `job_id`. An unknown id answers 404 "invoice not found" |
+| `GET /jobs/{id}/invoices` | Modeled | docs only | [Get Job Invoices][hcp-job-invoices] | `{ invoices }`, unpaged and without `job_id`, as the JobInvoice schema has it. Empty for finished work that isn't invoiced yet |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
@@ -214,3 +223,6 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [hcp-job]: https://docs.housecallpro.com/docs/housecall-public-api/bbabd67bed1ab-get-a-job
 [hcp-line-items]: https://docs.housecallpro.com/docs/housecall-public-api/1c84b6c79b94f-lists-all-line-items-for-a-job
 [hcp-appointments]: https://docs.housecallpro.com/docs/housecall-public-api/512e91c37033f-get-appointments
+[hcp-invoices]: https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
+[hcp-invoice]: https://docs.housecallpro.com/docs/housecall-public-api/0ae16219c3e58-get-invoice-by-uuid
+[hcp-job-invoices]: https://docs.housecallpro.com/docs/housecall-public-api/eb1f5b5f17290-get-job-invoices

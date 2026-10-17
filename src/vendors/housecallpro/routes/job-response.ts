@@ -1,4 +1,5 @@
 import { localTime } from "../../../core/local-time.ts";
+import { lineAmount, linesTotal } from "../amounts.ts";
 import type { HcpAppointment, HcpCompany, HcpEmployee, HcpJob, HcpLineItem, HcpState } from "../types.ts";
 import { customerResponse } from "./customers.ts";
 import { employeeResponse } from "./employees.ts";
@@ -11,7 +12,7 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
   const { company } = state;
   const customer = state.customers.get(job.customer_id)!;
   const { addresses: _, ...customerFields } = customerResponse(customer, company, NOTHING_EXPANDED); // the Job's customer has none
-  const total = jobTotal(job);
+  const total = linesTotal(job.line_items);
   return {
     id: job.id,
     invoice_number: job.invoice_number,
@@ -23,7 +24,7 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
     work_timestamps: workTimestamps(job),
     schedule: schedule(job, company, expand.has("appointments")),
     total_amount: total,
-    outstanding_balance: total,
+    outstanding_balance: outstandingBalance(job, total, state),
     subtotal: total,
     assigned_employees: assignedEmployees(job, state).map((employee) => employeeResponse(employee, company)),
     tags: job.tags,
@@ -48,6 +49,13 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
 }
 
 const NOTHING_EXPANDED = new Set<string>();
+
+/** What is still owed for the job: its total, less what has been paid on its invoices. */
+function outstandingBalance(job: HcpJob, total: number, state: HcpState): number {
+  const invoices = (state.invoicesByJob.get(job.id) ?? []).map((id) => state.invoices.get(id)!);
+  const paid = invoices.flatMap((invoice) => invoice.payments).reduce((sum, payment) => sum + payment.amount, 0);
+  return Math.max(0, total - paid);
+}
 
 /**
  * A job's work_status, from the work done: "needs scheduling" without an appointment, "complete unrated" once every
@@ -110,16 +118,6 @@ export function appointmentResponse(appointment: HcpAppointment, company: HcpCom
 export function assignedEmployees(job: HcpJob, state: HcpState): HcpEmployee[] {
   const ids = new Set(job.appointments.flatMap((appointment) => appointment.dispatched_employees_ids));
   return [...ids].flatMap((id) => state.employees.get(id) ?? []);
-}
-
-/** A line's amount in cents: quantity times unit price, to the nearest cent. */
-export function lineAmount(line: HcpLineItem): number {
-  return Math.round(line.quantity * line.unit_price);
-}
-
-/** What the job comes to, in cents. The world has no tax rate or discounts, so this is its subtotal too. */
-export function jobTotal(job: HcpJob): number {
-  return job.line_items.reduce((total, line) => total + lineAmount(line), 0);
 }
 
 /** A line item as Lists all line items for a job answers with it (the reference's LineItemResponse). */

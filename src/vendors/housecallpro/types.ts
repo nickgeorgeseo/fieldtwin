@@ -148,6 +148,32 @@ export interface HcpAppointment {
   completed_at: string | null; // not an API field: when the work was marked done, which decides the job's work_status
 }
 
+/** A bill for a job's work. The job's own number is the invoice's (FIDELITY.md). */
+export interface HcpInvoice {
+  id: string;
+  invoice_number: string;
+  job_id: string;
+  customer_id: string; // not an API field: whom the invoice bills, for the customer_uuid filter
+  items: HcpLineItem[]; // the job's lines, as invoiced
+  invoice_date: string;
+  service_date: string | null;
+  sent_at: string | null;
+  due_at: string;
+  paid_at: string | null;
+  payments: HcpPayment[];
+  created_at: string; // not an API field: what the list sorts by default
+  updated_at: string;
+}
+
+export interface HcpPayment {
+  id: string;
+  amount: number; // cents
+  payment_method: string;
+  status: string;
+  note: string | null;
+  paid_at: string;
+}
+
 export const ADDRESS_TEXT_FIELDS = ["street", "street_line_2", "city", "state", "zip", "country"] as const;
 
 export interface HcpState {
@@ -156,6 +182,16 @@ export interface HcpState {
   customers: Map<string, HcpCustomer>;
   employees: Map<string, HcpEmployee>;
   jobs: Map<string, HcpJob>;
+  invoices: Map<string, HcpInvoice>;
+  invoicesByJob: Map<string, string[]>; // a job's invoice ids, kept by apply() so a job never searches every invoice
   // How many of each have been created, to number the next one's id (ids.ts).
-  counts: { customers: number; addresses: number; jobs: number; lineItems: number; appointments: number };
+  counts: {
+    customers: number;
+    addresses: number;
+    jobs: number;
+    lineItems: number;
+    appointments: number;
+    invoices: number;
+    payments: number;
+  };
 }
