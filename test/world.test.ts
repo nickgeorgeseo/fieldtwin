@@ -22,6 +22,16 @@ describe("the world generator", () => {
     expect(fingerprint(7)).toBe("92c311d048c6cca4"); // Thorne Heating & Air
   });
 
+  it("gives the business an address and a phone number of its own, in its own city", () => {
+    for (const seed of [42, 7]) {
+      const { company } = world(seed);
+      expect(company.street).toMatch(/^\d+ \S/);
+      expect(company.postalCode).toMatch(/^\d{5}$/);
+      expect(company.phone).toMatch(/^555-\d{3}-\d{4}$/);
+    }
+    expect(world(42).company.postalCode.slice(0, 3)).toBe(world(42).customers[0]!.postalCode.slice(0, 3)); // the same zip area
+  });
+
   it("gives the business a price list for its own trade", () => {
     const electrician = world(42);
     expect(electrician.company.trade).toBe("electrical");

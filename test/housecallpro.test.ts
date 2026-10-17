@@ -14,6 +14,14 @@ describe("Housecall Pro twin: the company", () => {
     expect(company.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("gives the company the whole address AddressCreate requires, its phone number, and its one location", async () => {
+    const { twin, hcpGet } = setup();
+    const { street, postalCode, phone } = twin.world.company;
+    const company = await (await hcpGet("/company")).json();
+    expect(company).toMatchObject({ phone_number: phone, address: { street, zip: postalCode }, locations: [] });
+    for (const field of ["street", "city", "state", "zip", "country"]) expect(typeof company.address[field], field).toBe("string");
+  });
+
   it("names the business's time zone the way the API does, as an IANA zone", async () => {
     const { twin, hcpGet } = setup();
     const company = await (await hcpGet("/company")).json();

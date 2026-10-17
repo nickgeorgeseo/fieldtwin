@@ -99,16 +99,16 @@ const FIELD_TECH: HcpEmployee["permissions"] = {
 };
 
 function company(world: World): HcpCompany {
-  const { name, city, state, utcOffsetHours } = world.company;
+  const { name, city, state, utcOffsetHours, street, postalCode, phone } = world.company;
   return {
     id: stableUuid("housecallpro/company"), // the docs don't show a company id's format; a UUID is the plainest guess
     name,
-    phone_number: null,
+    phone_number: phone,
     support_email: null,
     logo_url: null,
     website: null,
     time_zone: TIME_ZONES[state] ?? null,
-    address: { street: null, street_line_2: null, city, state, zip: null, country: "US" },
+    address: { street, street_line_2: null, city, state, zip: postalCode, country: "US" },
     utcOffsetHours,
   };
 }

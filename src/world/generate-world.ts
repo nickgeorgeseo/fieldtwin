@@ -13,12 +13,23 @@ import { CITIES, FIRST_NAMES, LAST_NAMES, STREET_NAMES, TRADES } from "./word-li
  */
 export interface World {
   asOf: string; // the moment the world describes: history is before it, the schedule after it
-  company: { name: string; trade: string; city: string; state: string; utcOffsetHours: number };
+  company: WorldCompany;
   customers: WorldCustomer[];
   technicians: WorldTechnician[];
   catalog: CatalogEntry[];
   history: WorldHistory;
   drift: WorldDrift; // how far the field-service and accounting systems disagree (nothing, by default)
+}
+
+export interface WorldCompany {
+  name: string;
+  trade: string;
+  city: string;
+  state: string;
+  utcOffsetHours: number;
+  street: string; // the business's own address and phone, for vendors that show them (Housecall Pro's GET /company)
+  postalCode: string;
+  phone: string;
 }
 
 export interface WorldCustomer {
@@ -60,7 +71,7 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
 
   // Order matters: each part draws from the same random stream, so new parts of the world go last.
   // That way an existing seed keeps the same company, customers, and technicians when the world grows.
-  const company = {
+  const identity = {
     name: `${ownerLastName} ${trade.businessSuffix}`,
     trade: trade.name,
     city: home.city,
@@ -86,7 +97,14 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
     needsWork: drift.fieldServiceOnly,
     needsRecentPaidWork: drift.inactiveInAccounting,
   });
+  // Drawn last of all, after the history, so adding them changed nothing an existing seed already made.
+  const office = {
+    street: `${random.int(100, 9999)} ${random.pick(STREET_NAMES)}`,
+    postalCode: `${home.zipPrefix}${random.int(10, 99)}`,
+    phone: `555-${random.int(200, 999)}-${random.int(1000, 9999)}`,
+  };
 
+  const company = { ...identity, ...office };
   return { asOf: options.startTime, company, customers: customerList, technicians: technicianList, catalog, history, drift };
 }
 
