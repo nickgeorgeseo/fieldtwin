@@ -96,6 +96,7 @@ Every vendor has the same files, so once you have read one you can read them all
 | `routes.ts` | HTTP routes shaped like the real API. Validates, decides, then calls `twin.record()`. QuickBooks and Housecall Pro have grown this into `routes/`, one file per entity |
 | `errors.ts` | Error bodies in the vendor's real format (REST vendors) |
 | `oauth.ts` | The vendor's OAuth 2.0 server: its paths, how long codes and tokens last, and how refresh works (`core/oauth.ts` does the rest) |
+| `scenario-actions.ts` | Optional. What a scenario timeline can make happen in the vendor (Jobber's `newClients`, Housecall Pro's `completeJobs`): each checks its parameters and returns complete events (see [Scenario timelines](#scenario-timelines)) |
 | `webhooks.ts` | Optional. The webhooks the vendor sends: its topics, which events announce what, how a delivery is shaped and signed, and how long an app has to answer before it is tried again (`core/webhook-dispatcher.ts` queues and sends them) |
 | `index.ts` | Exports one `VendorTwin` object. Nothing else |
 
