@@ -151,6 +151,33 @@ describe("Housecall Pro twin: creating jobs", () => {
     }
   });
 
+  it("refuses a line too large to count in whole cents, rather than answer a total of null", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const before = harness.twin.log.length;
+    for (const [lines, field] of [
+      [[{ name: "Huge", quantity: 1e308, unit_price: 100 }], "line_items[0]"],
+      [[{ name: "Huge price", unit_price: 1e20 }], "line_items[0].unit_price"],
+      [[{ name: "Huge cost", unit_cost: 2 ** 60 }], "line_items[0].unit_cost"],
+      [Array.from({ length: 2 }, () => ({ name: "Half of too much", unit_price: 2 ** 52 })), "line_items"],
+    ] as const) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: lines });
+      expect(response.status, field).toBe(422);
+      expect((await response.json()).error.message).toContain(field);
+    }
+    expect(harness.twin.log.length).toBe(before);
+  });
+
+  it("refuses an invoice number too large to be a whole number, so the next one can still follow it", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 1e21 });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toMatch(/invoice_number/);
+    const next = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId })).json();
+    expect(next.invoice_number).toBe(String(harness.twin.world.history.jobs.length + 1));
+  });
+
   it("says it doesn't model anytime schedules, price forms, or job types yet (501)", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);

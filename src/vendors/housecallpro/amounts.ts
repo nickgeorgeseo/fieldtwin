@@ -4,7 +4,7 @@ import type { HcpLineItem } from "./types/index.ts";
  * Money in Housecall Pro is whole cents: "Unit price in cents (e.g., 10000 = $100.00)", and every total is an integer.
  * Quantities "can be a float up to two decimal places", so a line rounds to the nearest cent.
  */
-export function lineAmount(line: HcpLineItem): number {
+export function lineAmount(line: Pick<HcpLineItem, "quantity" | "unit_price">): number {
   return Math.round(line.quantity * line.unit_price);
 }
 
