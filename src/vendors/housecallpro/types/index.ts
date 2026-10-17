@@ -25,6 +25,7 @@ export interface HcpState {
     jobs: number;
     lineItems: number;
     appointments: number;
+    notes: number;
     estimates: number;
     options: number;
     invoices: number;

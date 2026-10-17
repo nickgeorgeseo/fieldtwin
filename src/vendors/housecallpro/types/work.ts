@@ -8,10 +8,11 @@
 export interface HcpJob {
   id: string;
   invoice_number: string; // "must be unique across all of a company's jobs"
-  description: string;
+  description: string | null; // JobCreate has no description, so a job made through the API has none
   customer_id: string;
   address_id: string | null;
   line_items: HcpLineItem[];
+  assigned_employee_ids: string[]; // the job's assigned_employees, scheduled or not
   appointments: HcpAppointment[]; // in the order they happen; the job's schedule runs from the first to the last
   original_estimate_id: string | null; // the estimate it was copied from
   tags: string[];
@@ -52,6 +53,7 @@ export interface HcpEstimate {
   estimate_number: string;
   customer_id: string;
   address_id: string | null;
+  assigned_employee_ids: string[];
   appointments: HcpAppointment[]; // a site visit to look at the work; the world's quotes never had one
   options: HcpEstimateOption[];
   created_at: string;

@@ -8,7 +8,7 @@ import { stableUuid } from "../../core/ids.ts";
  * An id is derived from its kind and number, never drawn, so the same world and the same requests give the same ids.
  * Numbers count up per kind in the order records are created (state.ts keeps the counts).
  */
-export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "est" | "opt" | "invoice" | "pmt";
+export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "note" | "est" | "opt" | "invoice" | "pmt";
 
 export function hcpId(prefix: HcpIdPrefix, n: number): string {
   return `${prefix}_${stableUuid(`housecallpro/${prefix}/${n}`).replaceAll("-", "")}`;

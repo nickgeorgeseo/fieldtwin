@@ -22,6 +22,7 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
       estimate_number: String(quote.number),
       customer_id: ids.customer(quote.customerKey),
       address_id: ids.address(quote.customerKey),
+      assigned_employee_ids: [],
       appointments: [],
       options: [
         {
@@ -51,6 +52,7 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
       customer_id: ids.customer(worldJob.customerKey),
       address_id: ids.address(worldJob.customerKey),
       line_items: lineItems(worldJob.lineItems, world, ids),
+      assigned_employee_ids: [...new Set(worldJob.visits.flatMap((visit) => visit.technicianKeys))].map((key) => ids.employee(key)),
       appointments: worldJob.visits.map((visit) => ({
         id: ids.next("appt"),
         start_time: hcpTime(visit.startAt),

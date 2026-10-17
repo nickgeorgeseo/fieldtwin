@@ -1,0 +1,167 @@
+import { describe, expect, it } from "vitest";
+import { setup } from "./helpers.ts";
+
+type Harness = ReturnType<typeof setup>;
+
+/** A customer with their address, and two employees, to create jobs for. */
+async function cast(harness: Harness) {
+  const customer = (await (await harness.hcpGet("/customers?page_size=1")).json()).customers[0] as {
+    id: string;
+    addresses: { id: string }[];
+  };
+  const employees = (await (await harness.hcpGet("/employees")).json()).employees as { id: string; first_name: string }[];
+  return { customerId: customer.id, addressId: customer.addresses[0]!.id, employees };
+}
+
+const SCHEDULE = { scheduled_start: "2026-07-20T14:00:00", scheduled_end: "2026-07-20T16:00:00", arrival_window: 60 };
+
+describe("Housecall Pro twin: creating jobs", () => {
+  it("creates a job for a customer at one of their addresses, numbered after the last job, answering 201", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId });
+    expect(response.status).toBe(201);
+    const job = await response.json();
+    expect(job.id).toMatch(/^job_[0-9a-f]{32}$/);
+    expect(job).toMatchObject({
+      invoice_number: String(harness.twin.world.history.jobs.length + 1),
+      customer: { id: customerId },
+      address: { id: addressId },
+      work_status: "needs scheduling",
+      schedule: { scheduled_start: null, scheduled_end: null },
+      total_amount: 0,
+      created_at: "2026-07-13T11:00:00Z",
+    });
+    expect(await (await harness.hcpGet(`/jobs/${job.id}`)).json()).toEqual(job);
+    expect(harness.twin.log.all().at(-1)).toMatchObject({ vendor: "housecallpro", type: "JobCreated", source: "api" });
+  });
+
+  it("schedules the job and dispatches its employees when the request says when and who", async () => {
+    const harness = setup();
+    const { customerId, addressId, employees } = await cast(harness);
+    const job = await (
+      await harness.hcpPost("/jobs", {
+        customer_id: customerId,
+        address_id: addressId,
+        schedule: SCHEDULE,
+        assigned_employee_ids: [employees[0]!.id],
+      })
+    ).json();
+    expect(job).toMatchObject({
+      work_status: "scheduled",
+      schedule: { scheduled_start: "2026-07-20T14:00:00Z", scheduled_end: "2026-07-20T16:00:00Z", arrival_window: 60 },
+      assigned_employees: [{ id: employees[0]!.id }],
+    });
+    const { appointments } = await (await harness.hcpGet(`/jobs/${job.id}/appointments`)).json();
+    expect(appointments).toEqual([expect.objectContaining({ arrival_window_minutes: 60, dispatched_employees_ids: [employees[0]!.id] })]);
+  });
+
+  it("keeps the employees assigned to a job without a schedule", async () => {
+    const harness = setup();
+    const { customerId, addressId, employees } = await cast(harness);
+    const job = await (
+      await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, assigned_employee_ids: [employees[1]!.id] })
+    ).json();
+    expect(job.work_status).toBe("needs scheduling");
+    expect(job.assigned_employees.map((employee: { id: string }) => employee.id)).toEqual([employees[1]!.id]);
+  });
+
+  it("prices the job's line items in cents, as labor and taxable unless told otherwise", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const line_items = [
+      { name: "Service call", unit_price: 8900 },
+      { name: "Filter", unit_price: 1850, quantity: 2.5, kind: "materials", taxable: false, description: "MERV 8" },
+    ];
+    const job = await (
+      await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items, tags: ["warranty"] })
+    ).json();
+    expect(job).toMatchObject({ total_amount: 8900 + 4625, subtotal: 13525, outstanding_balance: 13525, tags: ["warranty"] });
+    const { data } = await (await harness.hcpGet(`/jobs/${job.id}/line_items`)).json();
+    expect(data).toEqual([
+      expect.objectContaining({ name: "Service call", quantity: 1, unit_cost: 0, kind: "labor", taxable: true, amount: 8900 }),
+      expect.objectContaining({ name: "Filter", quantity: 2.5, kind: "materials", taxable: false, amount: 4625, description: "MERV 8" }),
+    ]);
+  });
+
+  it("takes the invoice number a request gives, and refuses one another job has, as it must be unique", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 5000 })).json();
+    expect(job.invoice_number).toBe("5000");
+    const next = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId })).json();
+    expect(next.invoice_number).toBe("5001");
+
+    const taken = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 1 });
+    expect(taken.status).toBe(422);
+    expect((await taken.json()).error.message).toMatch(/invoice_number 1 is taken/i);
+  });
+
+  it("refuses a job without customer_id or address_id (422), naming what's missing", async () => {
+    const harness = setup();
+    const { customerId } = await cast(harness);
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toMatch(/address_id/);
+  });
+
+  it("answers 404 for a customer, an address, or an employee that doesn't exist, and changes nothing", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const before = harness.twin.log.length;
+    const other = (await (await harness.hcpGet("/customers?page=2&page_size=1")).json()).customers[0];
+    for (const [body, what] of [
+      [{ customer_id: "cus_missing", address_id: addressId }, "customer"],
+      [{ customer_id: customerId, address_id: other.addresses[0].id }, "address"],
+      [{ customer_id: customerId, address_id: addressId, assigned_employee_ids: ["pro_missing"] }, "employee"],
+    ] as const) {
+      const response = await harness.hcpPost("/jobs", body);
+      expect(response.status, what).toBe(404);
+      expect((await response.json()).error.message).toBe(`${what} not found`);
+    }
+    expect(harness.twin.log.length).toBe(before);
+  });
+
+  it("refuses a schedule that ends before it starts, or a time it can't read", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    for (const schedule of [
+      { scheduled_start: SCHEDULE.scheduled_end, scheduled_end: SCHEDULE.scheduled_start },
+      { scheduled_start: "tomorrow", scheduled_end: SCHEDULE.scheduled_end },
+      { scheduled_start: SCHEDULE.scheduled_start },
+    ]) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
+      expect(response.status, JSON.stringify(schedule)).toBe(422);
+      expect((await response.json()).error.message).toMatch(/scheduled_(start|end)/);
+    }
+  });
+
+  it("refuses line items without a name, or priced in fractions of a cent", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    for (const [line, field] of [
+      [{ unit_price: 100 }, "line_items[0].name"],
+      [{ name: "Half cent", unit_price: 100.5 }, "line_items[0].unit_price"],
+      [{ name: "Too precise", quantity: 1.125 }, "line_items[0].quantity"],
+      [{ name: "Tip", kind: "gratuity" }, "line_items[0].kind"],
+    ] as const) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: [line] });
+      expect(response.status, field).toBe(422);
+      expect((await response.json()).error.message).toContain(field);
+    }
+  });
+
+  it("says it doesn't model anytime schedules, price forms, or job types yet (501)", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    for (const extra of [
+      { schedule: { anytime: true, anytime_start_date: "2026-07-20" } },
+      { line_items: [{ name: "Formed", pricing_form: { id: "pbpf_1" } }] },
+      { job_fields: { job_type_id: "jt_1" } },
+    ]) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
+      expect(response.status, JSON.stringify(extra)).toBe(501);
+      expect((await response.json()).error.message).toMatch(/doesn't model/);
+    }
+  });
+});

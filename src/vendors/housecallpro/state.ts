@@ -21,7 +21,18 @@ export function createHcpState(): HcpState {
     estimates: new Map(),
     invoices: new Map(),
     invoicesByJob: new Map(),
-    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0, estimates: 0, options: 0, invoices: 0, payments: 0 },
+    counts: {
+      customers: 0,
+      addresses: 0,
+      jobs: 0,
+      lineItems: 0,
+      appointments: 0,
+      notes: 0,
+      estimates: 0,
+      options: 0,
+      invoices: 0,
+      payments: 0,
+    },
   };
 }
 
@@ -61,6 +72,7 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
       state.counts.jobs += 1;
       state.counts.lineItems += data.job.line_items.length;
       state.counts.appointments += data.job.appointments.length;
+      state.counts.notes += data.job.notes.length;
       return;
 
     case "EstimateCreated": {

@@ -53,6 +53,6 @@ export function jobRoutes(app: Hono, twin: Twin): void {
 const SORTABLE = ["created_at", "updated_at", "invoice_number", "id", "description", "work_status"] as const;
 const EXPANDABLE = ["attachments", "appointments"];
 
-function sortValue(job: HcpJob, by: (typeof SORTABLE)[number]): string {
+function sortValue(job: HcpJob, by: (typeof SORTABLE)[number]): string | null {
   return by === "work_status" ? workStatus(job.appointments) : job[by];
 }

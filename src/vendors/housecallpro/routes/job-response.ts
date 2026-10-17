@@ -52,8 +52,6 @@ function outstandingBalance(job: HcpJob, total: number, state: HcpState): number
   return Math.max(0, total - paid);
 }
 
-/** Everyone dispatched to any of the job's appointments, in the order they first appear. */
 function assignedEmployees(job: HcpJob, state: HcpState): HcpEmployee[] {
-  const ids = new Set(job.appointments.flatMap((appointment) => appointment.dispatched_employees_ids));
-  return [...ids].flatMap((id) => state.employees.get(id) ?? []);
+  return job.assigned_employee_ids.flatMap((id) => state.employees.get(id) ?? []);
 }

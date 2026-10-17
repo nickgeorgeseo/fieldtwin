@@ -3,9 +3,10 @@ import { listParam, oneOf, type Test, timeRange } from "./filters.ts";
 import type { ListRequest } from "./lists.ts";
 import { workStatus } from "./work.ts";
 
-/** A job or an estimate: work for a customer, done on appointments. */
+/** A job or an estimate: work for a customer, done by the employees assigned, on appointments. */
 interface Work {
   customer_id: string;
+  assigned_employee_ids: string[];
   appointments: HcpAppointment[];
 }
 
@@ -27,9 +28,7 @@ export function readWorkFilter<T extends Work>(req: ListRequest): Test<T> | { pr
   if (customerId) tests.push((work) => work.customer_id === customerId);
   const employeeIds = listParam(req, "employee_ids");
   if (employeeIds.length) {
-    tests.push((work) =>
-      work.appointments.some((appointment) => appointment.dispatched_employees_ids.some((id) => employeeIds.includes(id))),
-    );
+    tests.push((work) => work.assigned_employee_ids.some((id) => employeeIds.includes(id)));
   }
   return (work) => tests.every((test) => test(work));
 }

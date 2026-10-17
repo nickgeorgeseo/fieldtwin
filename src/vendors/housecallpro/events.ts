@@ -35,7 +35,7 @@ export function describeHcpEvent(event: TwinEvent): string {
     case "JobCreated": {
       const { invoice_number, description, appointments } = data.job;
       const done = appointments.length > 0 && appointments.every((appointment) => appointment.completed_at);
-      return `JobCreated #${invoice_number} "${description}" ${appointments[0]?.start_time ?? "unscheduled"}${done ? " (complete)" : ""}`;
+      return `JobCreated #${invoice_number}${description ? ` "${description}"` : ""} ${appointments[0]?.start_time ?? "unscheduled"}${done ? " (complete)" : ""}`;
     }
     case "EstimateCreated": {
       const { estimate_number, options } = data.estimate;

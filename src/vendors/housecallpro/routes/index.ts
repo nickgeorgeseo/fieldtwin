@@ -9,6 +9,7 @@ import { customerRoutes } from "./customers.ts";
 import { employeeRoutes } from "./employees.ts";
 import { estimateRoutes } from "./estimates.ts";
 import { invoiceRoutes } from "./invoices.ts";
+import { jobWriteRoutes } from "./job-writes.ts";
 import { jobRoutes } from "./jobs.ts";
 
 /**
@@ -30,6 +31,7 @@ export function housecallproRoutes(twin: Twin): Hono {
   addressRoutes(app, twin);
   employeeRoutes(app, twin);
   jobRoutes(app, twin);
+  jobWriteRoutes(app, twin);
   invoiceRoutes(app, twin);
   estimateRoutes(app, twin);
 
@@ -44,5 +46,5 @@ export function housecallproRoutes(twin: Twin): Hono {
 
 const SERVED =
   "GET /company, customers and their addresses (list, get, create, update), GET /employees, jobs with their line items, " +
-  "appointments, and invoices (list, get), invoices (GET /invoices, GET /api/invoices/{uuid}), and estimates with " +
+  "appointments, and invoices (list, get, create), invoices (GET /invoices, GET /api/invoices/{uuid}), and estimates with " +
   "their options' line items (list, get)";
