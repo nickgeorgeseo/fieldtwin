@@ -142,4 +142,20 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
   it("names Jobber's client on each invoice", () => {
     assert.equal(byNumber["1"]?.jobber?.client, "Kendall Dunmore");
   });
+
+  it("keeps an invoice the books booked twice under one number, since QuickBooks accepts the second", () => {
+    const twice = readBooks([
+      event("jobber", "ClientCreated", { client: client(1, "Kendall", "Dunmore", "kendall@example.com") }),
+      event("jobber", "InvoiceCreated", { invoice: jobberInvoice("1", "client-1", [955], paid) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("1", "1", "Kendall Dunmore", 955, 0) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("2", "1", "Kendall Dunmore", 955, 955) }),
+    ]);
+    assert.deepEqual(
+      matchInvoices(twice).map((row) => [row.number, row.quickbooks?.id, row.status]),
+      [
+        ["1", "2", "only-in-quickbooks"],
+        ["1", "1", "in-sync"],
+      ],
+    );
+  });
 });

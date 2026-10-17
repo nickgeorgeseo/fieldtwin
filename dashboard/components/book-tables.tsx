@@ -58,7 +58,7 @@ export function InvoiceTable({ rows }: { rows: InvoiceRow[] }) {
         {rows.map((row) => {
           const { label, tone } = INVOICE_STATUSES[row.status];
           return (
-            <tr key={row.number}>
+            <tr key={`${row.number}-${row.quickbooks?.id}`}>
               <td className={`${CELL} font-mono text-xs`}>#{row.number}</td>
               <td className={CELL}>{row.jobber ? row.jobber.client : MISSING}</td>
               <td className={CELL}>{money(row.jobber?.total)}</td>

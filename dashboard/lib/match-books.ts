@@ -1,9 +1,9 @@
-import type { Books, JobberClient, QboCustomer } from "./books.ts";
+import type { Books, JobberClient, QboCustomer, QboInvoice } from "./books.ts";
 
 /**
  * Where Jobber and QuickBooks agree about the business, and where they have drifted apart. Customers match by email,
- * as the reference integration matches them (names drift between systems; emails don't). Invoices match by number:
- * the integration books Jobber's invoice number as QuickBooks' DocNumber, as the seeded books do.
+ * as the reference integration matches them (names drift between systems; emails don't). Invoices match by number,
+ * one to one: the integration books Jobber's invoice number as QuickBooks' DocNumber, as the seeded books do.
  */
 
 export type CustomerStatus = "only-in-jobber" | "only-in-quickbooks" | "inactive-in-quickbooks" | "spelled-differently" | "same";
@@ -71,30 +71,64 @@ const INVOICE_ORDER: InvoiceStatus[] = [
 
 export function matchInvoices({ jobber, quickbooks }: Books): InvoiceRow[] {
   const clients = new Map(jobber.clients.map((client) => [client.id, clientName(client)]));
-  const rows = new Map<string, InvoiceRow>();
-  for (const invoice of jobber.invoices) {
-    const total = cents(invoice.lineItems.reduce((sum, line) => sum + line.totalPrice, 0));
-    const client = clients.get(invoice.clientId) ?? "";
-    const paid = invoice.paidAt !== null;
-    rows.set(invoice.invoiceNumber, {
+  const pairs = pairUp(
+    jobber.invoices,
+    (invoice) => invoice.invoiceNumber,
+    quickbooks.invoices,
+    (invoice) => invoice.DocNumber ?? "",
+  );
+  const rows: InvoiceRow[] = jobber.invoices.map((invoice) => {
+    const row: InvoiceRow = {
       number: invoice.invoiceNumber,
-      jobber: { client, total, paid },
-      status: paid ? "paid-not-booked" : "open-not-booked", // until the books turn out to have it
+      jobber: {
+        client: clients.get(invoice.clientId) ?? "",
+        total: cents(invoice.lineItems.reduce((sum, line) => sum + line.totalPrice, 0)),
+        paid: invoice.paidAt !== null,
+      },
+      status: "in-sync",
+    };
+    const books = pairs.get(invoice);
+    if (books) row.quickbooks = asBooked(books);
+    row.status = invoiceStatus(row);
+    return row;
+  });
+  const paired = new Set(pairs.values());
+  for (const invoice of quickbooks.invoices) {
+    if (paired.has(invoice)) continue;
+    rows.push({
+      number: invoice.DocNumber ?? `Id ${invoice.Id}`,
+      quickbooks: asBooked(invoice),
+      status: "only-in-quickbooks",
     });
   }
-  for (const invoice of quickbooks.invoices) {
-    const number = invoice.DocNumber ?? `Id ${invoice.Id}`;
-    const row = rows.get(number) ?? { number, status: "only-in-quickbooks" };
-    row.quickbooks = { id: invoice.Id, customer: invoice.CustomerRef.name ?? "", total: invoice.TotalAmt, balance: invoice.Balance };
-    row.status = invoiceStatus(row);
-    rows.set(number, row);
-  }
-  return [...rows.values()].sort(
+  return rows.sort(
     (a, b) =>
       INVOICE_ORDER.indexOf(a.status) - INVOICE_ORDER.indexOf(b.status) ||
       Number(b.number) - Number(a.number) ||
       b.number.localeCompare(a.number),
   );
+}
+
+/** Pairs each field-service invoice with the first invoice in the books that has the same key and isn't paired yet. */
+function pairUp<F, B>(field: F[], fieldKey: (invoice: F) => string, books: B[], booksKey: (invoice: B) => string): Map<F, B> {
+  const waiting = new Map<string, B[]>();
+  for (const invoice of books) {
+    const key = booksKey(invoice);
+    if (!key) continue;
+    const queue = waiting.get(key) ?? [];
+    queue.push(invoice);
+    waiting.set(key, queue);
+  }
+  const pairs = new Map<F, B>();
+  for (const invoice of field) {
+    const match = waiting.get(fieldKey(invoice))?.shift();
+    if (match) pairs.set(invoice, match);
+  }
+  return pairs;
+}
+
+function asBooked(invoice: QboInvoice): InvoiceRow["quickbooks"] {
+  return { id: invoice.Id, customer: invoice.CustomerRef.name ?? "", total: invoice.TotalAmt, balance: invoice.Balance };
 }
 
 function invoiceStatus({ jobber, quickbooks }: InvoiceRow): InvoiceStatus {
