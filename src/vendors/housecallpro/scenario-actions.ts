@@ -2,13 +2,14 @@ import type { ScenarioAction } from "../../core/vendor-twin.ts";
 import { newCustomer } from "../../world/generate-world.ts";
 import { customerName } from "./events.ts";
 import { hcpId, hcpTime } from "./ids.ts";
-import type { HcpCustomer, HcpState } from "./types/index.ts";
+import type { HcpCustomer, HcpJob, HcpState } from "./types/index.ts";
 
 /**
  * What a scenario timeline can make happen in Housecall Pro, as if a Pro did it in the app. Each returns complete
  * events; the twin records them with source "scenario" when the entry is due.
  *
  *   housecallpro: { newCustomers: 15 }   fifteen new customers call in or book online
+ *   housecallpro: { completeJobs: 3 }    techs finish the three jobs whose visits began first
  */
 export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState>> = {
   newCustomers: {
@@ -52,6 +53,25 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
         };
         return { vendor: "housecallpro", type: "CustomerCreated", data: { customer } };
       });
+    },
+  },
+
+  // A tech marks the work done, and the job is "complete unrated" (routes/work.ts). Only work whose time has come is
+  // finished: a job with a visit still ahead waits for it, so no job is done before it was due to start.
+  completeJobs: {
+    check: (count) => checkCount("completeJobs", count),
+    run: (count, { state, nowIso }) => {
+      const now = hcpTime(nowIso);
+      return [...state.jobs.values()]
+        .map((job) => ({ job, left: job.appointments.filter((appointment) => !appointment.completed_at) }))
+        .filter(({ left }) => left.length > 0 && left.every((appointment) => Date.parse(appointment.start_time) <= Date.parse(nowIso)))
+        .sort((a, b) => Date.parse(a.left[0]!.start_time) - Date.parse(b.left[0]!.start_time))
+        .slice(0, count as number)
+        .map(({ job }) => {
+          const appointments = job.appointments.map((appointment) => ({ ...appointment, completed_at: appointment.completed_at ?? now }));
+          const completed: HcpJob = { ...job, appointments, updated_at: now };
+          return { vendor: "housecallpro", type: "JobUpdated", data: { job: completed } };
+        });
     },
   },
 };

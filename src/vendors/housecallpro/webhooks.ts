@@ -4,6 +4,7 @@ import { asHcpEvent } from "./events.ts";
 import { hcpTime } from "./ids.ts";
 import { customerResponse } from "./routes/customers.ts";
 import { jobResponse } from "./routes/job-response.ts";
+import { workTimestamps } from "./routes/work.ts";
 import type { HcpState } from "./types/index.ts";
 
 /**
@@ -18,11 +19,12 @@ import type { HcpState } from "./types/index.ts";
  *   - Delivery: the docs promise no retries and give no deadline, so the twin tries once and waits at most 3 seconds,
  *     the stricter reading: code that needs every event has to cope with one it missed.
  *
- * Only event keys the twin has events for are offered: customers created or updated, and jobs created (and scheduled,
- * when created with a schedule). The other keys need writes the twin doesn't model yet.
+ * Only event keys the twin has events for are offered: customers created or updated, jobs created (and scheduled,
+ * when created with a schedule), and jobs completed, once all their work is done. The other keys need writes the twin
+ * doesn't model yet.
  */
 export const housecallproWebhooks: VendorWebhooks<HcpState> = {
-  topics: ["customer.created", "customer.updated", "job.created", "job.scheduled"],
+  topics: ["customer.created", "customer.updated", "job.created", "job.scheduled", "job.completed"],
 
   delivery: {
     answerWithinMs: 3000,
@@ -36,6 +38,11 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
     const announce = (topic: string, itemId: string) => ({ topic, itemId, occurredAtMs: at });
     if (data.type === "CustomerCreated") return [announce("customer.created", data.customer.id)];
     if (data.type === "CustomerUpdated") return [announce("customer.updated", data.customer.id)];
+    // Completed by this very update: the last of its work was marked done just now.
+    if (data.type === "JobUpdated") {
+      const { completed_at } = workTimestamps(data.job.appointments);
+      return completed_at === hcpTime(event.at) ? [announce("job.completed", data.job.id)] : [];
+    }
     if (data.type !== "JobCreated") return [];
     const created = announce("job.created", data.job.id);
     return data.job.appointments.length ? [created, announce("job.scheduled", data.job.id)] : [created];

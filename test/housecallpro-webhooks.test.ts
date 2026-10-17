@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
+import { advanceClock, runAction } from "../src/control/operations.ts";
 import type { HcpState } from "../src/vendors/housecallpro/types/index.ts";
 
 /**
@@ -95,6 +96,35 @@ describe("Housecall Pro webhooks", () => {
     expect(job).toMatchObject({ work_status: "scheduled", schedule: { scheduled_start: schedule.scheduled_start } });
     expect(job.appointments).toEqual([expect.objectContaining({ start_time: schedule.scheduled_start, end_time: schedule.scheduled_end })]);
     expect(job.attachments).toEqual([]); // the Job Webhook Protocol has them, as the API does only when expanded
+  });
+
+  it("deliver customer.created for each customer a scenario brings in", async () => {
+    const { twin, subscribe, payloads } = twinWithEndpoint();
+    await subscribe(["customer.created"]);
+    await runAction(twin, "housecallpro", "newCustomers", 2);
+    expect(payloads().map((payload) => payload.event)).toEqual(["customer.created", "customer.created"]);
+    expect(payloads()[0].customer.addresses).toHaveLength(1);
+  });
+
+  it("deliver job.completed with the job as the work left it, once, when a tech finishes it", async () => {
+    const { twin, subscribe, payloads } = twinWithEndpoint();
+    await subscribe(["job.completed", "job.created", "job.scheduled"]);
+    await advanceClock(twin, 9 * 60); // 20:00 on Monday, when seed 42's first two jobs of the day have begun
+    await runAction(twin, "housecallpro", "completeJobs", 1);
+    await runAction(twin, "housecallpro", "completeJobs", 1);
+
+    expect(payloads().map((payload) => [payload.event, payload.job.invoice_number])).toEqual([
+      ["job.completed", "36"],
+      ["job.completed", "42"],
+    ]);
+    expect(payloads()[0]).toMatchObject({
+      event_occurred_at: "2026-07-13T20:00:00Z",
+      job: {
+        work_status: "complete unrated",
+        work_timestamps: { completed_at: "2026-07-13T20:00:00Z" },
+        appointments: [expect.objectContaining({ start_time: "2026-07-13T13:00:00Z" })],
+      },
+    });
   });
 
   it("send nothing for topics an app didn't subscribe to, or for the seeded world", async () => {

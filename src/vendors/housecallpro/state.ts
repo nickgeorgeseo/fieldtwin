@@ -75,6 +75,15 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
       state.counts.notes += data.job.notes.length;
       return;
 
+    case "JobUpdated": {
+      const before = state.jobs.get(data.job.id)!;
+      state.jobs.set(data.job.id, data.job);
+      state.counts.lineItems += added(before.line_items, data.job.line_items);
+      state.counts.appointments += added(before.appointments, data.job.appointments);
+      state.counts.notes += added(before.notes, data.job.notes);
+      return;
+    }
+
     case "EstimateCreated": {
       const { estimate } = data;
       state.estimates.set(estimate.id, estimate);
@@ -97,4 +106,10 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
     default:
       throw new Error(`Housecall Pro twin does not know how to apply "${event.type}"`);
   }
+}
+
+/** How many of an updated record's parts it didn't have before: what the update added, to number the next one's id. */
+function added(before: readonly { id: string }[], after: readonly { id: string }[]): number {
+  const had = new Set(before.map((part) => part.id));
+  return after.filter((part) => !had.has(part.id)).length;
 }

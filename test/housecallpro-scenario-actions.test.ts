@@ -44,7 +44,7 @@ describe("Housecall Pro newCustomers", () => {
     expect(customers(harness)).toHaveLength(total + 1);
   });
 
-  it("arrive at their time in a scenario, recorded with source scenario", async () => {
+  it("brings them in at their time in a scenario, recorded with source scenario", async () => {
     const harness = setup();
     loadScenario(harness.twin, scenario(`  - at: "+1h"\n    housecallpro: { newCustomers: 2 }`));
     const count = customers(harness).length;
@@ -59,7 +59,7 @@ describe("Housecall Pro newCustomers", () => {
     ]);
   });
 
-  it("don't take the name of a customer who is only in the books", async () => {
+  it("doesn't take the name of a customer who is only in the books", async () => {
     const harness = setup();
     loadScenarioByName(harness.twin, "mismatched-books");
     const before = new Set(customers(harness).map((customer) => customer.id));
@@ -71,11 +71,74 @@ describe("Housecall Pro newCustomers", () => {
     expect(new Set(customers(harness).map(nameOf)).size).toBe(customers(harness).length);
   });
 
-  it("refuse, when the scenario loads, a count that isn't a whole number of 1 or more", () => {
+  it("refuses, when the scenario loads, a count that isn't a whole number of 1 or more", () => {
     const harness = setup();
     expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    housecallpro: { newCustomers: "lots" }`))).toThrow(
       /housecallpro newCustomers takes how many/,
     );
     expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    housecallpro: { newCustomers: 0 }`))).toThrow(/newCustomers/);
+  });
+});
+
+/**
+ * Seed 42's scheduled jobs on Monday 2026-07-13 (UTC): #36 at 13:00, #38 at 16:30 with a second visit on Tuesday at
+ * 16:30, and #42 at 19:30. The twin starts at 11:00, before any of them.
+ */
+const jobNumbered = (harness: Harness, number: string) => [...state(harness).jobs.values()].find((job) => job.invoice_number === number)!;
+const jobAnswer = async (harness: Harness, number: string) => (await harness.hcpGet(`/jobs/${jobNumbered(harness, number).id}`)).json();
+
+describe("Housecall Pro completeJobs", () => {
+  it("finishes the job whose visit began first, so its work is complete unrated as of now", async () => {
+    const harness = setup();
+    await advanceClock(harness.twin, 9 * 60); // 20:00: #36 and #42 have begun
+    const { events } = await runAction(harness.twin, "housecallpro", "completeJobs", 1);
+
+    expect(events).toEqual([expect.stringMatching(/housecallpro {2}JobUpdated #36 .*\(complete\) {2}\(control\)$/)]);
+    expect(await jobAnswer(harness, "36")).toMatchObject({
+      work_status: "complete unrated",
+      work_timestamps: { started_at: "2026-07-13T13:00:00Z", completed_at: "2026-07-13T20:00:00Z" },
+      updated_at: "2026-07-13T20:00:00Z",
+    });
+    expect((await jobAnswer(harness, "42")).work_status).toBe("scheduled");
+  });
+
+  it("leaves work that hasn't begun, and a job whose next visit is still ahead, until its time comes", async () => {
+    const harness = setup();
+    expect((await runAction(harness.twin, "housecallpro", "completeJobs", 5)).events).toEqual([]); // 11:00: nothing has begun
+
+    await advanceClock(harness.twin, 9 * 60);
+    const { events } = await runAction(harness.twin, "housecallpro", "completeJobs", 5);
+    expect(events.map((event) => /JobUpdated (#\d+)/.exec(event)?.[1])).toEqual(["#36", "#42"]);
+    expect((await jobAnswer(harness, "38")).work_status).toBe("scheduled");
+    expect((await jobAnswer(harness, "44")).work_status).toBe("scheduled");
+
+    await advanceClock(harness.twin, 21 * 60); // Tuesday 17:00: #38's second visit has begun
+    await runAction(harness.twin, "housecallpro", "completeJobs", 5);
+    const job = await (await harness.hcpGet(`/jobs/${jobNumbered(harness, "38").id}/appointments`)).json();
+    expect(job.appointments).toHaveLength(2);
+    expect(await jobAnswer(harness, "38")).toMatchObject({
+      work_status: "complete unrated",
+      work_timestamps: { started_at: "2026-07-13T16:30:00Z", completed_at: "2026-07-14T17:00:00Z" },
+    });
+  });
+
+  it("finishes jobs at their time in a scenario, recorded with source scenario, and checks the count when it loads", async () => {
+    const harness = setup();
+    loadScenario(harness.twin, scenario(`  - at: "+3h"\n    housecallpro: { completeJobs: 1 }`));
+    await advanceClock(harness.twin, 3 * 60);
+    expect(harness.twin.log.all().at(-1)).toMatchObject({ type: "JobUpdated", source: "scenario", at: "2026-07-13T14:00:00.000Z" });
+    expect((await jobAnswer(harness, "36")).work_status).toBe("complete unrated");
+
+    expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    housecallpro: { completeJobs: 1.5 }`))).toThrow(
+      /housecallpro completeJobs takes how many/,
+    );
+  });
+
+  it("adds nothing to a job, so what is created next is numbered as before", async () => {
+    const harness = setup();
+    await advanceClock(harness.twin, 9 * 60);
+    const before = { ...state(harness).counts };
+    await runAction(harness.twin, "housecallpro", "completeJobs", 2);
+    expect(state(harness).counts).toEqual(before);
   });
 });
