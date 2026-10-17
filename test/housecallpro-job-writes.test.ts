@@ -110,6 +110,21 @@ describe("Housecall Pro twin: creating jobs", () => {
     ]);
   });
 
+  it("rounds a line's half cent up, as the QuickBooks and Jobber twins do, so the same line comes to the same amount", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    // 2.01 × $34.50 is $69.345 exactly; as floating point it is a hair under, which plain rounding takes down to $69.34.
+    const lines = [
+      { name: "Wire (per ft)", unit_price: 3450, quantity: 2.01 },
+      { name: "Filters", unit_price: 750, quantity: 0.29 },
+      { name: "Labor", unit_price: 2450, quantity: 0.57 },
+    ];
+    const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: lines })).json();
+    const { data } = await (await harness.hcpGet(`/jobs/${job.id}/line_items`)).json();
+    expect(data.map((line: { amount: number }) => line.amount)).toEqual([6935, 218, 1397]);
+    expect(job.total_amount).toBe(6935 + 218 + 1397);
+  });
+
   it("takes the invoice number a request gives, and refuses one another job has, as it must be unique", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);

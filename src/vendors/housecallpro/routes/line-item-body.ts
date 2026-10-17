@@ -51,7 +51,8 @@ function readLineItem(value: unknown, path: string): LineFields | Refusal {
   ) {
     return refuse(`${path}.quantity must be a number of 0 or more, with up to two decimal places, not ${JSON.stringify(quantity)}.`);
   }
-  if (!Number.isSafeInteger(lineAmount({ quantity, unit_price: unit_price as number }))) {
+  // lineAmount multiplies hundredths of the quantity by the price, so that product has to stay exact too.
+  if (!Number.isSafeInteger(Math.round(quantity * 100) * (unit_price as number))) {
     return refuse(`${path}: quantity times unit_price comes to more cents than the twin can count exactly. No real line is that big.`);
   }
   if (!KINDS.includes(kind as string)) return refuse(`${path}.kind must be one of ${KINDS.join(", ")}, not ${JSON.stringify(kind)}.`);
