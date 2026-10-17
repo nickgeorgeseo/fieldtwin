@@ -2,23 +2,26 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { readBooks } from "@/lib/books.ts";
-import { matchCustomers, matchInvoices } from "@/lib/match-books.ts";
-import { CUSTOMER_STATUSES, INVOICE_STATUSES } from "./book-statuses.ts";
+import { type FieldService, matchCustomers, matchInvoices } from "@/lib/match-books.ts";
+import { customerStatuses, FIELD_SERVICES, invoiceStatuses } from "./book-statuses.ts";
 import { CustomerTable, InvoiceTable } from "./book-tables.tsx";
-import { Badge, type BadgeTone } from "./ui.tsx";
+import { Badge, type BadgeTone, Button } from "./ui.tsx";
 import { useEventLog } from "./use-event-log.ts";
 
 type Tab = "customers" | "invoices";
 
-/** Jobber and QuickBooks side by side: the same business, as each system has it now. */
+/** A field-service system and QuickBooks side by side: the same business, as each system has it now. */
 export function BusinessView() {
   const { events, error } = useEventLog();
+  const [service, setService] = useState<FieldService>("jobber");
   const [tab, setTab] = useState<Tab>("customers");
   const [only, setOnly] = useState<string | null>(null);
-  const { customers, invoices } = useMemo(() => {
-    const books = readBooks(events);
-    return { customers: matchCustomers(books), invoices: matchInvoices(books) };
-  }, [events]);
+  const books = useMemo(() => readBooks(events), [events]);
+  const { customers, invoices } = useMemo(
+    () => ({ customers: matchCustomers(books, service), invoices: matchInvoices(books, service) }),
+    [books, service],
+  );
+  const { name } = FIELD_SERVICES[service];
 
   const show = (next: Tab, status: string | null) => {
     setTab(next);
@@ -32,6 +35,23 @@ export function BusinessView() {
   return (
     <div className="space-y-6">
       {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
+      <fieldset className="flex flex-wrap items-center gap-2">
+        {/* Floated, a legend lines up with the buttons as any flex item would. */}
+        <legend className="float-left text-sm text-zinc-500 dark:text-zinc-400">Compare QuickBooks with</legend>
+        {(Object.keys(FIELD_SERVICES) as FieldService[]).map((key) => (
+          <Button
+            key={key}
+            tone={key === service ? "primary" : "secondary"}
+            aria-pressed={key === service}
+            onClick={() => {
+              setService(key);
+              setOnly(null);
+            }}
+          >
+            {FIELD_SERVICES[key].name}
+          </Button>
+        ))}
+      </fieldset>
       <div className="grid gap-4 md:grid-cols-2">
         <Summary
           title="Customers, matched by email"
@@ -39,7 +59,7 @@ export function BusinessView() {
           active={tab === "customers"}
           onAll={() => show("customers", null)}
         >
-          {Object.entries(CUSTOMER_STATUSES).map(([status, { label, tone, help }]) => (
+          {Object.entries(customerStatuses(name)).map(([status, { label, tone, help }]) => (
             <Count
               key={status}
               label={label}
@@ -57,7 +77,7 @@ export function BusinessView() {
           active={tab === "invoices"}
           onAll={() => show("invoices", null)}
         >
-          {Object.entries(INVOICE_STATUSES).map(([status, { label, tone, help }]) => (
+          {Object.entries(invoiceStatuses(name)).map(([status, { label, tone, help }]) => (
             <Count
               key={status}
               label={label}
@@ -71,7 +91,11 @@ export function BusinessView() {
         </Summary>
       </div>
       <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        {tab === "customers" ? <CustomerTable rows={rows.customers} /> : <InvoiceTable rows={rows.invoices} />}
+        {tab === "customers" ? (
+          <CustomerTable service={service} rows={rows.customers} />
+        ) : (
+          <InvoiceTable service={service} rows={rows.invoices} />
+        )}
         {rows[tab].length === 0 && (
           <p className="p-6 text-center text-sm text-zinc-500">{events.length ? "None." : "Reading the twin's log…"}</p>
         )}

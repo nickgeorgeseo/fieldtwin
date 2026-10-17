@@ -37,8 +37,25 @@ const qboInvoice = (Id: string, DocNumber: string, customer: string, TotalAmt: n
   TotalAmt,
   Balance,
 });
+const hcpCustomer = (n: number, first_name: string, last_name: string, email: string | null) => ({
+  id: `cus_${n}`,
+  first_name,
+  last_name,
+  email,
+  company: null,
+  mobile_number: null,
+  home_number: null,
+  work_number: null,
+});
+const hcpInvoice = (invoice_number: string, customer_id: string, unitPrices: number[], paid_at: string | null) => ({
+  id: `invoice_${invoice_number}`,
+  invoice_number,
+  customer_id,
+  items: unitPrices.map((unit_price) => ({ unit_price, quantity: 1 })),
+  paid_at,
+});
 
-describe("rebuilding both vendors' books from the event log", () => {
+describe("rebuilding every vendor's books from the event log", () => {
   it("keeps the latest version of each record, since every event carries the whole record", () => {
     const books = readBooks([
       event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Harper Alder") }),
@@ -52,6 +69,19 @@ describe("rebuilding both vendors' books from the event log", () => {
       ["Harper Alder Jr"],
     );
     assert.equal(books.jobber.invoices[0]?.paidAt, "2026-07-13T12:00:00Z");
+  });
+
+  it("reads Housecall Pro's customers and invoices too", () => {
+    const books = readBooks([
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(1, "Harper", "Alder", "harper@example.com") }),
+      event("housecallpro", "CustomerUpdated", { customer: hcpCustomer(1, "Harper", "Alder Jr", "harper@example.com") }),
+      event("housecallpro", "InvoiceCreated", { invoice: hcpInvoice("12", "cus_1", [9300], null) }),
+    ]);
+    assert.deepEqual(
+      books.housecallpro.customers.map((customer) => customer.last_name),
+      ["Alder Jr"],
+    );
+    assert.equal(books.housecallpro.invoices[0]?.invoice_number, "12");
   });
 });
 
@@ -67,7 +97,7 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
     event("quickbooks", "CustomerCreated", { customer: qboCustomer("5", "Rowan Stroud", "rowan@example.com") }),
     event("quickbooks", "CustomerCreated", { customer: qboCustomer("6", "Dana Whitfield") }),
   ]);
-  const byEmail = Object.fromEntries(matchCustomers(books).map((row) => [row.email || row.quickbooks?.name, row.status]));
+  const byEmail = Object.fromEntries(matchCustomers(books, "jobber").map((row) => [row.email || row.quickbooks?.name, row.status]));
 
   it("calls a customer with the same name in both the same", () => {
     assert.equal(byEmail["kendall@example.com"], "same");
@@ -78,7 +108,7 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
   });
 
   it("finds customers only one system has", () => {
-    assert.equal(byEmail["quinn@example.com"], "only-in-jobber");
+    assert.equal(byEmail["quinn@example.com"], "only-in-field-service");
     assert.equal(byEmail["rowan@example.com"], "only-in-quickbooks");
     assert.equal(byEmail["Dana Whitfield"], "only-in-quickbooks");
   });
@@ -88,7 +118,7 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
   });
 
   it("lists the differences before the customers that agree", () => {
-    assert.equal(matchCustomers(books).at(-1)?.status, "same");
+    assert.equal(matchCustomers(books, "jobber").at(-1)?.status, "same");
   });
 });
 
@@ -110,7 +140,7 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
     event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("6", "6", "Kendall Dunmore", 250, 250) }),
     event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("29", "1001", "Dana Whitfield", 185, 185) }),
   ]);
-  const byNumber = Object.fromEntries(matchInvoices(books).map((row) => [row.number, row]));
+  const byNumber = Object.fromEntries(matchInvoices(books, "jobber").map((row) => [row.number, row]));
 
   it("calls an invoice paid in both, or open in both, in sync", () => {
     assert.equal(byNumber["1"]?.status, "in-sync");
@@ -130,7 +160,7 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
   });
 
   it("adds Jobber's lines to the cent before comparing totals", () => {
-    assert.equal(byNumber["5"]?.jobber?.total, 20.01);
+    assert.equal(byNumber["5"]?.field?.total, 20.01);
     assert.equal(byNumber["5"]?.status, "in-sync");
   });
 
@@ -140,7 +170,7 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
   });
 
   it("names Jobber's client on each invoice", () => {
-    assert.equal(byNumber["1"]?.jobber?.client, "Kendall Dunmore");
+    assert.equal(byNumber["1"]?.field?.customer, "Kendall Dunmore");
   });
 
   it("keeps an invoice the books booked twice under one number, since QuickBooks accepts the second", () => {
@@ -151,11 +181,88 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
       event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("2", "1", "Kendall Dunmore", 955, 955) }),
     ]);
     assert.deepEqual(
-      matchInvoices(twice).map((row) => [row.number, row.quickbooks?.id, row.status]),
+      matchInvoices(twice, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
       [
         ["1", "2", "only-in-quickbooks"],
         ["1", "1", "in-sync"],
       ],
     );
+  });
+});
+
+describe("comparing Housecall Pro with the books instead of Jobber", () => {
+  const paid = "2026-07-01T00:00:00Z";
+  const kendall = [
+    event("housecallpro", "CustomerCreated", { customer: hcpCustomer(1, "Kendall", "Dunmore", "kendall@example.com") }),
+    event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Kendall Dunmore", "kendall@example.com") }),
+  ];
+
+  it("matches Housecall Pro's customers by email, leaving Jobber's out", () => {
+    const books = readBooks([
+      ...kendall,
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(2, "Jamie", "Lindqvist", "Jamie@Example.com") }),
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(3, "Quinn", "Brooks", "quinn@example.com") }),
+      event("jobber", "ClientCreated", { client: client(4, "Sage", "Jessup", "sage@example.com") }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("2", "Jamie Lindquist", "jamie@example.com") }),
+    ]);
+    assert.deepEqual(
+      matchCustomers(books, "housecallpro").map((row) => [row.email, row.field?.name, row.status]),
+      [
+        ["quinn@example.com", "Quinn Brooks", "only-in-field-service"],
+        ["jamie@example.com", "Jamie Lindqvist", "spelled-differently"],
+        ["kendall@example.com", "Kendall Dunmore", "same"],
+      ],
+    );
+  });
+
+  it("turns Housecall Pro's cents into dollars before comparing totals", () => {
+    const books = readBooks([
+      ...kendall,
+      event("housecallpro", "InvoiceCreated", { invoice: hcpInvoice("1", "cus_1", [89500, 6000], paid) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("1", "1", "Kendall Dunmore", 955, 0) }),
+    ]);
+    const [row] = matchInvoices(books, "housecallpro");
+    assert.equal(row?.field?.total, 955);
+    assert.equal(row?.status, "in-sync");
+  });
+
+  it("adds Housecall Pro's lines as the twin does, a half cent up, before comparing totals", () => {
+    const invoice = { ...hcpInvoice("5", "cus_1", [], paid), items: [{ unit_price: 3450, quantity: 2.01 }] }; // 6934.4999... multiplied out
+    const books = readBooks([
+      ...kendall,
+      event("housecallpro", "InvoiceCreated", { invoice }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("5", "5", "Kendall Dunmore", 69.35, 0) }),
+    ]);
+    const [row] = matchInvoices(books, "housecallpro");
+    assert.deepEqual([row?.field?.total, row?.status], [69.35, "in-sync"]);
+  });
+
+  it("pairs each invoice with the books' one under its number, as the books carry Housecall Pro's numbers", () => {
+    const books = readBooks([
+      ...kendall,
+      event("housecallpro", "InvoiceCreated", { invoice: hcpInvoice("3", "cus_1", [9300], paid) }),
+      event("housecallpro", "InvoiceCreated", { invoice: hcpInvoice("4", "cus_1", [9300], paid) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("3", "3", "Kendall Dunmore", 93, 0) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("2", "2", "Kendall Dunmore", 93, 0) }),
+    ]);
+    // #4 has the same customer and total as the books' #2, but another number: another invoice, which isn't booked yet.
+    assert.deepEqual(
+      matchInvoices(books, "housecallpro").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      [
+        ["4", undefined, "paid-not-booked"],
+        ["2", "2", "only-in-quickbooks"],
+        ["3", "3", "in-sync"],
+      ],
+    );
+  });
+
+  it("finds an invoice booked under Housecall Pro's number for another total, as cents booked as dollars would be", () => {
+    const books = readBooks([
+      ...kendall,
+      event("housecallpro", "InvoiceCreated", { invoice: hcpInvoice("45", "cus_1", [12300], paid) }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("31", "45", "Kendall Dunmore", 12300, 0) }),
+    ]);
+    const [row] = matchInvoices(books, "housecallpro");
+    assert.deepEqual([row?.field?.total, row?.quickbooks?.total, row?.status], [123, 12300, "totals-differ"]);
   });
 });
