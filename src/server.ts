@@ -86,7 +86,8 @@ function announce(twin: Twin, hostname: string, port: number) {
   console.error(
     twin.authMode === "any-token"
       ? "fieldtwin: auth is any-token: ANY Bearer token is accepted. Set FIELDTWIN_AUTH=oauth for real OAuth checks."
-      : "fieldtwin: auth is oauth: only access tokens from the twin's OAuth endpoints are accepted, until they expire.",
+      : "fieldtwin: auth is oauth: only access tokens from the twin's OAuth endpoints are accepted, until they expire. " +
+          "Housecall Pro API keys (Token <key>) work too, as the twin can't check them.",
   );
 }
 

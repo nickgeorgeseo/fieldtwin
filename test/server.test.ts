@@ -74,9 +74,9 @@ describe("npm start", () => {
   });
 
   /** Runs src/server.ts the way `npm start` does, collecting what it prints. */
-  function start(port: number, args: string[] = [], checkout = join(import.meta.dirname, "..")) {
+  function start(port: number, args: string[] = [], checkout = join(import.meta.dirname, ".."), env: Record<string, string> = {}) {
     const child = spawn(process.execPath, ["--import", "tsx", join(checkout, "src", "server.ts"), ...args], {
-      env: { ...process.env, FIELDTWIN_PORT: String(port) },
+      env: { ...process.env, FIELDTWIN_PORT: String(port), ...env },
     });
     children.push(child);
     let output = "";
@@ -102,6 +102,13 @@ describe("npm start", () => {
     await server.printed(`is open for business at http://localhost:${port}`);
     const response = await fetch(`http://localhost:${port}/_twin`);
     expect(response.status).toBe(200);
+  }, 20_000);
+
+  it("says which credentials it checks in oauth mode, and that Housecall Pro API keys still work", async () => {
+    const port = await freePort();
+    const output = await start(port, [], undefined, { FIELDTWIN_AUTH: "oauth" }).printed("auth is oauth");
+    expect(output).toContain("only access tokens from the twin's OAuth endpoints are accepted, until they expire");
+    expect(output).toContain("Housecall Pro API keys");
   }, 20_000);
 
   it("says the port it really listens on when FIELDTWIN_PORT is 0, which lets the system pick one", async () => {
