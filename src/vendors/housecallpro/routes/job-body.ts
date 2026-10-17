@@ -2,7 +2,7 @@ import { isObject } from "../../../core/request-body.ts";
 import { readTime } from "../dates.ts";
 import { hcpTime } from "../ids.ts";
 import type { HcpState } from "../types/index.ts";
-import { type LineFields, type Refusal, readLineItems, refuse } from "./line-item-body.ts";
+import { type LineFields, type Refusal, readLineItems, refuse, withoutNulls } from "./line-item-body.ts";
 
 /**
  * Reading a Create a Job request (the reference's JobCreate): "Create a job with the ID for an already existing
@@ -26,7 +26,7 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   if (missing.length)
     return refuse(`A job needs ${missing.join(" and ")}: "Create a job with the ID for an already existing address and customer."`);
   const fields = body.job_fields;
-  if (isObject(fields) && (fields.job_type_id !== undefined || fields.business_unit_id !== undefined)) {
+  if (isObject(fields) && (fields.job_type_id != null || fields.business_unit_id != null)) {
     return { status: 501, problem: "job_fields: the twin doesn't model job types or business units yet." };
   }
 
@@ -44,7 +44,8 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   if (schedule && "problem" in schedule) return schedule;
   const lines = readLineItems(body.line_items);
   if ("problem" in lines) return lines;
-  const { tags = [], lead_source = null, notes } = body;
+  // null on an optional field means it wasn't sent, as clients generated from the OpenAPI spec send it.
+  const { tags = [], lead_source = null, notes = undefined } = withoutNulls(body);
   if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string"))
     return refuse(`tags must be a list of strings, like ["warranty"].`);
   if (lead_source !== null && typeof lead_source !== "string") return refuse("lead_source must be a string.");
@@ -93,7 +94,7 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   }
   const [start, end] = times as [number, number];
   if (end <= start) return refuse("schedule.scheduled_end must be after schedule.scheduled_start.");
-  const { arrival_window = 0 } = value;
+  const { arrival_window = 0 } = withoutNulls(value);
   if (!Number.isInteger(arrival_window) || (arrival_window as number) < 0)
     return refuse("schedule.arrival_window must be whole minutes of 0 or more.");
   return { start: iso(start), end: iso(end), arrivalWindow: arrival_window as number };

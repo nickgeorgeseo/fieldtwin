@@ -15,7 +15,7 @@ export type LineFields = Omit<HcpLineItem, "id">;
 export type Refusal = { status: 422 | 501; problem: string };
 
 export function readLineItems(value: unknown): LineFields[] | Refusal {
-  if (value === undefined) return [];
+  if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) return refuse(`line_items must be a list of line items, not ${JSON.stringify(value)}.`);
   const lines: LineFields[] = [];
   for (const [index, entry] of value.entries()) {
@@ -31,8 +31,9 @@ export function readLineItems(value: unknown): LineFields[] | Refusal {
 
 function readLineItem(value: unknown, path: string): LineFields | Refusal {
   if (!isObject(value)) return refuse(`${path} must be a line item, like {"name": "Service call", "unit_price": 8900}.`);
-  if (value.pricing_form !== undefined) return { status: 501, problem: `${path}.pricing_form: the twin doesn't model price forms yet.` };
-  const { name, description = null, unit_price = 0, unit_cost = 0, quantity = 1, kind = "labor", taxable = true } = value;
+  if (value.pricing_form != null) return { status: 501, problem: `${path}.pricing_form: the twin doesn't model price forms yet.` };
+  const fields = withoutNulls(value); // a field sent as null takes its default, as one not sent does
+  const { name, description = null, unit_price = 0, unit_cost = 0, quantity = 1, kind = "labor", taxable = true } = fields;
   if (typeof name !== "string" || !name.trim()) return refuse(`${path}.name is required: a line item needs a name.`);
   if (description !== null && typeof description !== "string") return refuse(`${path}.description must be a string or null.`);
   for (const [field, cents] of [
@@ -67,4 +68,9 @@ const KINDS = ["materials", "labor", "fixed gratuity", "fixed discount", "percen
 
 export function refuse(problem: string): Refusal {
   return { status: 422, problem };
+}
+
+/** The fields of `body` that aren't null: an optional field sent as null reads as one not sent. */
+export function withoutNulls(body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null));
 }

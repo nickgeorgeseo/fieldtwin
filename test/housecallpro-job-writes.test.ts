@@ -177,6 +177,28 @@ describe("Housecall Pro twin: creating jobs", () => {
     }
   });
 
+  it("reads null on an optional field as not sent, as clients generated from the OpenAPI spec send it", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const response = await harness.hcpPost("/jobs", {
+      customer_id: customerId,
+      address_id: addressId,
+      invoice_number: null,
+      tags: null,
+      notes: null,
+      lead_source: null,
+      job_fields: { job_type_id: null, business_unit_id: null },
+      schedule: { scheduled_start: "2026-07-20T14:00:00Z", scheduled_end: "2026-07-20T15:00:00Z", arrival_window: null, anytime: null },
+      line_items: [{ name: "Defaults", unit_price: null, unit_cost: null, quantity: null, kind: null, taxable: null, pricing_form: null }],
+    });
+    expect(response.status).toBe(201);
+    const job = await response.json();
+    expect(job).toMatchObject({ tags: [], notes: [], schedule: { arrival_window: 0 }, total_amount: 0 });
+    const { data } = await (await harness.hcpGet(`/jobs/${job.id}/line_items`)).json();
+    expect(data[0]).toMatchObject({ quantity: 1, unit_price: 0, unit_cost: 0, kind: "labor", taxable: true });
+    expect((await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: null })).status).toBe(201);
+  });
+
   it("refuses line items without a name, or priced in fractions of a cent", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);

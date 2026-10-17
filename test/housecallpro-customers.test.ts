@@ -144,6 +144,19 @@ describe("Housecall Pro twin: creating and updating customers", () => {
     expect(twin.log.length).toBe(before);
   });
 
+  it("reads null tags or notifications_enabled as not sent when creating, and null tags as none when updating", async () => {
+    const { hcpPost, hcpPut } = setup();
+    const created = await hcpPost("/customers", { first_name: "Nulls", tags: null, notifications_enabled: null });
+    expect(created.status).toBe(201);
+    const customer = await created.json();
+    expect(customer).toMatchObject({ tags: [], notifications_enabled: false });
+    await hcpPut(`/customers/${customer.id}`, { tags: ["vip"] });
+    expect(await (await hcpPut(`/customers/${customer.id}`, { tags: null, notifications_enabled: null })).json()).toMatchObject({
+      tags: [],
+      notifications_enabled: false,
+    });
+  });
+
   it("refuses a field of the wrong type, naming it", async () => {
     const { hcpPost } = setup();
     for (const [body, field] of [

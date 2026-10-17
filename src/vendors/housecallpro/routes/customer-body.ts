@@ -21,14 +21,15 @@ export function readCustomerFields(body: Record<string, unknown>): Read<Customer
     if (value !== null && typeof value !== "string") return { problem: `${name} must be a string or null, not ${JSON.stringify(value)}.` };
     fields[name] = value;
   }
-  if ("notifications_enabled" in body) {
+  // null on notifications_enabled means it wasn't sent; null tags means none.
+  if ("notifications_enabled" in body && body.notifications_enabled !== null) {
     if (typeof body.notifications_enabled !== "boolean") {
       return { problem: `notifications_enabled must be true or false, not ${JSON.stringify(body.notifications_enabled)}.` };
     }
     fields.notifications_enabled = body.notifications_enabled;
   }
   if ("tags" in body) {
-    const { tags } = body;
+    const tags = body.tags ?? [];
     if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string")) {
       return { problem: `tags must be a list of strings, like ["vip"], not ${JSON.stringify(tags)}.` };
     }
