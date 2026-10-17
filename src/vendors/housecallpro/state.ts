@@ -15,6 +15,8 @@ export function createHcpState(): HcpState {
       address: { street: null, street_line_2: null, city: "", state: "", zip: null, country: "US" },
       utcOffsetHours: 0,
     },
+    customers: new Map(),
+    counts: { customers: 0, addresses: 0 },
   };
 }
 
@@ -26,6 +28,24 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
     case "CompanyCreated":
       state.company = data.company;
       return;
+
+    case "CustomerCreated":
+      state.customers.set(data.customer.id, data.customer);
+      state.counts.customers += 1;
+      state.counts.addresses += data.customer.addresses.length;
+      return;
+
+    case "CustomerUpdated":
+      state.customers.set(data.customer.id, data.customer);
+      return;
+
+    case "AddressCreated": {
+      // Records are replaced, not edited, so a customer read earlier stays as it was read.
+      const customer = state.customers.get(data.customerId)!;
+      state.customers.set(customer.id, { ...customer, addresses: [...customer.addresses, data.address] });
+      state.counts.addresses += 1;
+      return;
+    }
 
     default:
       throw new Error(`Housecall Pro twin does not know how to apply "${event.type}"`);

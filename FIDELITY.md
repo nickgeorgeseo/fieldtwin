@@ -148,6 +148,20 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | An error the twin didn't expect | Approximate | | | 500 with an `error.message`, and the twin logs the stack: it is a bug in the twin |
 | Rate limits | Via faults | | [Overview][hcp-home] | The docs give no numbers, only "a status 429" whose `RateLimit-Reset` header is "the time (in epoch format) that the user rate limit will be reset". Fault rules make 429s, without that header |
 | `GET /company` | Modeled | docs only | [Get Company][hcp-company] | Name, `time_zone` (an IANA zone), and the address's city, state, and country, from the world. What the world doesn't describe (phone, support email, logo, website, street, zip) is null. `service_areas_data`, `locations`, and `franchise_info` are left out |
+| Ids | Approximate | | [API reference][hcp-v1] | A prefix and 32 hex digits, as the docs' samples show for employees (`pro_`) and customers (`cus_`). Other prefixes are the twin's (`adr_` for addresses). Treat ids as opaque |
+| Timestamps | Approximate | | [Changelog][hcp-changelog] | UTC ISO 8601 to the second (`2026-07-13T11:00:00Z`), like the docs' samples |
+| Lists: `page`, `page_size`, and the counts | Modeled | docs only | [Get Customers][hcp-customers] | `page` counts from 1 and `page_size` is 10 unless asked; the answer carries `page`, `page_size`, `total_pages`, and `total_items` beside the records. `location_ids` is ignored: the twin has one location |
+| Paging limits | Approximate | check | [Get Customers][hcp-customers] | A `page` or `page_size` below 1, or not a whole number, answers 400, so code that counts pages from 0 finds out; the docs don't say what Housecall Pro does. They give no largest `page_size`, so the twin has none |
+| Sorting lists | Approximate | check | [Get Customers][hcp-customers] | `sort_direction` is `desc` unless asked. Customers sort by `created_at` (the default), `updated_at`, `first_name`, `last_name`, `email`, or `company`: the docs say only "customer attribute", so any other answers 400. Text sorts without regard to case, and empty values last when ascending, as Postgres sorts NULL. Ties keep the order records were created in |
+| `expand` | Approximate | | [Get Customers][hcp-customers] | `attachments` adds an empty list (the twin keeps no files) and `do_not_service` adds `false`. A value a list doesn't document answers 400 |
+| Customer search (`q`) | Approximate | check | [Get Customers][hcp-customers] | Searches "by name, email, mobile number and address": the text anywhere in the name, email, or an address, without regard to case, or its digits anywhere in the mobile number. How Housecall Pro matches isn't documented |
+| `GET /customers` and `GET /customers/{id}` | Modeled | docs only | [Get Customer][hcp-customer] | Seeded from the world, with one `service` address each. An unknown id answers 404 `{ "error": { "message": "customer not found" } }` |
+| Customers in a drifted world | Modeled | | | Housecall Pro is a field-service system, as Jobber is: customers only the books know aren't in it, and names are spelled the field-service way |
+| `POST /customers` | Modeled | docs only | [Create Customer][hcp-create-customer] | 201 with the customer. "One of first_name, last_name, email, mobile_number, home_number, work_number are required": without one, 422. Addresses sent with it get ids of their own |
+| Customer field types | Approximate | check | [Create Customer][hcp-create-customer] | A text field that isn't a string or null, `tags` that isn't a list of strings, or `notifications_enabled` that isn't true or false answers 422 naming the field. Housecall Pro may convert some instead |
+| Defaults for a new customer | Approximate | check | [Create Customer][hcp-create-customer] | `notifications_enabled` false, no `tags`, and addresses of `type` `service`: the docs give no defaults. Phone numbers are kept as sent |
+| `PUT /customers/{id}` | Approximate | check | [Update Customer][hcp-update-customer] | Changes the fields sent and keeps the rest; `null` clears one. A PUT that changes nothing records nothing and leaves `updated_at` alone. Addresses can't be changed this way: CustomerUpdate has none |
+| A customer's addresses | Modeled | docs only | [Addresses][hcp-addresses] | Listed (paged, by `created_at` or `updated_at`, newest first), read one at a time, and created: `street`, `city`, `state`, `zip`, and `country` are required (422 without them), and the answer is 200, as documented. `latitude` and `longitude` are accepted and dropped |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
@@ -175,3 +189,9 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [hcp-v1]: https://docs.housecallpro.com/docs/housecall-public-api/a4ca20a18010c-housecall-v1-api
 [hcp-auth]: https://docs.housecallpro.com/docs/housecall-public-api/b87d37ae48a0d-authentication
 [hcp-company]: https://docs.housecallpro.com/docs/housecall-public-api/24a5d891a80a8-get-company
+[hcp-changelog]: https://docs.housecallpro.com/docs/housecall-public-api/06ba3d648e345-changelog
+[hcp-customers]: https://docs.housecallpro.com/docs/housecall-public-api/042bd3bf861ae-get-customers
+[hcp-customer]: https://docs.housecallpro.com/docs/housecall-public-api/7599b1ec89338-get-customer
+[hcp-create-customer]: https://docs.housecallpro.com/docs/housecall-public-api/4e0bf8c4d65d7-create-customer
+[hcp-update-customer]: https://docs.housecallpro.com/docs/housecall-public-api/b1c3acd657849-update-customer
+[hcp-addresses]: https://docs.housecallpro.com/docs/housecall-public-api/abdc4e24d762b-get-all-of-a-customer-s-addresses
