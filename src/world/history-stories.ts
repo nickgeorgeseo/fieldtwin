@@ -17,7 +17,8 @@ export interface JobStory {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const BIG_JOB_PRICE = 500; // a service at least this price is quoted first and takes two visits
-const NET_DAYS = 30;
+/** The business's terms: an invoice is due this many days after it is issued. */
+export const NET_DAYS = 30;
 const FIRST_START_HOUR = 8; // local time; visits start between 8:00 and 15:30
 const LAST_START_HOUR = 15;
 

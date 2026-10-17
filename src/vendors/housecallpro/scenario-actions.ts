@@ -1,8 +1,10 @@
 import type { ScenarioAction } from "../../core/vendor-twin.ts";
 import { newCustomer } from "../../world/generate-world.ts";
+import { NET_DAYS } from "../../world/history-stories.ts";
 import { customerName } from "./events.ts";
 import { hcpId, hcpTime } from "./ids.ts";
 import { dueAmount } from "./routes/invoice-response.ts";
+import { workTimestamps } from "./routes/work.ts";
 import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./types/index.ts";
 
 /**
@@ -11,6 +13,7 @@ import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./ty
  *
  *   housecallpro: { newCustomers: 15 }   fifteen new customers call in or book online
  *   housecallpro: { completeJobs: 3 }    techs finish the three jobs whose visits began first
+ *   housecallpro: { invoiceJobs: 2 }     the Pro invoices the two jobs finished longest ago
  *   housecallpro: { payInvoices: 2 }     customers pay the two invoices due longest ago, in full
  */
 export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState>> = {
@@ -77,6 +80,42 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 
+  // A Pro invoices finished work and sends it at once, as the world's invoices were sent: the job's lines under the
+  // job's own number, as seed-work.ts bills them, due on the world's terms (FIDELITY.md). The fields are Get Invoices':
+  // https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
+  invoiceJobs: {
+    check: (count) => checkCount("invoiceJobs", count),
+    run: (count, { state, nowIso }) => {
+      const now = hcpTime(nowIso);
+      const dueAt = hcpTime(new Date(Date.parse(nowIso) + NET_DAYS * DAY_MS).toISOString());
+      return [...state.jobs.values()]
+        .flatMap((job) => {
+          const finished = workTimestamps(job.appointments).completed_at;
+          return finished && !state.invoicesByJob.has(job.id) ? [{ job, finished }] : [];
+        })
+        .sort((a, b) => Date.parse(a.finished) - Date.parse(b.finished))
+        .slice(0, count as number)
+        .map(({ job, finished }, index) => {
+          const invoice: HcpInvoice = {
+            id: hcpId("invoice", state.counts.invoices + 1 + index),
+            invoice_number: job.invoice_number,
+            job_id: job.id,
+            customer_id: job.customer_id,
+            items: job.line_items,
+            invoice_date: now,
+            service_date: finished,
+            sent_at: now,
+            due_at: dueAt,
+            paid_at: null,
+            payments: [],
+            created_at: now,
+            updated_at: now,
+          };
+          return { vendor: "housecallpro", type: "InvoiceCreated", data: { invoice } };
+        });
+    },
+  },
+
   // One payment for what is still owed, so the invoice is "paid". It is "external", like the world's payments: a
   // scenario doesn't say how the customer paid (FIDELITY.md).
   payInvoices: {
@@ -102,6 +141,8 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 };
+
+const DAY_MS = 86_400_000;
 
 function checkCount(action: string, value: unknown): void {
   if (!Number.isInteger(value) || (value as number) < 1) {
