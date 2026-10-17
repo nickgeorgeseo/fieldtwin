@@ -10,7 +10,8 @@ interface Job {
   invoice_number: string;
   created_at: string;
   work_status: string;
-  customer: { id: string };
+  description: string | null;
+  customer: { id: string; email: string };
   assigned_employees: { id: string; first_name: string }[];
   schedule: {
     scheduled_start: string;
@@ -27,10 +28,12 @@ interface Job {
 
 const cents = (job: WorldJob) => job.lineItems.reduce((total, line) => total + Math.round(line.quantity * line.unitPrice * 100), 0);
 
-/** The twin's job for a world job: the job number is its invoice_number. */
+/** The twin's job for a world job: the same work, for the same customer, starting at the same time. */
 async function jobFor(harness: Harness, worldJob: WorldJob, query = ""): Promise<Job> {
   const all = (await (await harness.hcpGet(`/jobs?page_size=1000${query}`)).json()).jobs as Job[];
-  return all.find((job) => job.invoice_number === String(worldJob.number))!;
+  const email = harness.twin.world.customers.find((customer) => customer.key === worldJob.customerKey)!.email;
+  const start = worldJob.visits[0]!.startAt.replace(".000Z", "Z");
+  return all.find((job) => job.description === worldJob.title && job.customer.email === email && job.schedule.scheduled_start === start)!;
 }
 
 const finishedJob = (harness: Harness) => harness.twin.world.history.jobs.find((job) => job.visits.every((visit) => visit.completedAt))!;
@@ -84,6 +87,21 @@ describe("Housecall Pro twin: listing jobs", () => {
     const date = await hcpGet("/jobs?scheduled_start_min=next-tuesday");
     expect(date.status).toBe(400);
     expect((await date.json()).error.message).toMatch(/scheduled_start_min/);
+  });
+});
+
+describe("Housecall Pro twin: job numbers", () => {
+  it("gives an invoiced job its invoice's number, the one the books and Jobber use, and later jobs the numbers after", async () => {
+    const harness = setup();
+    const { jobs, invoices } = harness.twin.world.history;
+    for (const invoice of invoices) {
+      const job = await jobFor(harness, jobs.find((candidate) => candidate.key === invoice.jobKey)!);
+      expect(job.invoice_number, invoice.key).toBe(String(invoice.number));
+    }
+    const waiting = jobs.filter((job) => !invoices.some((invoice) => invoice.jobKey === job.key)); // in the order they were created
+    const numbers: string[] = [];
+    for (const worldJob of waiting) numbers.push((await jobFor(harness, worldJob)).invoice_number);
+    expect(numbers).toEqual(waiting.map((_, index) => String(invoices.length + index + 1)));
   });
 });
 

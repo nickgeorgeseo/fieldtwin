@@ -59,10 +59,11 @@ describe("Housecall Pro twin: estimates", () => {
 
     const job = harness.twin.world.history.jobs.find((candidate) => candidate.key === quote.jobKey)!;
     const jobs = (await (await harness.hcpGet("/jobs?page_size=1000")).json()).jobs as {
-      invoice_number: string;
+      description: string;
       original_estimate_id: string;
     }[];
-    expect(jobs.find((candidate) => candidate.invoice_number === String(job.number))!.original_estimate_id).toBe(estimate.id);
+    const copied = jobs.filter((candidate) => candidate.original_estimate_id === estimate.id);
+    expect(copied.map((candidate) => candidate.description)).toEqual([job.title]);
   });
 
   it("shows a quote the customer hasn't answered as awaiting a response since it was sent", async () => {

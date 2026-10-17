@@ -28,10 +28,9 @@ async function allInvoices(harness: Harness, query = ""): Promise<Invoice[]> {
   return (await (await harness.hcpGet(`/invoices?page_size=1000${query}`)).json()).invoices;
 }
 
-/** The twin's invoice for a world invoice: it carries its job's number. */
+/** The twin's invoice for a world invoice: it has the world's invoice number, as the books and Jobber do. */
 async function invoiceFor(harness: Harness, worldInvoice: WorldInvoice): Promise<Invoice> {
-  const job = harness.twin.world.history.jobs.find((candidate) => candidate.key === worldInvoice.jobKey)!;
-  return (await allInvoices(harness)).find((invoice) => invoice.invoice_number === String(job.number))!;
+  return (await allInvoices(harness)).find((invoice) => invoice.invoice_number === String(worldInvoice.number))!;
 }
 
 const paidInvoice = (harness: Harness) => harness.twin.world.history.invoices.find((invoice) => invoice.paidAt)!;
@@ -114,6 +113,21 @@ describe("Housecall Pro twin: invoices", () => {
   });
 });
 
+describe("Housecall Pro twin: invoices and the books", () => {
+  it("numbers each invoice as the books do, so a sync finds it in QuickBooks by number, or finds it missing", async () => {
+    const harness = setup();
+    let found = 0;
+    for (const invoice of await allInvoices(harness)) {
+      const query = encodeURIComponent(`select * from Invoice where DocNumber = '${invoice.invoice_number}'`);
+      const [booked] = (await (await harness.qboGet(`/query?query=${query}`)).json()).QueryResponse.Invoice ?? [];
+      if (!booked) continue; // issued too recently for the bookkeeper (the books run two weeks behind)
+      found++;
+      expect(Math.round(booked.TotalAmt * 100), invoice.invoice_number).toBe(invoice.amount);
+    }
+    expect(found).toBeGreaterThan(0);
+  });
+});
+
 describe("Housecall Pro twin: a job's invoices", () => {
   it("lists a job's invoices, and none for finished work not invoiced yet", async () => {
     const harness = setup();
@@ -124,8 +138,11 @@ describe("Housecall Pro twin: a job's invoices", () => {
 
     const { jobs, invoices: worldInvoices } = harness.twin.world.history;
     const waiting = jobs.find((job) => job.visits.every((visit) => visit.completedAt) && !worldInvoices.some((i) => i.jobKey === job.key))!;
-    const all = (await (await harness.hcpGet("/jobs?page_size=1000")).json()).jobs as { id: string; invoice_number: string }[];
-    const job = all.find((candidate) => candidate.invoice_number === String(waiting.number))!;
+    const all = (await (await harness.hcpGet("/jobs?page_size=1000")).json()).jobs as {
+      id: string;
+      schedule: { scheduled_start: string };
+    }[];
+    const job = all.find((candidate) => candidate.schedule.scheduled_start === waiting.visits[0]!.startAt.replace(".000Z", "Z"))!;
     expect((await (await harness.hcpGet(`/jobs/${job.id}/invoices`)).json()).invoices).toEqual([]);
   });
 

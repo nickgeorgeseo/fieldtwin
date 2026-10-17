@@ -44,10 +44,11 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
   }
 
   const jobs = new Map<string, HcpJob>();
+  const numbers = jobNumbers(world);
   for (const worldJob of world.history.jobs) {
     const job: HcpJob = {
       id: ids.numbered("job", worldJob.key),
-      invoice_number: String(worldJob.number),
+      invoice_number: numbers.get(worldJob.key)!,
       description: worldJob.title,
       customer_id: ids.customer(worldJob.customerKey),
       address_id: ids.address(worldJob.customerKey),
@@ -103,6 +104,19 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
     events.push({ vendor: "housecallpro", type: "InvoiceCreated", data: { invoice } });
   }
   return events;
+}
+
+/**
+ * Each job's invoice_number. In Housecall Pro a job's number is its invoice's number, and that is the number the books
+ * carry (QuickBooks' DocNumber is the field-service system's invoice number: see quickbooks/seed-books.ts), so an
+ * invoiced job takes its invoice's number. Jobs not invoiced yet, the newest, are numbered after the invoiced ones in
+ * the order they were created. This way a sync that matches invoices by number finds the right one in the books.
+ */
+function jobNumbers(world: World): Map<string, string> {
+  const numbers = new Map(world.history.invoices.map((invoice) => [invoice.jobKey, String(invoice.number)]));
+  let next = world.history.invoices.length;
+  for (const job of world.history.jobs) if (!numbers.has(job.key)) numbers.set(job.key, String(++next));
+  return numbers;
 }
 
 /** The world's line items, in cents: services as labor, parts as taxable materials (as the books have them). */

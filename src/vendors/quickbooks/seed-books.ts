@@ -7,7 +7,8 @@ import type { QboCustomer, QboInvoice, QboPayment, QboSalesItemLine } from "./ty
  * The books as the bookkeeper has entered them: two weeks behind the field.
  *
  * Invoices issued more than BOOKKEEPING_LAG_DAYS ago are in QuickBooks, entered that long after they were
- * issued, with Jobber's invoice number as the DocNumber (how businesses keep the two systems matched).
+ * issued, with the field-service system's invoice number as the DocNumber (how businesses keep the two systems
+ * matched). Jobber and Housecall Pro number each invoice the same way, from the world.
  * Payments made more than BOOKKEEPING_LAG_DAYS ago are recorded against them the same way. Everything newer
  * is missing on purpose: syncing it is the job of the code under test.
  */
