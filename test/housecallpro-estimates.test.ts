@@ -111,6 +111,15 @@ describe("Housecall Pro twin: estimates", () => {
     });
   });
 
+  it("pages an option's line items with page and page_size, the only parameters that list documents", async () => {
+    const harness = setup();
+    const estimate = (await allEstimates(harness)).find((candidate) => candidate.options.length)!;
+    const path = `/estimates/${estimate.id}/options/${estimate.options[0]!.id}/line_items`;
+    const all = (await (await harness.hcpGet(path)).json()).line_items;
+    const first = await (await harness.hcpGet(`${path}?page_size=1&sort_by=name&sort_direction=asc`)).json();
+    expect(first).toMatchObject({ page: 1, page_size: 1, total_items: all.length, line_items: [all[0]] });
+  });
+
   it("answers 404 for an estimate or option that doesn't exist, in the documented words", async () => {
     const harness = setup();
     const missing = await harness.hcpGet("/estimates/est_missing");

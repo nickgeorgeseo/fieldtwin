@@ -26,7 +26,8 @@ export function readList<Key extends string>(
   if ("problem" in paging) return paging;
   const sort = readSort(req, options.sortable, options.sortBy);
   if ("problem" in sort) return sort;
-  const expand = readExpand(req, options.expandable);
+  // A list that documents no expand values ignores the parameter, as it ignores any other it doesn't take.
+  const expand = options.expandable.length ? readExpand(req, options.expandable) : new Set<string>();
   if ("problem" in expand) return expand;
   return { paging, sort, expand };
 }

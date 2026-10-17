@@ -6,7 +6,7 @@ import type { HcpEstimate, HcpEstimateOption, HcpState } from "../types/index.ts
 import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
 import { employeeResponse } from "./employees.ts";
-import { pageOf, readExpand, readList, sorted } from "./lists.ts";
+import { pageOf, readExpand, readList, readPaging, sorted } from "./lists.ts";
 import { lineItemResponse, schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
 import { readWorkFilter } from "./work-filters.ts";
 
@@ -41,10 +41,10 @@ export function estimateRoutes(app: Hono, twin: Twin): void {
     if (!estimate) return notFound(c, "Estimate");
     const option = estimate.options.find((candidate) => candidate.id === c.req.param("optionId"));
     if (!option) return notFound(c, "Estimate option");
-    const list = readList(c.req, { sortable: ["created_at"], sortBy: "created_at", expandable: [] });
-    if ("problem" in list) return c.json(hcpError(list.problem), 400);
-    const lines = option.line_items.map(lineItemResponse);
-    return c.json(pageOf("line_items", lines, list.paging, (line) => line));
+    // "page" and "page_size" are all this list documents: the lines keep the option's order.
+    const paging = readPaging(c.req);
+    if ("problem" in paging) return c.json(hcpError(paging.problem), 400);
+    return c.json(pageOf("line_items", option.line_items.map(lineItemResponse), paging, (line) => line));
   });
 }
 

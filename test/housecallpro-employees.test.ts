@@ -25,6 +25,12 @@ describe("Housecall Pro twin: employees", () => {
     expect(employees.sort()).toEqual(users.map((user: { email: { raw: string } }) => user.email.raw).sort());
   });
 
+  it("ignores expand, which Get Employees doesn't document, as it does any parameter it doesn't take", async () => {
+    const { hcpGet } = setup();
+    for (const path of ["/employees?expand[]=attachments", "/invoices?expand[]=anything"])
+      expect((await hcpGet(path)).status, path).toBe(200);
+  });
+
   it("sorts employees by name when asked", async () => {
     const { hcpGet } = setup();
     const body = await (await hcpGet("/employees?sort_by=first_name&sort_direction=asc")).json();
