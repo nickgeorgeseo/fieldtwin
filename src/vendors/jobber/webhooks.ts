@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { stableUuid } from "../../core/ids.ts";
+import { localTime } from "../../core/local-time.ts";
 import type { VendorWebhooks, WebhookNotification } from "../../core/webhooks.ts";
 import { asJobberEvent } from "./events.ts";
 import type { JobberState } from "./types.ts";
@@ -44,19 +45,10 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
       appId: stableUuid(subscription.clientId), // Jobber gives each app a UUID; the twin has no app registry (FIDELITY.md)
       accountId: state.account.id,
       itemId: notification.itemId,
-      occurredAt: localTime(notification.occurredAtMs, state.account.utcOffsetHours),
+      occurredAt: localTime(notification.occurredAtMs, state.account.utcOffsetHours), // like the documented sample
     };
     const body = JSON.stringify({ data: { webHookEvent } });
     const signature = createHmac("sha256", subscription.clientSecret).update(body).digest("base64");
     return { headers: { "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }, body };
   },
 };
-
-/** "2026-07-16T16:31:31-06:00": the business's local time with its offset, like the documented sample. */
-function localTime(ms: number, utcOffsetHours: number): string {
-  const offsetMinutes = Math.round(utcOffsetHours * 60);
-  const local = new Date(ms + offsetMinutes * 60_000).toISOString().slice(0, 19);
-  const sign = offsetMinutes < 0 ? "-" : "+";
-  const hours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, "0");
-  return `${local}${sign}${hours}:${String(Math.abs(offsetMinutes) % 60).padStart(2, "0")}`;
-}
