@@ -52,7 +52,8 @@ export function readPaging(req: ListRequest): Paging | { problem: string } {
 
 function wholeNumber(text: string | undefined, fallback: number): number | undefined {
   if (text === undefined || text === "") return fallback;
-  return /^\d+$/.test(text) && Number(text) >= 1 ? Number(text) : undefined;
+  const value = Number(text);
+  return /^\d+$/.test(text) && Number.isSafeInteger(value) && value >= 1 ? value : undefined; // never Infinity or a rounded one
 }
 
 /** One page of `records`, rendered as the API answers with them, under `name`, with the counts every list answers with. */

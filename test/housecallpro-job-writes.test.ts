@@ -251,6 +251,38 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect(next.invoice_number).toBe(String(harness.twin.world.history.jobs.length + 1));
   });
 
+  it("takes a large quantity with two decimal places, and refuses a third", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const post = (quantity: number) =>
+      harness.hcpPost("/jobs", {
+        customer_id: customerId,
+        address_id: addressId,
+        line_items: [{ name: "Wire (per inch)", quantity, unit_price: 1 }],
+      });
+    for (const quantity of [1234567.89, 9876543.21, 0.29]) expect((await post(quantity)).status, String(quantity)).toBe(201);
+    expect((await post(1234567.891)).status).toBe(422);
+  });
+
+  it("refuses a schedule that ends within the second it starts, since times are kept to the second", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const schedule = { scheduled_start: "2026-07-20T14:00:00.100Z", scheduled_end: "2026-07-20T14:00:00.900Z" };
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toMatch(/scheduled_end must be after/);
+  });
+
+  it("refuses to number a job after the largest invoice number it can count to, rather than repeat it", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const top = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: Number.MAX_SAFE_INTEGER });
+    expect(top.status).toBe(201);
+    const next = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId });
+    expect(next.status).toBe(422);
+    expect((await next.json()).error.message).toMatch(/invoice_number/);
+  });
+
   it("says it doesn't model anytime schedules, price forms, or job types yet (501)", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);

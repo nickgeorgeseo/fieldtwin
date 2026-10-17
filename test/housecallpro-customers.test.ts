@@ -30,9 +30,9 @@ describe("Housecall Pro twin: listing customers", () => {
     expect((await (await hcpGet("/customers?page=5&page_size=7")).json()).customers).toEqual([]);
   });
 
-  it("refuses a page or page_size below 1, since pages count from 1", async () => {
+  it("refuses a page or page_size below 1, or too large to count, since pages count from 1", async () => {
     const { hcpGet } = setup();
-    for (const query of ["page=0", "page_size=0", "page=two"]) {
+    for (const query of ["page=0", "page_size=0", "page=two", `page_size=${"9".repeat(400)}`, `page=${"9".repeat(30)}`]) {
       const response = await hcpGet(`/customers?${query}`);
       expect(response.status, query).toBe(400);
       expect((await response.json()).error.message).toMatch(/whole number of 1 or more/);

@@ -18,11 +18,17 @@ export function jobWriteRoutes(app: Hono, twin: Twin): void {
     const request = readJobRequest(read.body, state());
     if ("problem" in request) return c.json(hcpError(request.problem), request.status);
 
+    const invoiceNumber = request.invoice_number ?? nextInvoiceNumber(state());
+    if (invoiceNumber === undefined) {
+      const problem = `invoice_number: the highest number taken is ${Number.MAX_SAFE_INTEGER}, the largest the twin can count to. Send one.`;
+      return c.json(hcpError(problem), 422);
+    }
+
     const { counts } = state();
     const now = hcpTime(twin.clock.nowIso());
     const job: HcpJob = {
       id: hcpId("job", counts.jobs + 1),
-      invoice_number: request.invoice_number ?? nextInvoiceNumber(state()),
+      invoice_number: invoiceNumber,
       description: null,
       customer_id: request.customer_id,
       address_id: request.address_id,
@@ -55,8 +61,12 @@ export function jobWriteRoutes(app: Hono, twin: Twin): void {
 
 const NOTHING_EXPANDED = new Set<string>();
 
-/** "If left blank, one will be automatically generated": the twin takes the number after the highest so far. */
-function nextInvoiceNumber(state: HcpState): string {
+/**
+ * "If left blank, one will be automatically generated": the twin takes the number after the highest so far, or none
+ * past the largest whole number it can count to exactly.
+ */
+function nextInvoiceNumber(state: HcpState): string | undefined {
   const numbers = [...state.jobs.values()].map((job) => Number(job.invoice_number)).filter(Number.isInteger);
-  return String(Math.max(0, ...numbers) + 1);
+  const next = Math.max(0, ...numbers) + 1;
+  return Number.isSafeInteger(next) ? String(next) : undefined;
 }

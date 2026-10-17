@@ -92,8 +92,9 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
       return refuse(`schedule.${name} is required, as an ISO-8601 date and time like 2026-07-20T14:00:00, not ${JSON.stringify(text)}.`);
     times.push(ms);
   }
-  const [start, end] = times as [number, number];
-  if (end <= start) return refuse("schedule.scheduled_end must be after schedule.scheduled_start.");
+  // Times are kept to the second (hcpTime), so compare them as kept: 14:00:00.1 to 14:00:00.9 would be no time at all.
+  const [start, end] = (times as [number, number]).map((ms) => Math.floor(ms / 1000) * 1000) as [number, number];
+  if (end <= start) return refuse("schedule.scheduled_end must be after schedule.scheduled_start, by a second or more.");
   const { arrival_window = 0 } = withoutNulls(value);
   if (!Number.isInteger(arrival_window) || (arrival_window as number) < 0)
     return refuse("schedule.arrival_window must be whole minutes of 0 or more.");

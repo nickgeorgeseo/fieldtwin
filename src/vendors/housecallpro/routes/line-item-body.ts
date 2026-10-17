@@ -48,7 +48,7 @@ function readLineItem(value: unknown, path: string): LineFields | Refusal {
     typeof quantity !== "number" ||
     !Number.isFinite(quantity) ||
     quantity < 0 ||
-    Math.abs(quantity * 100 - Math.round(quantity * 100)) > 1e-9
+    Math.round(quantity * 100) / 100 !== quantity // two decimal places, however large: 1234567.89 is, 1.125 isn't
   ) {
     return refuse(`${path}.quantity must be a number of 0 or more, with up to two decimal places, not ${JSON.stringify(quantity)}.`);
   }
