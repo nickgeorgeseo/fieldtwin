@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { AUTH_PROBLEMS, checkCredentials } from "../auth.ts";
 import { hcpError, hcpUnauthorized } from "../errors.ts";
+import { housecallproOAuthRoutes } from "../oauth.ts";
 import { addressRoutes } from "./addresses.ts";
 import { HCP } from "./base.ts";
 import { companyRoutes } from "./company.ts";
@@ -18,6 +19,9 @@ import { jobRoutes } from "./jobs.ts";
  */
 export function housecallproRoutes(twin: Twin): Hono {
   const app = new Hono();
+
+  // First, so the credential check below never runs for them: these are how an app gets its credentials.
+  housecallproOAuthRoutes(app, twin);
 
   // "Housecall Pro expects the OAuth 2.0 access token or API key to be included in all authenticated API requests."
   app.use(`${HCP}/*`, async (c, next) => {
