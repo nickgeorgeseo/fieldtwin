@@ -1,3 +1,4 @@
+import { hcpLineCents } from "./books.ts";
 import type { TwinEvent } from "./twin-types.ts";
 
 /**
@@ -14,7 +15,7 @@ export function parseLog(text: string): TwinEvent[] {
 
 type Fields = Record<string, unknown>;
 
-/** A short label for the record an event is about: 'Id=26 "Dana Whitfield"', '#13 "AC tune-up"'. */
+/** A short label for the record an event is about: 'Id=26 "Dana Whitfield"', '#13 "AC tune-up"', '#12 131.25'. */
 export function describeEvent(event: TwinEvent): string {
   const record = recordOf(event.data);
   if (!record) return "";
@@ -23,7 +24,7 @@ export function describeEvent(event: TwinEvent): string {
     text(record.DocNumber) && `DocNumber=${text(record.DocNumber)}`,
     number(record) && `#${number(record)}`,
     name(record) && `"${name(record)}"`,
-    typeof record.TotalAmt === "number" && record.TotalAmt.toFixed(2),
+    amount(record),
   ];
   return parts.filter(Boolean).join(" ");
 }
@@ -44,32 +45,65 @@ export function filterEvents(events: TwinEvent[], { vendor, sources, search }: E
   );
 }
 
-/** The record in `{ "customer": {...} }`: events name what they carry by its kind. */
+/** The record in `{ "customer": {...} }`: events name what they carry by its kind, after an id or two at most. */
 function recordOf(data: unknown): Fields | null {
   if (typeof data !== "object" || data === null) return null;
-  const values = Object.values(data);
-  const [only] = values;
-  return values.length >= 1 && typeof only === "object" && only !== null && !Array.isArray(only) ? (only as Fields) : null;
+  const record = Object.values(data).find((value) => typeof value === "object" && value !== null && !Array.isArray(value));
+  return (record as Fields | undefined) ?? null;
 }
 
 function name(record: Fields): string {
-  const person = [text(record.firstName), text(record.lastName)].filter(Boolean).join(" ");
+  const person =
+    [text(record.firstName), text(record.lastName)].filter(Boolean).join(" ") ||
+    [text(record.first_name), text(record.last_name)].filter(Boolean).join(" "); // Housecall Pro's names are snake_case
   const customer = text(field(record.CustomerRef, "name"));
   const named = text(record.name) || text(field(record.name, "full")); // a Jobber account's name, a team member's full name
+  const place = [text(record.street), text(record.city)].filter(Boolean).join(", "); // a Housecall Pro address
+  // A Housecall Pro customer needs only one of these, and goes by the first it has.
+  const contact = text(record.email) || text(record.mobile_number) || text(record.home_number) || text(record.work_number);
   return (
     text(record.DisplayName) ||
     text(record.Name) ||
     person ||
     text(record.companyName) ||
+    text(record.company) ||
     named ||
     text(record.subject) ||
     text(record.title) ||
-    customer
+    text(record.description) ||
+    place ||
+    customer ||
+    contact
   );
 }
 
 function number(record: Fields): string {
-  return text(record.invoiceNumber) || text(record.jobNumber) || text(record.quoteNumber);
+  return (
+    text(record.invoiceNumber) ||
+    text(record.jobNumber) ||
+    text(record.quoteNumber) ||
+    text(record.invoice_number) ||
+    text(record.estimate_number)
+  );
+}
+
+/** What an invoice comes to, in dollars, or each of a Housecall Pro estimate's options. Housecall Pro counts in cents. */
+function amount(record: Fields): string {
+  if (typeof record.TotalAmt === "number") return record.TotalAmt.toFixed(2);
+  const options = Array.isArray(record.options) ? record.options.map((option) => field(option, "line_items")) : [];
+  const lineLists = Array.isArray(record.items) ? [record.items] : options;
+  return lineLists
+    .filter(Array.isArray)
+    .map(centsOf)
+    .filter(Number.isFinite) // lines without a price say nothing
+    .map((cents) => (cents / 100).toFixed(2))
+    .join(" or ");
+}
+
+/** Housecall Pro's lines, in cents, added up as the twin adds them. */
+function centsOf(lines: unknown[]): number {
+  const priced = lines.map((line) => ({ quantity: Number(field(line, "quantity")), unit_price: Number(field(line, "unit_price")) }));
+  return priced.reduce((total, line) => total + hcpLineCents(line), 0);
 }
 
 function field(value: unknown, key: string): unknown {

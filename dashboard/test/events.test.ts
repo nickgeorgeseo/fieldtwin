@@ -75,6 +75,87 @@ describe("saying what an event is about", () => {
     );
   });
 
+  it("names a Housecall Pro company, customer, and employee by name", () => {
+    assert.equal(
+      describeEvent(event(1, "housecallpro", "CompanyCreated", { company: { id: "f199", name: "Rowntree Electric" } })),
+      '"Rowntree Electric"',
+    );
+    assert.equal(
+      describeEvent(
+        event(1, "housecallpro", "CustomerUpdated", { customer: { id: "cus_cd98", first_name: "Kendall", last_name: "Dunmore" } }),
+      ),
+      '"Kendall Dunmore"',
+    );
+    assert.equal(
+      describeEvent(
+        event(1, "housecallpro", "EmployeeCreated", {
+          employee: { id: "pro_b9d8", first_name: "Jordan", last_name: "Kettering", email: "jordan@example.com", role: "field tech" },
+        }),
+      ),
+      '"Jordan Kettering"',
+    );
+  });
+
+  it("names a Housecall Pro customer with no name by their company, email, or phone, as Housecall Pro does", () => {
+    const customer = (fields: object) =>
+      describeEvent(
+        event(1, "housecallpro", "CustomerCreated", { customer: { first_name: null, last_name: null, company: null, ...fields } }),
+      );
+    assert.equal(customer({ company: "Acme" }), '"Acme"');
+    assert.equal(customer({ email: "pat@example.com", mobile_number: "555-0100" }), '"pat@example.com"');
+    assert.equal(customer({ email: null, mobile_number: "555-0100" }), '"555-0100"');
+  });
+
+  it("says where a Housecall Pro address is, though the customer's id comes first", () => {
+    assert.equal(
+      describeEvent(
+        event(1, "housecallpro", "AddressCreated", {
+          customerId: "cus_cd98",
+          address: { id: "adr_a5e9", street: "6284 Pine Hollow Rd", city: "Oak Hollow", state: "TX" },
+        }),
+      ),
+      '"6284 Pine Hollow Rd, Oak Hollow"',
+    );
+  });
+
+  it("numbers Housecall Pro jobs, estimates, and invoices, and turns their cents into dollars", () => {
+    assert.equal(
+      describeEvent(event(1, "housecallpro", "JobCreated", { job: { invoice_number: "12", description: "AC tune-up" } })),
+      '#12 "AC tune-up"',
+    );
+    assert.equal(describeEvent(event(1, "housecallpro", "JobCreated", { job: { invoice_number: "45", description: null } })), "#45");
+    assert.equal(
+      describeEvent(
+        event(1, "housecallpro", "EstimateCreated", {
+          estimate: {
+            estimate_number: "7",
+            options: [{ line_items: [{ unit_price: 45000, quantity: 1 }] }, { line_items: [{ unit_price: 26000, quantity: 2 }] }],
+          },
+        }),
+      ),
+      "#7 450.00 or 520.00",
+    );
+    assert.equal(
+      describeEvent(
+        event(1, "housecallpro", "InvoiceCreated", {
+          invoice: {
+            invoice_number: "12",
+            items: [
+              { unit_price: 9300, quantity: 1 },
+              { unit_price: 2550, quantity: 1.5 },
+            ],
+          },
+        }),
+      ),
+      "#12 131.25",
+    );
+  });
+
+  it("rounds a Housecall Pro line's half cent up, as the twin does, though the float multiplied out falls just short", () => {
+    const invoice = { invoice_number: "12", items: [{ unit_price: 3450, quantity: 2.01 }] }; // 2.01 × 3450 is 6934.4999... cents
+    assert.equal(describeEvent(event(1, "housecallpro", "InvoiceCreated", { invoice })), "#12 69.35");
+  });
+
   it("says nothing it can't back up when the record is unfamiliar", () => {
     assert.equal(describeEvent(event(1, "quickbooks", "CompanyCreated", { realmId: "9341000000000001" })), "");
   });

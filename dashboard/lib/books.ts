@@ -53,6 +53,15 @@ export function readBooks(events: TwinEvent[]): Books {
   };
 }
 
+/**
+ * A Housecall Pro line in cents, as the twin works it out (src/vendors/housecallpro/amounts.ts): the quantity, counted
+ * in hundredths, times the unit price in cents, to the nearest cent, half a cent up. Multiplying the quantity as it is
+ * would round some half cents down: 2.01 × 3450 is 6934.4999... in floating point.
+ */
+export function hcpLineCents({ quantity, unit_price }: { quantity: number; unit_price: number }): number {
+  return Math.round((Math.round(quantity * 100) * unit_price) / 100);
+}
+
 /** "quickbooks:customer" → Id → the customer as its latest event left it. */
 function latestRecords(events: TwinEvent[]): Map<string, Map<string, unknown>> {
   const records = new Map<string, Map<string, unknown>>();
