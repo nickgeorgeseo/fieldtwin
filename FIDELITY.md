@@ -139,7 +139,7 @@ Scenarios can make the field-service twins (Jobber and Housecall Pro) and the bo
 | Behavior | Status | Verified | Docs | Notes |
 |---|---|---|---|---|
 | Base URL | Approximate | | [API reference][hcp-v1] | The real API is at `https://api.housecallpro.com`, with paths straight after the host. The twin serves the same paths under `/housecallpro`, because `/api/invoices/{uuid}` would share Jobber's `/api` prefix: set the base URL to `http://localhost:4010/housecallpro` |
-| `Authorization: Token <API key>` and `Bearer <access token>` | Modeled | docs only | [Authentication][hcp-auth] | Exactly those formats, as "the headers must follow these exact formats" says; anything else answers 401 |
+| `Authorization: Token <API key>` and `Bearer <access token>` | Modeled | docs only | [Authentication][hcp-auth] | Exactly those formats, as "the headers must follow these exact formats" says: anything else, `bearer` in lower case or two spaces included, answers 401 |
 | API keys | Approximate | | [Authentication][hcp-auth] | Any key works, in both auth modes: a Pro makes keys in Housecall Pro's settings, which the twin doesn't have. In `auth: oauth` mode only OAuth access tokens are checked |
 | Error bodies | Approximate | check | [API reference][hcp-v1] | `{ "error": { "message" } }`, the documented ErrorResponse. A few endpoints document other shapes: Update a single line item's 400 is `{ "message", <field>: ... }`, and several 404s are `{}` |
 | 401 body | Approximate | check | [API reference][hcp-v1] | `{ "message" }`, the only 401 body the reference shows (Get Pipeline Statuses) |

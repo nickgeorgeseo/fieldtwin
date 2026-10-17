@@ -42,9 +42,9 @@ describe("Housecall Pro twin: credentials", () => {
     expect((await response.json()).message).toMatch(/Token <API key>.*Bearer <access token>/);
   });
 
-  it("refuses an API key sent in any other format, since the docs say the headers must be exact", async () => {
+  it("refuses credentials sent in any other format, since the docs say the headers must be exact", async () => {
     const { app } = setup();
-    for (const header of ["token 0046421dc0", "0046421dc0", "Token"]) {
+    for (const header of ["token 0046421dc0", "0046421dc0", "Token", "bearer d7f65570a4", "BEARER d7f65570a4", "Bearer  d7f65570a4"]) {
       const response = await app.request("/housecallpro/company", { headers: { Authorization: header } });
       expect(response.status, header).toBe(401);
     }
