@@ -67,6 +67,37 @@ describe("Housecall Pro twin: credentials", () => {
   });
 });
 
+describe("Housecall Pro twin: locations", () => {
+  const company = async (harness: ReturnType<typeof setup>) => (await (await harness.hcpGet("/company")).json()).id as string;
+
+  it("takes X-Company-Id or location_ids naming the company itself, its only location", async () => {
+    const harness = setup();
+    const id = await company(harness);
+    const withHeader = await harness.app.request("/housecallpro/customers", { headers: { Authorization: "Token k", "X-Company-Id": id } });
+    expect(withHeader.status).toBe(200);
+    expect((await harness.hcpGet(`/customers?location_ids[]=${id}`)).status).toBe(200);
+  });
+
+  it("refuses a location the key can't reach with 403, as the multi-location guide documents", async () => {
+    const harness = setup();
+    const other = "ce348586-c67a-4d5b-812f-9480514f84f2";
+    const withHeader = await harness.app.request("/housecallpro/jobs", { headers: { Authorization: "Token k", "X-Company-Id": other } });
+    expect(withHeader.status).toBe(403);
+    expect((await withHeader.json()).error.message).toContain(other);
+    const withParam = await harness.hcpGet(`/customers?location_ids[]=${await company(harness)}&location_ids[]=${other}`);
+    expect(withParam.status).toBe(403);
+  });
+
+  it("ignores location_ids when X-Company-Id is sent too, as the guide says", async () => {
+    const harness = setup();
+    const id = await company(harness);
+    const response = await harness.app.request("/housecallpro/customers?location_ids[]=somewhere-else", {
+      headers: { Authorization: "Token k", "X-Company-Id": id },
+    });
+    expect(response.status).toBe(200);
+  });
+});
+
 describe("Housecall Pro twin: what it doesn't serve", () => {
   it("answers 501 in Housecall Pro's error format for an endpoint it doesn't model yet, naming what it serves", async () => {
     const { hcpGet } = setup();

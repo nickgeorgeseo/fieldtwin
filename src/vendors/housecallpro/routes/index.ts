@@ -12,6 +12,7 @@ import { estimateRoutes } from "./estimates.ts";
 import { invoiceRoutes } from "./invoices.ts";
 import { jobWriteRoutes } from "./job-writes.ts";
 import { jobRoutes } from "./jobs.ts";
+import { locationCheck } from "./locations.ts";
 
 /**
  * Housecall Pro's public API, v1, served under /housecallpro (base.ts says why).
@@ -29,6 +30,7 @@ export function housecallproRoutes(twin: Twin): Hono {
     if ("problem" in auth) return c.json(hcpUnauthorized(AUTH_PROBLEMS[auth.problem]), 401);
     await next();
   });
+  app.use(`${HCP}/*`, locationCheck(twin));
 
   companyRoutes(app, twin);
   customerRoutes(app, twin);

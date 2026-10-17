@@ -49,7 +49,7 @@ function sortValue(invoice: HcpInvoice, by: (typeof SORTABLE)[number]): string |
 
 /**
  * The filters Get Invoices documents: status, customer_uuid, created_at, due_at, and paid_at ranges, amount_due
- * ranges (in cents, like every amount), and payment_method. location_ids is ignored: the twin has one location.
+ * ranges (in cents, like every amount), and payment_method. location_ids is checked for every request (locations.ts).
  */
 function readInvoiceFilter(req: ListRequest): Test<HcpInvoice> | { problem: string } {
   const tests: Test<HcpInvoice>[] = [];
