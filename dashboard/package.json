@@ -1,7 +1,7 @@
 {
   "name": "fieldtwin-dashboard",
   "private": true,
-  "description": "A web dashboard for a running fieldtwin: its clock, scenarios, faults, checkpoints, events, and both vendors' books.",
+  "description": "A web dashboard for a running fieldtwin: its clock, scenarios, faults, checkpoints, events, and each vendor's books.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

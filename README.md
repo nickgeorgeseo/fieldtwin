@@ -420,7 +420,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 
 ## The dashboard
 
-[`dashboard/`](dashboard/README.md) is a web dashboard for a running twin: everything in the control plane from a browser, the event log as it grows, and Jobber and QuickBooks side by side with every customer and invoice marked as matching or drifted.
+[`dashboard/`](dashboard/README.md) is a web dashboard for a running twin: everything in the control plane from a browser, the event log as it grows, and QuickBooks side by side with Jobber or Housecall Pro, every customer and invoice marked as matching or drifted.
 
 ```bash
 npm start                                   # terminal 1: the twin

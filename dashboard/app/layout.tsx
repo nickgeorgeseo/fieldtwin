@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "fieldtwin dashboard",
-  description: "Drive a running fieldtwin and watch what happens in Jobber and QuickBooks Online.",
+  description: "Drive a running fieldtwin and watch what happens in Jobber, Housecall Pro, and QuickBooks Online.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
