@@ -17,7 +17,8 @@ export function createHcpState(): HcpState {
     },
     customers: new Map(),
     employees: new Map(),
-    counts: { customers: 0, addresses: 0 },
+    jobs: new Map(),
+    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0 },
   };
 }
 
@@ -50,6 +51,13 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
 
     case "EmployeeCreated":
       state.employees.set(data.employee.id, data.employee);
+      return;
+
+    case "JobCreated":
+      state.jobs.set(data.job.id, data.job);
+      state.counts.jobs += 1;
+      state.counts.lineItems += data.job.line_items.length;
+      state.counts.appointments += data.job.appointments.length;
       return;
 
     default:

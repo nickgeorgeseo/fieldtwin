@@ -1,22 +1,25 @@
 import { stableUuid } from "../../core/ids.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
-import { hcpId, hcpTime } from "./ids.ts";
+import { hcpTime } from "./ids.ts";
+import { SeedIds } from "./seed-ids.ts";
+import { seedWork } from "./seed-work.ts";
 import type { HcpCompany, HcpCustomer, HcpEmployee } from "./types.ts";
 
 const SEED_TIME = hcpTime("2020-01-01T00:00:00.000Z");
 
-/** Turns the shared world into Housecall Pro's starting records: the company, its customers, and its employees. */
+/** Turns the shared world into Housecall Pro's starting records: the company, its people, and its work history. */
 export function seedHousecallPro(world: World): NewEvent[] {
+  const ids = new SeedIds(world);
   const events: NewEvent[] = [{ vendor: "housecallpro", type: "CompanyCreated", data: { company: company(world) } }];
   const record = (type: string, data: object) => events.push({ vendor: "housecallpro", type, data });
 
   // Housecall Pro is a field-service system, like Jobber: customers who exist only in the books aren't here, and
   // everyone is spelled the way the field-service system has them (see world/drift.ts).
-  const people = world.customers.filter((person) => !world.drift.accountingOnly.includes(person.key));
-  people.forEach((person, index) => {
+  for (const key of ids.customerKeys()) {
+    const person = world.customers.find((candidate) => candidate.key === key)!;
     const customer: HcpCustomer = {
-      id: hcpId("cus", index + 1),
+      id: ids.customer(key),
       first_name: person.firstName,
       last_name: person.lastName,
       email: person.email,
@@ -30,7 +33,7 @@ export function seedHousecallPro(world: World): NewEvent[] {
       tags: [],
       addresses: [
         {
-          id: hcpId("adr", index + 1),
+          id: ids.address(key),
           type: "service",
           street: person.street,
           street_line_2: null,
@@ -44,12 +47,12 @@ export function seedHousecallPro(world: World): NewEvent[] {
       updated_at: SEED_TIME,
     };
     record("CustomerCreated", { customer });
-  });
+  }
 
   // The technicians are field techs, with the email address Jobber has for them, so the two can be matched.
   world.technicians.forEach((tech, index) => {
     const employee: HcpEmployee = {
-      id: hcpId("pro", index + 1),
+      id: ids.employee(tech.key),
       first_name: tech.firstName,
       last_name: tech.lastName,
       email: `${tech.firstName}.${tech.lastName}.${index + 1}@example.com`.toLowerCase(),
@@ -64,6 +67,7 @@ export function seedHousecallPro(world: World): NewEvent[] {
     record("EmployeeCreated", { employee });
   });
 
+  events.push(...seedWork(world, ids));
   return events;
 }
 

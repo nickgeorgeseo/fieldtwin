@@ -109,6 +109,45 @@ export const EMPLOYEE_PERMISSIONS = [
   "is_admin",
 ] as const;
 
+/** "A job is the work that is done for a customer by an employee." */
+export interface HcpJob {
+  id: string;
+  invoice_number: string; // "must be unique across all of a company's jobs"
+  description: string;
+  customer_id: string;
+  address_id: string | null;
+  line_items: HcpLineItem[];
+  appointments: HcpAppointment[]; // in the order they happen; the job's schedule runs from the first to the last
+  original_estimate_id: string | null; // the estimate it was copied from
+  tags: string[];
+  notes: { id: string; content: string }[];
+  lead_source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A line on a job, an invoice, or an estimate option. Prices are in cents: "Unit price in cents (e.g., 10000 = $100.00)". */
+export interface HcpLineItem {
+  id: string;
+  name: string;
+  description: string | null;
+  unit_price: number;
+  unit_cost: number;
+  quantity: number; // "can be a float up to two decimal places"
+  kind: "labor" | "materials" | "fixed gratuity" | "fixed discount" | "percent discount";
+  taxable: boolean;
+}
+
+/** A visit to the customer's property to do a job's work. */
+export interface HcpAppointment {
+  id: string;
+  start_time: string;
+  end_time: string;
+  arrival_window_minutes: number;
+  dispatched_employees_ids: string[];
+  completed_at: string | null; // not an API field: when the work was marked done, which decides the job's work_status
+}
+
 export const ADDRESS_TEXT_FIELDS = ["street", "street_line_2", "city", "state", "zip", "country"] as const;
 
 export interface HcpState {
@@ -116,5 +155,7 @@ export interface HcpState {
   // Maps keep insertion order: the order records were created, which sorts break ties by.
   customers: Map<string, HcpCustomer>;
   employees: Map<string, HcpEmployee>;
-  counts: { customers: number; addresses: number }; // how many of each have been created, to number the next one's id
+  jobs: Map<string, HcpJob>;
+  // How many of each have been created, to number the next one's id (ids.ts).
+  counts: { customers: number; addresses: number; jobs: number; lineItems: number; appointments: number };
 }

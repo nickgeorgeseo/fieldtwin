@@ -7,6 +7,7 @@ import { HCP } from "./base.ts";
 import { companyRoutes } from "./company.ts";
 import { customerRoutes } from "./customers.ts";
 import { employeeRoutes } from "./employees.ts";
+import { jobRoutes } from "./jobs.ts";
 
 /**
  * Housecall Pro's public API, v1, served under /housecallpro (base.ts says why).
@@ -26,6 +27,7 @@ export function housecallproRoutes(twin: Twin): Hono {
   customerRoutes(app, twin);
   addressRoutes(app, twin);
   employeeRoutes(app, twin);
+  jobRoutes(app, twin);
 
   // Anything else is an endpoint the twin doesn't model yet. 501, which the real API never sends, so a client can't
   // mistake it for "that record doesn't exist" (a 404) or a request it should fix (a 400 or 422).
@@ -36,4 +38,5 @@ export function housecallproRoutes(twin: Twin): Hono {
   return app;
 }
 
-const SERVED = "GET /company, customers and their addresses (list, get, create, update), and GET /employees";
+const SERVED =
+  "GET /company, customers and their addresses (list, get, create, update), GET /employees, and jobs with their line items and appointments (list, get)";

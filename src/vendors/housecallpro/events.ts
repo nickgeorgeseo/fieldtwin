@@ -1,5 +1,5 @@
 import type { TwinEvent } from "../../core/types.ts";
-import type { HcpAddress, HcpCompany, HcpCustomer, HcpEmployee } from "./types.ts";
+import type { HcpAddress, HcpCompany, HcpCustomer, HcpEmployee, HcpJob } from "./types.ts";
 
 /** Every event the Housecall Pro twin records. Events carry complete records, so apply() stays simple. */
 export type HcpEventData =
@@ -7,7 +7,8 @@ export type HcpEventData =
   | { type: "CustomerCreated"; customer: HcpCustomer }
   | { type: "CustomerUpdated"; customer: HcpCustomer }
   | { type: "AddressCreated"; customerId: string; address: HcpAddress }
-  | { type: "EmployeeCreated"; employee: HcpEmployee };
+  | { type: "EmployeeCreated"; employee: HcpEmployee }
+  | { type: "JobCreated"; job: HcpJob };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asHcpEvent(event: TwinEvent): HcpEventData {
@@ -27,6 +28,11 @@ export function describeHcpEvent(event: TwinEvent): string {
       return `AddressCreated ${data.address.id} for ${data.customerId} "${[data.address.street, data.address.city].filter(Boolean).join(", ")}"`;
     case "EmployeeCreated":
       return `EmployeeCreated ${data.employee.id} "${data.employee.first_name} ${data.employee.last_name}" (${data.employee.role})`;
+    case "JobCreated": {
+      const { invoice_number, description, appointments } = data.job;
+      const done = appointments.length > 0 && appointments.every((appointment) => appointment.completed_at);
+      return `JobCreated #${invoice_number} "${description}" ${appointments[0]?.start_time ?? "unscheduled"}${done ? " (complete)" : ""}`;
+    }
   }
 }
 
