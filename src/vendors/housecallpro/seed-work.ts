@@ -4,15 +4,44 @@ import type { WorldLineItem } from "../../world/history.ts";
 import { linesTotal } from "./amounts.ts";
 import { hcpTime } from "./ids.ts";
 import type { SeedIds } from "./seed-ids.ts";
-import type { HcpInvoice, HcpJob, HcpLineItem } from "./types.ts";
+import type { HcpEstimate, HcpInvoice, HcpJob, HcpLineItem } from "./types/index.ts";
 
 /**
- * The business's work history in Housecall Pro: each of the world's jobs, with a visit as an appointment, and the
- * invoices for them. Records keep facts (when each appointment's work was done, when an invoice was paid), and the API
+ * The business's work history in Housecall Pro: the world's quotes as estimates, each of its jobs with a visit as an
+ * appointment, and the invoices for them. Records keep facts (when each appointment's work was done, when an invoice was paid), and the API
  * derives statuses from them (routes/job-response.ts, routes/invoice-response.ts).
  */
 export function seedWork(world: World, ids: SeedIds): NewEvent[] {
   const events: NewEvent[] = [];
+
+  // A quote is an estimate with one option. The world's quotes were sent without a site visit, so none is scheduled.
+  for (const quote of world.history.quotes) {
+    const created = hcpTime(quote.createdAt);
+    const estimate: HcpEstimate = {
+      id: ids.numbered("est", quote.key),
+      estimate_number: String(quote.number),
+      customer_id: ids.customer(quote.customerKey),
+      address_id: ids.address(quote.customerKey),
+      appointments: [],
+      options: [
+        {
+          id: ids.next("opt"),
+          name: "Option #1",
+          option_number: "1",
+          line_items: lineItems(quote.lineItems, world, ids),
+          sent_at: hcpTime(quote.sentAt),
+          approved_at: quote.approvedAt ? hcpTime(quote.approvedAt) : null,
+          job_id: quote.jobKey ? ids.numbered("job", quote.jobKey) : null,
+          created_at: created,
+          updated_at: hcpTime(quote.approvedAt ?? quote.sentAt),
+        },
+      ],
+      created_at: created,
+      updated_at: hcpTime(quote.approvedAt ?? quote.sentAt),
+    };
+    events.push({ vendor: "housecallpro", type: "EstimateCreated", data: { estimate } });
+  }
+
   const jobs = new Map<string, HcpJob>();
   for (const worldJob of world.history.jobs) {
     const job: HcpJob = {

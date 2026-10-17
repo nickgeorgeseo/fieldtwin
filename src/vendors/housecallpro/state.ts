@@ -1,6 +1,6 @@
 import type { TwinEvent } from "../../core/types.ts";
 import { asHcpEvent } from "./events.ts";
-import type { HcpState } from "./types.ts";
+import type { HcpState } from "./types/index.ts";
 
 export function createHcpState(): HcpState {
   return {
@@ -18,9 +18,10 @@ export function createHcpState(): HcpState {
     customers: new Map(),
     employees: new Map(),
     jobs: new Map(),
+    estimates: new Map(),
     invoices: new Map(),
     invoicesByJob: new Map(),
-    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0, invoices: 0, payments: 0 },
+    counts: { customers: 0, addresses: 0, jobs: 0, lineItems: 0, appointments: 0, estimates: 0, options: 0, invoices: 0, payments: 0 },
   };
 }
 
@@ -61,6 +62,16 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
       state.counts.lineItems += data.job.line_items.length;
       state.counts.appointments += data.job.appointments.length;
       return;
+
+    case "EstimateCreated": {
+      const { estimate } = data;
+      state.estimates.set(estimate.id, estimate);
+      state.counts.estimates += 1;
+      state.counts.options += estimate.options.length;
+      state.counts.appointments += estimate.appointments.length;
+      state.counts.lineItems += estimate.options.reduce((total, option) => total + option.line_items.length, 0);
+      return;
+    }
 
     case "InvoiceCreated": {
       const { invoice } = data;

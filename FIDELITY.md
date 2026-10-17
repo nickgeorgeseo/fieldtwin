@@ -148,7 +148,7 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | An error the twin didn't expect | Approximate | | | 500 with an `error.message`, and the twin logs the stack: it is a bug in the twin |
 | Rate limits | Via faults | | [Overview][hcp-home] | The docs give no numbers, only "a status 429" whose `RateLimit-Reset` header is "the time (in epoch format) that the user rate limit will be reset". Fault rules make 429s, without that header |
 | `GET /company` | Modeled | docs only | [Get Company][hcp-company] | Name, `time_zone` (an IANA zone), and the address's city, state, and country, from the world. What the world doesn't describe (phone, support email, logo, website, street, zip) is null. `service_areas_data`, `locations`, and `franchise_info` are left out |
-| Ids | Approximate | | [API reference][hcp-v1] | A prefix and 32 hex digits, as the docs' samples show for employees (`pro_`) and customers (`cus_`). The docs' webhook sample shows `invoice_` for invoices. Other prefixes are the twin's (`adr_`, `job_`, `li_`, `appt_`, `est_`, `pmt_`). Treat ids as opaque |
+| Ids | Approximate | | [API reference][hcp-v1] | A prefix and 32 hex digits, as the docs' samples show for employees (`pro_`) and customers (`cus_`). The docs' webhook sample shows `invoice_` for invoices. Other prefixes are the twin's (`adr_`, `job_`, `li_`, `appt_`, `est_`, `opt_`, `pmt_`). Treat ids as opaque |
 | Timestamps | Approximate | | [Changelog][hcp-changelog] | UTC ISO 8601 to the second (`2026-07-13T11:00:00Z`), like the docs' samples |
 | Lists: `page`, `page_size`, and the counts | Modeled | docs only | [Get Customers][hcp-customers] | `page` counts from 1 and `page_size` is 10 unless asked; the answer carries `page`, `page_size`, `total_pages`, and `total_items` beside the records. `location_ids` is ignored: the twin has one location |
 | Paging limits | Approximate | check | [Get Customers][hcp-customers] | A `page` or `page_size` below 1, or not a whole number, answers 400, so code that counts pages from 0 finds out; the docs don't say what Housecall Pro does. They give no largest `page_size`, so the twin has none |
@@ -185,6 +185,11 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 | Invoice fields the docs don't explain | Approximate | check | [Get Invoices][hcp-invoices] | `due_concept` and `display_due_concept` are null. `sent_at` and `invoice_date` are when the world issued the invoice, and `service_date` when the work was done. Items have the job's line item ids |
 | `GET /api/invoices/{uuid}` | Modeled | docs only | [Get Invoice by UUID][hcp-invoice] | The invoice by its id, with `job_id`. An unknown id answers 404 "invoice not found" |
 | `GET /jobs/{id}/invoices` | Modeled | docs only | [Get Job Invoices][hcp-job-invoices] | `{ invoices }`, unpaged and without `job_id`, as the JobInvoice schema has it. Empty for finished work that isn't invoiced yet |
+| `GET /estimates` and `GET /estimates/{id}` | Modeled | docs only | [Get Estimates][hcp-estimates] | The world's quotes, each an estimate with one option, "Option #1". Filtered as jobs are, and sorted by `created_at` (the default), `updated_at`, or `id`. An unknown id answers 404 "Estimate not found", the message Create an estimate option documents |
+| Estimate schedules | Approximate | | [Get Estimates][hcp-estimates] | The world's quotes were sent without a site visit, so every estimate `needs scheduling`, with an empty schedule and nobody assigned |
+| Option approval | Approximate | check | [Get Estimates][hcp-estimates] | `approval_status` is `approved` once the customer approved and `awaiting response` once it was sent, and `approval_status_updated_at` is when it last changed. `status` is `created job from estimate` once a job was copied from it, `open` before. The docs list the values but not when each applies |
+| Estimate to job | Modeled | docs only | [Get a Job][hcp-job] | A job copied from an estimate names it in `original_estimate_id` and `original_estimate_uuids` |
+| `GET /estimates/{id}/options/{option_id}/line_items` | Modeled | docs only | [Option line items][hcp-option-lines] | Paged, in cents, as a job's are |
 
 [qbo-cdc]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/changedatacapture
 [qbo-customer]: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
@@ -226,3 +231,5 @@ Scenarios can make the two twins disagree on purpose (`world.drift`: respelled c
 [hcp-invoices]: https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
 [hcp-invoice]: https://docs.housecallpro.com/docs/housecall-public-api/0ae16219c3e58-get-invoice-by-uuid
 [hcp-job-invoices]: https://docs.housecallpro.com/docs/housecall-public-api/eb1f5b5f17290-get-job-invoices
+[hcp-estimates]: https://docs.housecallpro.com/docs/housecall-public-api/e430ba3d520a0-get-estimates
+[hcp-option-lines]: https://docs.housecallpro.com/docs/housecall-public-api/781468fb5da47-list-estimate-option-line-items

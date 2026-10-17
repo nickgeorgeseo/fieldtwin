@@ -1,5 +1,5 @@
 import { lineAmount, linesTotal } from "../amounts.ts";
-import type { HcpInvoice } from "../types.ts";
+import type { HcpInvoice } from "../types/index.ts";
 
 /**
  * An invoice as the API answers with it, the reference's JobInvoice. Amounts are cents; `due_amount` is what the

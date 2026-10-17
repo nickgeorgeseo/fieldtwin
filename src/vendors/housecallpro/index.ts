@@ -5,7 +5,7 @@ import { HCP } from "./routes/base.ts";
 import { housecallproRoutes } from "./routes/index.ts";
 import { seedHousecallPro } from "./seed.ts";
 import { applyHcpEvent, createHcpState } from "./state.ts";
-import type { HcpState } from "./types.ts";
+import type { HcpState } from "./types/index.ts";
 
 export const housecallproTwin: VendorTwin<HcpState> = {
   name: "housecallpro",

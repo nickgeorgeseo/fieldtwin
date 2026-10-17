@@ -1,12 +1,13 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
-import type { HcpJob, HcpState } from "../types.ts";
+import type { HcpJob, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
-import { appointmentResponse, jobResponse, lineItemResponse, workStatus } from "./job-response.ts";
+import { jobResponse } from "./job-response.ts";
 import { pageOf, readExpand, readList, sorted } from "./lists.ts";
-import { readJobFilter } from "./work-filters.ts";
+import { appointmentResponse, lineItemResponse, workStatus } from "./work.ts";
+import { readWorkFilter } from "./work-filters.ts";
 
 /**
  * Jobs. Get Jobs:          https://docs.housecallpro.com/docs/housecall-public-api/6c97704da8bf3-get-jobs
@@ -20,7 +21,7 @@ export function jobRoutes(app: Hono, twin: Twin): void {
   app.get(`${HCP}/jobs`, (c) => {
     const list = readList(c.req, { sortable: SORTABLE, sortBy: "created_at", expandable: EXPANDABLE });
     if ("problem" in list) return c.json(hcpError(list.problem), 400);
-    const matches = readJobFilter(c.req);
+    const matches = readWorkFilter<HcpJob>(c.req);
     if ("problem" in matches) return c.json(hcpError(matches.problem), 400);
     const records = sorted([...state().jobs.values()].filter(matches), list.sort, sortValue);
     return c.json(pageOf("jobs", records, list.paging, (job) => jobResponse(job, state(), list.expand)));
@@ -53,5 +54,5 @@ const SORTABLE = ["created_at", "updated_at", "invoice_number", "id", "descripti
 const EXPANDABLE = ["attachments", "appointments"];
 
 function sortValue(job: HcpJob, by: (typeof SORTABLE)[number]): string {
-  return by === "work_status" ? workStatus(job) : job[by];
+  return by === "work_status" ? workStatus(job.appointments) : job[by];
 }

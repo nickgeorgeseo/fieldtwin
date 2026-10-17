@@ -7,6 +7,7 @@ import { HCP } from "./base.ts";
 import { companyRoutes } from "./company.ts";
 import { customerRoutes } from "./customers.ts";
 import { employeeRoutes } from "./employees.ts";
+import { estimateRoutes } from "./estimates.ts";
 import { invoiceRoutes } from "./invoices.ts";
 import { jobRoutes } from "./jobs.ts";
 
@@ -30,6 +31,7 @@ export function housecallproRoutes(twin: Twin): Hono {
   employeeRoutes(app, twin);
   jobRoutes(app, twin);
   invoiceRoutes(app, twin);
+  estimateRoutes(app, twin);
 
   // Anything else is an endpoint the twin doesn't model yet. 501, which the real API never sends, so a client can't
   // mistake it for "that record doesn't exist" (a 404) or a request it should fix (a 400 or 422).
@@ -42,4 +44,5 @@ export function housecallproRoutes(twin: Twin): Hono {
 
 const SERVED =
   "GET /company, customers and their addresses (list, get, create, update), GET /employees, jobs with their line items, " +
-  "appointments, and invoices (list, get), and invoices (GET /invoices, GET /api/invoices/{uuid})";
+  "appointments, and invoices (list, get), invoices (GET /invoices, GET /api/invoices/{uuid}), and estimates with " +
+  "their options' line items (list, get)";

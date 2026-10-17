@@ -1,7 +1,7 @@
 import { formatMoney } from "../../core/money.ts";
 import type { TwinEvent } from "../../core/types.ts";
 import { linesTotal } from "./amounts.ts";
-import type { HcpAddress, HcpCompany, HcpCustomer, HcpEmployee, HcpInvoice, HcpJob } from "./types.ts";
+import type { HcpAddress, HcpCompany, HcpCustomer, HcpEmployee, HcpEstimate, HcpInvoice, HcpJob } from "./types/index.ts";
 
 /** Every event the Housecall Pro twin records. Events carry complete records, so apply() stays simple. */
 export type HcpEventData =
@@ -11,6 +11,7 @@ export type HcpEventData =
   | { type: "AddressCreated"; customerId: string; address: HcpAddress }
   | { type: "EmployeeCreated"; employee: HcpEmployee }
   | { type: "JobCreated"; job: HcpJob }
+  | { type: "EstimateCreated"; estimate: HcpEstimate }
   | { type: "InvoiceCreated"; invoice: HcpInvoice };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
@@ -35,6 +36,11 @@ export function describeHcpEvent(event: TwinEvent): string {
       const { invoice_number, description, appointments } = data.job;
       const done = appointments.length > 0 && appointments.every((appointment) => appointment.completed_at);
       return `JobCreated #${invoice_number} "${description}" ${appointments[0]?.start_time ?? "unscheduled"}${done ? " (complete)" : ""}`;
+    }
+    case "EstimateCreated": {
+      const { estimate_number, options } = data.estimate;
+      const approved = options.some((option) => option.approved_at);
+      return `EstimateCreated #${estimate_number} ${options.length} option${options.length === 1 ? "" : "s"}${approved ? " (approved)" : ""}`;
     }
     case "InvoiceCreated": {
       const { invoice_number, items, paid_at } = data.invoice;

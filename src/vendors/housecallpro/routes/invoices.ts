@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
-import type { HcpInvoice, HcpState } from "../types.ts";
+import type { HcpInvoice, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
 import { amountRange, oneOf, type Test, timeRange } from "./filters.ts";

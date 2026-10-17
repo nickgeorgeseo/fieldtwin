@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
-import type { HcpCompany, HcpEmployee, HcpState } from "../types.ts";
+import type { HcpCompany, HcpEmployee, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { pageOf, readList, sorted } from "./lists.ts";
 

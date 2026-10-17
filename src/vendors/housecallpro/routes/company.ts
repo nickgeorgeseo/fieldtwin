@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
-import type { HcpState } from "../types.ts";
+import type { HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 
 /** Get Company: https://docs.housecallpro.com/docs/housecall-public-api/24a5d891a80a8-get-company */

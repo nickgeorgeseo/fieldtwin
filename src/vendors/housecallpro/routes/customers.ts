@@ -3,7 +3,7 @@ import { readJsonObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
 import { hcpId, hcpTime } from "../ids.ts";
-import { ADDRESS_TEXT_FIELDS, type HcpCompany, type HcpCustomer, type HcpState } from "../types.ts";
+import { ADDRESS_TEXT_FIELDS, type HcpCompany, type HcpCustomer, type HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { identityProblem, noCustomerText, readAddressList, readCustomerFields } from "./customer-body.ts";
 import { pageOf, readExpand, readList, sorted } from "./lists.ts";

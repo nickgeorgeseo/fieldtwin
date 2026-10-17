@@ -4,7 +4,7 @@ import type { World } from "../../world/generate-world.ts";
 import { hcpTime } from "./ids.ts";
 import { SeedIds } from "./seed-ids.ts";
 import { seedWork } from "./seed-work.ts";
-import type { HcpCompany, HcpCustomer, HcpEmployee } from "./types.ts";
+import type { HcpCompany, HcpCustomer, HcpEmployee } from "./types/index.ts";
 
 const SEED_TIME = hcpTime("2020-01-01T00:00:00.000Z");
 

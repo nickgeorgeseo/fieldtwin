@@ -1,4 +1,4 @@
-import type { HcpLineItem } from "./types.ts";
+import type { HcpLineItem } from "./types/index.ts";
 
 /**
  * Money in Housecall Pro is whole cents: "Unit price in cents (e.g., 10000 = $100.00)", and every total is an integer.

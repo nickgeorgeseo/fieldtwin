@@ -1,5 +1,5 @@
 import { isObject } from "../../../core/request-body.ts";
-import { ADDRESS_TEXT_FIELDS, CUSTOMER_IDENTITY_FIELDS, CUSTOMER_TEXT_FIELDS, type HcpAddress, type HcpCustomer } from "../types.ts";
+import { ADDRESS_TEXT_FIELDS, CUSTOMER_IDENTITY_FIELDS, CUSTOMER_TEXT_FIELDS, type HcpAddress, type HcpCustomer } from "../types/index.ts";
 
 /**
  * Reading the customer and address fields a client sends (the reference's CustomerCreate, CustomerUpdate, and

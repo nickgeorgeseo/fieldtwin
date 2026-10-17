@@ -3,7 +3,7 @@ import { readJsonObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
 import { hcpId } from "../ids.ts";
-import type { HcpAddress, HcpState } from "../types.ts";
+import type { HcpAddress, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { readAddress } from "./customer-body.ts";
 import { notFound } from "./customers.ts";
