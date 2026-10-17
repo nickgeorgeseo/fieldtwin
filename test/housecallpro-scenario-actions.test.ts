@@ -142,3 +142,55 @@ describe("Housecall Pro completeJobs", () => {
     expect(state(harness).counts).toEqual(before);
   });
 });
+
+/** Seed 42 has eight open invoices. The two due longest ago are #23 (due July 12) and #25 (due July 21). */
+const invoiceNumbered = (harness: Harness, number: string) =>
+  [...state(harness).invoices.values()].find((invoice) => invoice.invoice_number === number)!;
+const invoiceAnswer = async (harness: Harness, number: string) =>
+  (await harness.hcpGet(`/api/invoices/${invoiceNumbered(harness, number).id}`)).json();
+const openInvoices = async (harness: Harness) =>
+  (await (await harness.hcpGet("/invoices?status=open&page_size=100")).json()).invoices.map(
+    (invoice: { invoice_number: string }) => invoice.invoice_number,
+  );
+
+describe("Housecall Pro payInvoices", () => {
+  it("pays the open invoices due longest ago in full, with one payment for what was still owed", async () => {
+    const harness = setup();
+    const { amount } = await invoiceAnswer(harness, "23");
+    const { events } = await runAction(harness.twin, "housecallpro", "payInvoices", 2);
+
+    expect(events.map((event) => /InvoiceUpdated (#\d+)/.exec(event)?.[1])).toEqual(["#23", "#25"]);
+    const invoice = await invoiceAnswer(harness, "23");
+    expect(invoice).toMatchObject({ status: "paid", due_amount: 0, paid_at: "2026-07-13T11:00:00Z" });
+    expect(invoice.payments).toEqual([
+      expect.objectContaining({ amount, status: "succeeded", payment_method: "external", paid_at: "2026-07-13T11:00:00Z" }),
+    ]);
+    const job = await (await harness.hcpGet(`/jobs/${invoice.job_id}`)).json();
+    expect(job.outstanding_balance).toBe(0);
+    expect(await openInvoices(harness)).toHaveLength(6);
+  });
+
+  it("pays no more invoices than are open, and never pays one twice", async () => {
+    const harness = setup();
+    expect((await runAction(harness.twin, "housecallpro", "payInvoices", 50)).events).toHaveLength(8);
+    expect((await runAction(harness.twin, "housecallpro", "payInvoices", 1)).events).toEqual([]);
+    expect(await openInvoices(harness)).toEqual([]);
+
+    // Each payment has an id of its own, the seeded ones included.
+    const payments = [...state(harness).invoices.values()].flatMap((invoice) => invoice.payments.map((payment) => payment.id));
+    expect(new Set(payments).size).toBe(payments.length);
+    expect(state(harness).counts.payments).toBe(payments.length);
+  });
+
+  it("pays invoices at their time in a scenario, recorded with source scenario, and checks the count when it loads", async () => {
+    const harness = setup();
+    loadScenario(harness.twin, scenario(`  - at: "+2h"\n    housecallpro: { payInvoices: 1 }`));
+    await advanceClock(harness.twin, 2 * 60);
+    expect(harness.twin.log.all().at(-1)).toMatchObject({ type: "InvoiceUpdated", source: "scenario", at: "2026-07-13T13:00:00.000Z" });
+    expect((await invoiceAnswer(harness, "23")).paid_at).toBe("2026-07-13T13:00:00Z");
+
+    expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    housecallpro: { payInvoices: [1] }`))).toThrow(
+      /housecallpro payInvoices takes how many/,
+    );
+  });
+});

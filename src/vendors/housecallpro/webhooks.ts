@@ -3,7 +3,8 @@ import type { VendorWebhooks, WebhookNotification } from "../../core/webhooks.ts
 import { asHcpEvent } from "./events.ts";
 import { hcpTime } from "./ids.ts";
 import { customerResponse } from "./routes/customers.ts";
-import { jobResponse } from "./routes/job-response.ts";
+import { invoiceResponse, invoiceStatus } from "./routes/invoice-response.ts";
+import { jobResponse, outstandingBalance } from "./routes/job-response.ts";
 import { workTimestamps } from "./routes/work.ts";
 import type { HcpState } from "./types/index.ts";
 
@@ -12,7 +13,8 @@ import type { HcpState } from "./types/index.ts";
  *
  *   - Payload: "All webhook payloads include shared metadata": `event` (the event key, like `job.created`),
  *     `company_id`, and `event_occurred_at`, and since November 13, 2025 `event_created_at` too (the changelog). Then
- *     the whole record the event is about, as the API answers with it: `customer`, or `job` with its `appointments`.
+ *     the whole record the event is about, as the API answers with it: `customer`, `job` with its `appointments`, or
+ *     `invoice` with its `job_id`.
  *   - Signature: `Api-Timestamp` is "the timestamp in seconds since the epoch", and `Api-Signature` an HMAC-SHA256,
  *     keyed with the signing secret, of `timestamp + "." + json_payload`. The docs don't say how the hash is written
  *     out; the twin writes hex (FIDELITY.md).
@@ -20,11 +22,21 @@ import type { HcpState } from "./types/index.ts";
  *     the stricter reading: code that needs every event has to cope with one it missed.
  *
  * Only event keys the twin has events for are offered: customers created or updated, jobs created (and scheduled,
- * when created with a schedule), and jobs completed, once all their work is done. The other keys need writes the twin
- * doesn't model yet.
+ * when created with a schedule), jobs completed, once all their work is done, and invoices paid: each payment that
+ * succeeds, the invoice once it is paid in full, and its job once nothing is owed on it. The docs don't give an
+ * order; the twin sends them in that one. The other keys need writes the twin doesn't model yet.
  */
 export const housecallproWebhooks: VendorWebhooks<HcpState> = {
-  topics: ["customer.created", "customer.updated", "job.created", "job.scheduled", "job.completed"],
+  topics: [
+    "customer.created",
+    "customer.updated",
+    "job.created",
+    "job.scheduled",
+    "job.completed",
+    "job.paid",
+    "invoice.payment.succeeded",
+    "invoice.paid",
+  ],
 
   delivery: {
     answerWithinMs: 3000,
@@ -32,7 +44,7 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
     retryAfterMs: () => null,
   },
 
-  notify(event): WebhookNotification[] {
+  notify(event, state): WebhookNotification[] {
     const data = asHcpEvent(event);
     const at = Date.parse(event.at);
     const announce = (topic: string, itemId: string) => ({ topic, itemId, occurredAtMs: at });
@@ -42,6 +54,18 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
     if (data.type === "JobUpdated") {
       const { completed_at } = workTimestamps(data.job.appointments);
       return completed_at === hcpTime(event.at) ? [announce("job.completed", data.job.id)] : [];
+    }
+    // Paid by this very update: each payment made just now, the invoice if they cover it, and then its job if nothing
+    // more is owed on it.
+    if (data.type === "InvoiceUpdated") {
+      const { invoice } = data;
+      const now = hcpTime(event.at);
+      const payments = invoice.payments
+        .filter((payment) => payment.paid_at === now && payment.status === "succeeded")
+        .map(() => announce("invoice.payment.succeeded", invoice.id));
+      if (invoice.paid_at !== now || invoiceStatus(invoice) !== "paid") return payments;
+      const jobPaid = outstandingBalance(state.jobs.get(invoice.job_id)!, state) === 0;
+      return [...payments, announce("invoice.paid", invoice.id), ...(jobPaid ? [announce("job.paid", invoice.job_id)] : [])];
     }
     if (data.type !== "JobCreated") return [];
     const created = announce("job.created", data.job.id);
@@ -64,6 +88,8 @@ function record(notification: WebhookNotification, state: HcpState) {
   if (notification.topic.startsWith("customer.")) {
     return { customer: customerResponse(state.customers.get(notification.itemId)!, state.company, NOTHING_EXPANDED) };
   }
+  // The Invoice Protocol carries the invoice's job_id, as Get Invoice by UUID does.
+  if (notification.topic.startsWith("invoice.")) return { invoice: invoiceResponse(state.invoices.get(notification.itemId)!, true) };
   const job = state.jobs.get(notification.itemId)!;
   // The Job Webhook Protocol has the appointments beside the schedule rather than in it.
   const appointments = job.appointments.map(({ id, start_time, end_time, arrival_window_minutes }) => ({

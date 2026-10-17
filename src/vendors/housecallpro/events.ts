@@ -13,7 +13,8 @@ export type HcpEventData =
   | { type: "JobCreated"; job: HcpJob }
   | { type: "JobUpdated"; job: HcpJob }
   | { type: "EstimateCreated"; estimate: HcpEstimate }
-  | { type: "InvoiceCreated"; invoice: HcpInvoice };
+  | { type: "InvoiceCreated"; invoice: HcpInvoice }
+  | { type: "InvoiceUpdated"; invoice: HcpInvoice };
 
 /** A logged event, narrowed to this vendor's payloads. The event's `type` tells you which one you have. */
 export function asHcpEvent(event: TwinEvent): HcpEventData {
@@ -44,9 +45,10 @@ export function describeHcpEvent(event: TwinEvent): string {
       const approved = options.some((option) => option.approved_at);
       return `EstimateCreated #${estimate_number} ${options.length} option${options.length === 1 ? "" : "s"}${approved ? " (approved)" : ""}`;
     }
-    case "InvoiceCreated": {
+    case "InvoiceCreated":
+    case "InvoiceUpdated": {
       const { invoice_number, items, paid_at } = data.invoice;
-      return `InvoiceCreated #${invoice_number} amount=${formatMoney(linesTotal(items) / 100)}${paid_at ? " (paid)" : ""}`;
+      return `${data.type} #${invoice_number} amount=${formatMoney(linesTotal(items) / 100)}${paid_at ? " (paid)" : ""}`;
     }
   }
 }

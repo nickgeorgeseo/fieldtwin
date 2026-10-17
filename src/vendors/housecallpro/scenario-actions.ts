@@ -2,7 +2,8 @@ import type { ScenarioAction } from "../../core/vendor-twin.ts";
 import { newCustomer } from "../../world/generate-world.ts";
 import { customerName } from "./events.ts";
 import { hcpId, hcpTime } from "./ids.ts";
-import type { HcpCustomer, HcpJob, HcpState } from "./types/index.ts";
+import { dueAmount } from "./routes/invoice-response.ts";
+import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./types/index.ts";
 
 /**
  * What a scenario timeline can make happen in Housecall Pro, as if a Pro did it in the app. Each returns complete
@@ -10,6 +11,7 @@ import type { HcpCustomer, HcpJob, HcpState } from "./types/index.ts";
  *
  *   housecallpro: { newCustomers: 15 }   fifteen new customers call in or book online
  *   housecallpro: { completeJobs: 3 }    techs finish the three jobs whose visits began first
+ *   housecallpro: { payInvoices: 2 }     customers pay the two invoices due longest ago, in full
  */
 export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState>> = {
   newCustomers: {
@@ -71,6 +73,31 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
           const appointments = job.appointments.map((appointment) => ({ ...appointment, completed_at: appointment.completed_at ?? now }));
           const completed: HcpJob = { ...job, appointments, updated_at: now };
           return { vendor: "housecallpro", type: "JobUpdated", data: { job: completed } };
+        });
+    },
+  },
+
+  // One payment for what is still owed, so the invoice is "paid". It is "external", like the world's payments: a
+  // scenario doesn't say how the customer paid (FIDELITY.md).
+  payInvoices: {
+    check: (count) => checkCount("payInvoices", count),
+    run: (count, { state, nowIso }) => {
+      const now = hcpTime(nowIso);
+      return [...state.invoices.values()]
+        .filter((invoice) => dueAmount(invoice) > 0)
+        .sort((a, b) => Date.parse(a.due_at) - Date.parse(b.due_at))
+        .slice(0, count as number)
+        .map((invoice, index) => {
+          const payment: HcpPayment = {
+            id: hcpId("pmt", state.counts.payments + 1 + index),
+            amount: dueAmount(invoice),
+            payment_method: "external",
+            status: "succeeded",
+            note: null,
+            paid_at: now,
+          };
+          const paid: HcpInvoice = { ...invoice, payments: [...invoice.payments, payment], paid_at: now, updated_at: now };
+          return { vendor: "housecallpro", type: "InvoiceUpdated", data: { invoice: paid } };
         });
     },
   },

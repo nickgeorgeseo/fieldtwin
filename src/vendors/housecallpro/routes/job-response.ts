@@ -22,7 +22,7 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
     work_timestamps: workTimestamps(job.appointments),
     schedule: schedule(job.appointments, company, expand.has("appointments")),
     total_amount: total,
-    outstanding_balance: outstandingBalance(job, total, state),
+    outstanding_balance: outstandingBalance(job, state),
     subtotal: total,
     assigned_employees: assignedEmployees(job, state).map((employee) => employeeResponse(employee, company)),
     tags: job.tags,
@@ -56,10 +56,10 @@ function customerNotes(customer: HcpCustomer): { id: string; content: string }[]
 }
 
 /** What is still owed for the job: its total, less what has been paid on its invoices. */
-function outstandingBalance(job: HcpJob, total: number, state: HcpState): number {
+export function outstandingBalance(job: HcpJob, state: HcpState): number {
   const invoices = (state.invoicesByJob.get(job.id) ?? []).map((id) => state.invoices.get(id)!);
   const paid = invoices.flatMap((invoice) => invoice.payments).reduce((sum, payment) => sum + payment.amount, 0);
-  return Math.max(0, total - paid);
+  return Math.max(0, linesTotal(job.line_items) - paid);
 }
 
 function assignedEmployees(job: HcpJob, state: HcpState): HcpEmployee[] {

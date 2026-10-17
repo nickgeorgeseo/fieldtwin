@@ -103,6 +103,13 @@ export function applyHcpEvent(state: HcpState, event: TwinEvent): void {
       return;
     }
 
+    case "InvoiceUpdated": {
+      const before = state.invoices.get(data.invoice.id)!;
+      state.invoices.set(data.invoice.id, data.invoice);
+      state.counts.payments += added(before.payments, data.invoice.payments);
+      return;
+    }
+
     default:
       throw new Error(`Housecall Pro twin does not know how to apply "${event.type}"`);
   }
