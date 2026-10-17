@@ -31,10 +31,11 @@ export function addressRoutes(app: Hono, twin: Twin): void {
 
   // AddressCreate requires every one of these, and the documented answer is 200 with the new Address (not 201).
   app.post(`${HCP}/customers/:id/addresses`, async (c) => {
-    const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return notFound(c);
     const read = await readJsonObject(c, '{"street": "12 Elm St", "city": "Riverton", "state": "NC", "zip": "28201", "country": "US"}');
     if ("problem" in read) return c.json(hcpError(read.problem), 400);
+    // Only now, with the whole body read, is the customer looked up: a reset or rewind meanwhile may have removed them.
+    const customer = state().customers.get(c.req.param("id"));
+    if (!customer) return notFound(c);
     const fields = readAddress(read.body, "address");
     if ("problem" in fields) return c.json(hcpError(fields.problem), 422);
     const missing = REQUIRED.filter((name) => !fields[name]?.trim());

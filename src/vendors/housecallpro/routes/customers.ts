@@ -62,10 +62,11 @@ export function customerRoutes(app: Hono, twin: Twin): void {
   // A PUT changes the fields it sends and leaves the rest, the way Rails updates attributes; null clears a field. A PUT
   // that changes nothing records nothing, as Rails touches neither the row nor updated_at then (FIDELITY.md).
   app.put(`${HCP}/customers/:id`, async (c) => {
-    const existing = state().customers.get(c.req.param("id"));
-    if (!existing) return notFound(c);
     const read = await readJsonObject(c, '{"last_name": "Alder"}');
     if ("problem" in read) return c.json(hcpError(read.problem), 400);
+    // Only now, with the whole body read, is the customer looked up: nothing can change it between the read and the write.
+    const existing = state().customers.get(c.req.param("id"));
+    if (!existing) return notFound(c);
     const fields = readCustomerFields(read.body);
     if ("problem" in fields) return c.json(hcpError(fields.problem), 422);
     const missing = identityProblem({ ...existing, ...fields });
