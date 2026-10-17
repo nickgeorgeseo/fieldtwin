@@ -10,7 +10,7 @@ import { stableUuid } from "../../core/ids.ts";
  */
 export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "note" | "est" | "opt" | "invoice" | "pmt";
 
-export function hcpId(prefix: HcpIdPrefix, n: number): string {
+export function hcpId(prefix: HcpIdPrefix, n: number | string): string {
   return `${prefix}_${stableUuid(`housecallpro/${prefix}/${n}`).replaceAll("-", "")}`;
 }
 

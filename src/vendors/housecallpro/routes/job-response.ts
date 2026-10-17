@@ -1,5 +1,6 @@
 import { linesTotal } from "../amounts.ts";
-import type { HcpEmployee, HcpJob, HcpState } from "../types/index.ts";
+import { hcpId } from "../ids.ts";
+import type { HcpCustomer, HcpEmployee, HcpJob, HcpState } from "../types/index.ts";
 import { employeeResponse } from "./employees.ts";
 import { schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
 
@@ -14,7 +15,7 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
     id: job.id,
     invoice_number: job.invoice_number,
     description: job.description,
-    customer: workCustomer(job.customer_id, state),
+    customer: { ...workCustomer(job.customer_id, state), notes: customerNotes(state.customers.get(job.customer_id)!) },
     address: workAddress(job.customer_id, job.address_id, state),
     notes: job.notes,
     work_status: workStatus(job.appointments),
@@ -43,6 +44,15 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
     recurrence_id: null,
     assigned_route_template_id: null,
   };
+}
+
+/**
+ * The Job object documents its customer's `notes` as a list of Notes, where Get Customer (and the Estimate object) has
+ * them as text. The twin keeps a customer's notes as text, so a job shows them as one note, with an id derived from the
+ * customer's: the same every time (FIDELITY.md).
+ */
+function customerNotes(customer: HcpCustomer): { id: string; content: string }[] {
+  return customer.notes ? [{ id: hcpId("note", `customer/${customer.id}`), content: customer.notes }] : [];
 }
 
 /** What is still owed for the job: its total, less what has been paid on its invoices. */

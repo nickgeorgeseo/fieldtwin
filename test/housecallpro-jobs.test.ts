@@ -109,6 +109,20 @@ describe("Housecall Pro twin: one job", () => {
     );
   });
 
+  it("gives a job's customer their notes as a list of notes, as the Job object documents (an estimate's stay text)", async () => {
+    const harness = setup();
+    const job = await jobFor(harness, finishedJob(harness));
+    expect((await (await harness.hcpGet(`/jobs/${job.id}`)).json()).customer.notes).toEqual([]);
+
+    await harness.hcpPut(`/customers/${job.customer.id}`, { notes: "Gate code 4411" });
+    const notes = (await (await harness.hcpGet(`/jobs/${job.id}`)).json()).customer.notes;
+    expect(notes).toEqual([{ id: expect.stringMatching(/^note_[0-9a-f]{32}$/), content: "Gate code 4411" }]);
+    expect((await (await harness.hcpGet(`/jobs/${job.id}`)).json()).customer.notes).toEqual(notes); // the same id every time
+
+    const estimates = (await (await harness.hcpGet(`/estimates?customer_id=${job.customer.id}`)).json()).estimates;
+    for (const estimate of estimates) expect(estimate.customer.notes).toBe("Gate code 4411");
+  });
+
   it("says a job is complete once its work is done, with when it started and finished", async () => {
     const harness = setup();
     const worldJob = finishedJob(harness);
