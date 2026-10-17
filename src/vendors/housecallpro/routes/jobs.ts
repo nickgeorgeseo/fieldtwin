@@ -5,7 +5,7 @@ import type { HcpJob, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
 import { jobResponse } from "./job-response.ts";
-import { pageOf, readExpand, readList, sorted } from "./lists.ts";
+import { invoiceNumberOrder, pageOf, readExpand, readList, sorted } from "./lists.ts";
 import { appointmentResponse, lineItemResponse, workStatus } from "./work.ts";
 import { readWorkFilter } from "./work-filters.ts";
 
@@ -53,6 +53,7 @@ export function jobRoutes(app: Hono, twin: Twin): void {
 const SORTABLE = ["created_at", "updated_at", "invoice_number", "id", "description", "work_status"] as const;
 const EXPANDABLE = ["attachments", "appointments"];
 
-function sortValue(job: HcpJob, by: (typeof SORTABLE)[number]): string | null {
+function sortValue(job: HcpJob, by: (typeof SORTABLE)[number]): string | number | null {
+  if (by === "invoice_number") return invoiceNumberOrder(job.invoice_number);
   return by === "work_status" ? workStatus(job.appointments) : job[by];
 }

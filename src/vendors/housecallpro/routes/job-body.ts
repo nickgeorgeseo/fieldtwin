@@ -64,11 +64,13 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
 }
 
 /** "Invoice number must be unique across all of a company's jobs in Housecall Pro." A number, as JobCreate types it. */
-function readInvoiceNumber(value: unknown, state: HcpState): string | undefined | Refusal {
-  if (value === undefined || value === null) return undefined;
+function readInvoiceNumber(sent: unknown, state: HcpState): string | undefined | Refusal {
+  if (sent === undefined || sent === null) return undefined;
+  // Digits in a string work too ("6001"), as answers write the number and Rails would read it (FIDELITY.md).
+  const value = typeof sent === "string" && /^\d+$/.test(sent) ? Number(sent) : sent;
   // A safe integer, so it prints as digits ("5000", never "1e+21") and the number after it is one more.
   if (!Number.isSafeInteger(value) || (value as number) < 1) {
-    return refuse(`invoice_number must be a whole number from 1 to ${Number.MAX_SAFE_INTEGER}, not ${JSON.stringify(value)}.`);
+    return refuse(`invoice_number must be a whole number from 1 to ${Number.MAX_SAFE_INTEGER}, not ${JSON.stringify(sent)}.`);
   }
   const taken = [...state.jobs.values()].some((job) => job.invoice_number === String(value));
   if (taken) return refuse(`invoice_number ${value} is taken: it must be unique across all of a company's jobs.`);

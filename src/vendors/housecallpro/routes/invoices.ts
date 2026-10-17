@@ -6,7 +6,7 @@ import { HCP } from "./base.ts";
 import { notFound } from "./customers.ts";
 import { amountRange, oneOf, type Test, timeRange } from "./filters.ts";
 import { dueAmount, invoiceResponse, invoiceStatus } from "./invoice-response.ts";
-import { type ListRequest, pageOf, readList, sorted } from "./lists.ts";
+import { invoiceNumberOrder, type ListRequest, pageOf, readList, sorted } from "./lists.ts";
 
 /**
  * Invoices. Get Invoices:        https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
@@ -44,6 +44,7 @@ function sortValue(invoice: HcpInvoice, by: (typeof SORTABLE)[number]): string |
   if (by === "amount") return invoiceResponse(invoice, false).amount;
   if (by === "due_amount") return dueAmount(invoice);
   if (by === "status") return invoiceStatus(invoice);
+  if (by === "invoice_number") return invoiceNumberOrder(invoice.invoice_number);
   return invoice[by];
 }
 

@@ -91,6 +91,13 @@ describe("Housecall Pro twin: listing jobs", () => {
 });
 
 describe("Housecall Pro twin: job numbers", () => {
+  it("sorts jobs by invoice_number as numbers, so 2 comes before 10", async () => {
+    const { hcpGet } = setup();
+    const jobs = (await (await hcpGet("/jobs?page_size=1000&sort_by=invoice_number&sort_direction=asc")).json()).jobs as Job[];
+    const numbers = jobs.map((job) => Number(job.invoice_number));
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+  });
+
   it("gives an invoiced job its invoice's number, the one the books and Jobber use, and later jobs the numbers after", async () => {
     const harness = setup();
     const { jobs, invoices } = harness.twin.world.history;

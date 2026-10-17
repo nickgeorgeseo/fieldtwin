@@ -77,6 +77,14 @@ export function readSort<Key extends string>(req: ListRequest, sortable: readonl
 type Sortable = string | number | null | undefined;
 
 /**
+ * An invoice_number to sort by. JobCreate types it as a number, and the twin only makes numbers, so lists sort them as
+ * numbers, 2 before 10, though answers write them as text (FIDELITY.md).
+ */
+export function invoiceNumberOrder(invoiceNumber: string): number | string {
+  return /^\d+$/.test(invoiceNumber) ? Number(invoiceNumber) : invoiceNumber;
+}
+
+/**
  * `records` sorted by `value`, which the caller reads from each record for `sort.by`. Text compares without regard to
  * case, and an empty value sorts after every other, as a Postgres database sorts NULL (the docs say neither). Ties keep
  * the order records were created in, reversed for `desc`, so every page of a list holds the same records each time.

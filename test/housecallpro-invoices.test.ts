@@ -92,6 +92,14 @@ describe("Housecall Pro twin: invoices", () => {
     expect(paidSince.every((invoice) => invoice.paid_at! >= "2026-07-01")).toBe(true);
   });
 
+  it("sorts invoices by invoice_number as numbers, so 2 comes before 10", async () => {
+    const harness = setup();
+    const numbers = (await allInvoices(harness, "&sort_by=invoice_number&sort_direction=asc")).map((invoice) =>
+      Number(invoice.invoice_number),
+    );
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+  });
+
   it("sorts invoices by amount when asked, and refuses a status it doesn't know", async () => {
     const harness = setup();
     const amounts = (await allInvoices(harness, "&sort_by=amount&sort_direction=asc")).map((invoice) => invoice.amount);

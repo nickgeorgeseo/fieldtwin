@@ -194,6 +194,16 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect(harness.twin.log.length).toBe(before);
   });
 
+  it("takes an invoice number sent as digits in a string, as every answer writes it, and refuses one that isn't a number", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: "6001" })).json();
+    expect(job.invoice_number).toBe("6001");
+    const lettered = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: "INV-6002" });
+    expect(lettered.status).toBe(422);
+    expect((await lettered.json()).error.message).toMatch(/invoice_number/);
+  });
+
   it("refuses an invoice number too large to be a whole number, so the next one can still follow it", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);
