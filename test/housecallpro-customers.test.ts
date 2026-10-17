@@ -60,6 +60,13 @@ describe("Housecall Pro twin: listing customers", () => {
     expect((await response.json()).error.message).toMatch(/sort_by.*first_name/);
   });
 
+  it("ignores an empty expand value, as it does an empty filter, but refuses one it doesn't document", async () => {
+    const { hcpGet } = setup();
+    expect((await hcpGet("/customers?expand[]=")).status).toBe(200);
+    expect((await hcpGet("/customers?expand[]=&expand[]=attachments")).status).toBe(200);
+    expect((await hcpGet("/customers?expand[]=appointments")).status).toBe(400);
+  });
+
   it("finds customers by name, email, mobile number, or address with q", async () => {
     const { twin, hcpGet } = setup();
     const person = twin.world.customers[3]!;

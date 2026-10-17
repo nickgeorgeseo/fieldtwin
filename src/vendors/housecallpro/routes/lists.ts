@@ -103,7 +103,7 @@ function compare(a: Sortable, b: Sortable): number {
  * with them. Each list documents the values it takes.
  */
 export function readExpand(req: ListRequest, allowed: readonly string[]): Set<string> | { problem: string } {
-  const asked = [...(req.queries("expand[]") ?? []), ...(req.queries("expand") ?? [])];
+  const asked = [...(req.queries("expand[]") ?? []), ...(req.queries("expand") ?? [])].filter(Boolean); // as filters ignore empties
   const unknown = asked.find((value) => !allowed.includes(value));
   if (unknown !== undefined) return { problem: `expand takes ${allowed.join(" and ")}, not "${unknown}".` };
   return new Set(asked);
