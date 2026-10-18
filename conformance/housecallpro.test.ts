@@ -111,3 +111,56 @@ describe("cases that read records the account already has", () => {
     });
   });
 });
+
+describe("cases that make customers", () => {
+  /** An account that keeps the customers it is sent, and searches and sorts them with `sort`, newest first unless asked. */
+  function keepingCustomers(sort: (a: Customer, b: Customer) => number): Target {
+    const customers: Customer[] = [];
+    return account((url, init) => {
+      if (init?.method === "POST") {
+        customers.push({ id: `cus_${customers.length + 1}`, ...JSON.parse(String(init.body)) });
+        return { status: 201, body: customers.at(-1) };
+      }
+      const q = url.searchParams.get("q") ?? "";
+      const found = customers.filter((customer) => `${customer.first_name ?? ""} ${customer.last_name ?? ""}`.includes(q));
+      return { body: { customers: url.searchParams.get("sort_by") === "last_name" ? found.sort(sort) : found.reverse() } };
+    });
+  }
+  interface Customer {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }
+
+  it("tells last names sorted by character code, capitals first, from last names sorted without regard to case", async () => {
+    const byCharacterCode = keepingCustomers(({ last_name: a = null }, { last_name: b = null }) =>
+      a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1,
+    );
+    await expect(housecallproCase("customer-sort-order").observe(byCharacterCode)).resolves.toEqual({
+      byLastNameAscending: ["B", "a", "no last name"],
+      byDefault: ["no last name", "B", "a"],
+    });
+  });
+
+  it("asks a real account again while a new customer isn't searchable yet, and records nothing if they never are", async () => {
+    const search = housecallproCase("customer-search");
+    const indexingSlowly = (searchesBeforeFound: number) => {
+      let searches = 0;
+      const pauses: number[] = [];
+      const target: Target = {
+        ...account((_, init) => {
+          if (init?.method === "POST") return { status: 201, body: { id: "cus_1" } };
+          return { body: { customers: searches++ < searchesBeforeFound ? [] : [{ id: "cus_1" }] } };
+        }),
+        pause: async (ms) => {
+          pauses.push(ms);
+        },
+      };
+      return { target, pauses };
+    };
+    const twoSearchesLate = indexingSlowly(2);
+    await expect(search.observe(twoSearchesLate.target)).resolves.toMatchObject({ email: true });
+    expect(twoSearchesLate.pauses).toEqual([2000, 2000]);
+    await expect(search.observe(indexingSlowly(Number.POSITIVE_INFINITY).target)).rejects.toThrow("can't tell how q matches");
+  });
+});

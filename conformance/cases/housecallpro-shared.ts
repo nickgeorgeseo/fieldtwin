@@ -1,4 +1,4 @@
-import { type Answer, expectOk, housecallpro, type Observation, type Observations, type Target } from "../case.ts";
+import { type Answer, expectOk, housecallpro, type Observation, type Observations, type Target, unique } from "../case.ts";
 
 /**
  * How the Housecall Pro cases boil answers down to observations. A twin and a real account hold different records,
@@ -44,4 +44,34 @@ export async function firstId(target: Target, list: string): Promise<string> {
 export function noneLike(id: string): string {
   const start = id.lastIndexOf("_") + 1;
   return id.slice(0, start) + id.slice(start).replace(/[0-9a-f]/gi, "0");
+}
+
+/** An address with every field AddressCreate requires, for the customers the cases make. Nobody lives there. */
+export const ADDRESS = { street: "1 Conformance Way", city: "Springfield", state: "IL", zip: "62701", country: "US" };
+
+/**
+ * A new customer with `fields`, named "fieldtwin conformance ..." so they are easy to find in Housecall Pro, whose API
+ * can't delete them. Notifications are off unless `fields` say otherwise, and a case gives them no way to be reached.
+ */
+export async function newCustomer(target: Target, label: string, fields: object = {}): Promise<Answer["body"]> {
+  const customer = { last_name: unique(label), notifications_enabled: false, ...fields };
+  return expectOk(await housecallpro(target, "POST", "/customers", customer), "create a customer");
+}
+
+/**
+ * Whether `found()` comes true, asking again for ten seconds on a real account, where a new record can take a moment to
+ * show in searches and lists. A twin shows it at once.
+ */
+export async function eventually(target: Target, found: () => Promise<boolean>): Promise<boolean> {
+  for (let attempt = 1; ; attempt++) {
+    if (await found()) return true;
+    if (!target.pause || attempt === 6) return false;
+    await target.pause(2000);
+  }
+}
+
+/** Lets a second pass before the next write, so the two get different times: a twin's clock moves when asked the time. */
+export async function aSecondLater(target: Target): Promise<void> {
+  await target.now();
+  await target.pause?.(1100);
 }
