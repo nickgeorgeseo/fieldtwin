@@ -140,6 +140,7 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
         apiKey: env.HOUSECALLPRO_API_KEY ?? "",
       },
       now: async () => new Date().toISOString(),
+      pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     },
   };
 }

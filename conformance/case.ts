@@ -20,6 +20,7 @@ export interface Target {
   jobber: { apiUrl: string; accessToken: string };
   housecallpro: { apiBase: string; apiKey: string }; // paths follow apiBase, as they follow https://api.housecallpro.com
   now(): Promise<string>; // the target's current time, ISO 8601
+  pause?(ms: number): Promise<void>; // lets real time pass, for a sandbox that takes a moment to show a write. A twin needs none
 }
 
 export interface ConformanceCase {
@@ -141,13 +142,29 @@ export async function housecallpro(
     },
     body: sent,
   });
-  const answer = { status: response.status, body: await response.json().catch(() => null) };
+  // The recording is made in a real account: an answer that repeats its key loses it here, before any case sees it.
+  const text = await response.text();
+  const answer = { status: response.status, body: parsed(apiKey ? text.replaceAll(apiKey, "(the API key)") : text) };
   // A 401 is about the key only when the key went alone: one naming a location may be refusing the location, so a
   // case that names one asks again with the key alone afterwards.
-  const keyAlone = options.authorization === undefined && options.companyId === undefined;
+  const keyAlone = options.authorization === undefined && options.companyId === undefined && !/[?&]location_ids/.test(path);
   const stopped = "the API key (HTTP 401). Check that HOUSECALLPRO_API_KEY is still one of the account's keys";
   if (!options.anyAnswer) refuseUnrecordable("Housecall Pro", answer, keyAlone, stopped);
   return answer;
+}
+
+function parsed(text: string): Answer["body"] {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** The body of a 2xx answer; anything else stops the case with what went wrong. */
+export function expectOk(answer: Answer, doing: string): Answer["body"] {
+  if (answer.status >= 200 && answer.status < 300) return answer.body;
+  throw new Error(`Couldn't ${doing}: HTTP ${answer.status} ${JSON.stringify(answer.body).slice(0, 300)}`);
 }
 
 /**

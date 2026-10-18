@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Answer, type ConformanceCase, faultOf, quickbooks, quickbooksQuery, type Target, unique } from "../case.ts";
+import { type Answer, type ConformanceCase, expectOk, faultOf, quickbooks, quickbooksQuery, type Target, unique } from "../case.ts";
 
 /**
  * QuickBooks Online cases that create records: a customer and an invoice or two each, in the sandbox company, under
@@ -159,10 +159,4 @@ async function invoiceFor(target: Target, customerId: string) {
       { DetailType: "SalesItemLineDetail", Amount: 100, SalesItemLineDetail: { ItemRef: { value: item.Id }, Qty: 1, UnitPrice: 100 } },
     ],
   };
-}
-
-/** The body of a 2xx answer; anything else stops the case with what went wrong. */
-function expectOk(answer: Answer, doing: string): Answer["body"] {
-  if (answer.status >= 200 && answer.status < 300) return answer.body;
-  throw new Error(`Couldn't ${doing}: HTTP ${answer.status} ${JSON.stringify(answer.body).slice(0, 300)}`);
 }
