@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { caseId, quickbooks, type Target } from "./case.ts";
+import { caseId, housecallpro, quickbooks, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { readRecordings } from "./recordings.ts";
 import { compare, observeAll, report } from "./run.ts";
@@ -49,6 +49,12 @@ describe("a twin as a target", () => {
     const cdc = CASES.find((testCase) => caseId(testCase) === "quickbooks/cdc-nothing-changed")!;
     expect(await cdc.observe(twin)).toEqual({ status: 200, groupKeys: [] });
   });
+
+  it("reaches the twin's Housecall Pro the way a real account is reached: an API key, and paths after the base URL", async () => {
+    const company = await housecallpro(target, "GET", "/company");
+    expect(company.status).toBe(200);
+    expect(typeof company.body.id).toBe("string");
+  });
 });
 
 describe("the ORDERBY case", () => {
@@ -70,6 +76,7 @@ describe("the ORDERBY case", () => {
       },
       quickbooks: { apiBase: "https://books.test/v3", realmId: "1", accessToken: "t" },
       jobber: { apiUrl: "https://jobber.test/api/graphql", accessToken: "t" },
+      housecallpro: { apiBase: "https://housecallpro.test", apiKey: "k" },
       now: async () => "2026-10-12T00:00:00Z",
     };
   }

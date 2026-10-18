@@ -7,14 +7,14 @@ import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording, readRecordings, writeRecording } from "./recordings.ts";
 import { observeAll, report } from "./run.ts";
-import { runningTwin, sandboxTarget, twinTarget } from "./targets.ts";
+import { runningTwin, SANDBOX_NAMES, sandboxTarget, twinTarget } from "./targets.ts";
 
 /**
  *   npm run conformance                   score a fresh twin of its own against the recordings: per case, per
  *                                         endpoint, and overall. FIELDTWIN_URL scores a running twin instead (the
  *                                         cases write a few records to it, and any faults it has skew the score)
- *   npm run conformance:record            run every case against the real sandboxes in your environment variables
- *                                         (see targets.ts) and save what they observed to recordings/
+ *   npm run conformance:record            run every case against the real sandboxes (and Housecall Pro account) in your
+ *                                         environment variables (see targets.ts) and save what they observed to recordings/
  *   npm run conformance:record -- --dry-run   the same, printing the observations instead of saving them. The cases
  *                                         still run, so the ones marked `writes` still create their test records
  */
@@ -48,9 +48,14 @@ async function record(dryRun: boolean): Promise<void> {
   const { target, vendors } = sandboxTarget(process.env);
   await checkTokens(target, vendors);
   const cases = CASES.filter((testCase) => vendors.includes(testCase.vendor));
-  const writes = cases.filter((testCase) => testCase.writes).map(caseId);
-  console.log(`Recording ${cases.length} cases against ${vendors.join(" and ")}.`);
-  if (writes.length) console.log(`These create records named "fieldtwin conformance ..." in the sandbox: ${writes.join(", ")}.`);
+  console.log(`Recording ${cases.length} cases against ${listed(vendors.map((vendor) => `the ${SANDBOX_NAMES[vendor]}`))}.`);
+  for (const vendor of vendors) {
+    const writes = cases.filter((testCase) => testCase.vendor === vendor && testCase.writes).map(caseId);
+    if (!writes.length) continue;
+    console.log(
+      `These create records named "fieldtwin conformance ..." in the ${SANDBOX_NAMES[vendor]}, and leave them there: ${writes.join(", ")}.`,
+    );
+  }
 
   const results = await observeAll(target, cases);
   const earlier = readRecordings();
@@ -61,7 +66,7 @@ async function record(dryRun: boolean): Promise<void> {
       const result = results[caseId(testCase)]!;
       if ("error" in result) console.log(`  ${caseId(testCase)} couldn't run: ${result.error}`);
     }
-    const name = vendor === "quickbooks" ? "QuickBooks Online sandbox company" : "Jobber developer testing account";
+    const name = SANDBOX_NAMES[vendor];
     const { recording, kept, missing } = nextRecording(earlier[vendor], vendorCases, results, new Date().toISOString(), name);
     if (kept.length) console.log(`  Kept the earlier recording of ${kept.join(", ")}.`);
     if (missing.length) console.log(`  Not recorded: ${missing.join(", ")}.`);
@@ -70,6 +75,11 @@ async function record(dryRun: boolean): Promise<void> {
     else console.log(`Saved ${Object.keys(recording.cases).length} cases to ${writeRecording(vendor, recording)}`);
   }
   if (incomplete) throw new Error("some cases couldn't run (above). Fix what they say and record again.");
+}
+
+/** "a", "a and b", or "a, b, and c". */
+function listed(items: string[]): string {
+  return items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
 /** A twin of this checkout's own on a free port, so scoring never changes yours. Stopped once the score is printed. */
