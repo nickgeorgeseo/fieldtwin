@@ -66,7 +66,8 @@ export async function twinTarget(baseUrl: string, fetchImpl: Fetch = (url, init)
     fetch: fetchImpl,
     quickbooks: { apiBase: `${baseUrl}/v3`, realmId: qbo.get("realmId") ?? "", accessToken: qboToken },
     jobber: { apiUrl: `${baseUrl}/api/graphql`, accessToken: jobberToken },
-    housecallpro: { apiBase: `${baseUrl}/housecallpro`, apiKey: "conformance" },
+    // Any key works on the twin. Not a word its answers use: an answer loses its target's key wherever it appears.
+    housecallpro: { apiBase: `${baseUrl}/housecallpro`, apiKey: "fieldtwin-conformance-key" },
     now: async () => {
       const advanced = await fetchImpl(`${baseUrl}/_twin/clock/advance`, {
         method: "POST",

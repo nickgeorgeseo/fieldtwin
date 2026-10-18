@@ -55,6 +55,13 @@ describe("a twin as a target", () => {
     expect(company.status).toBe(200);
     expect(typeof company.body.id).toBe("string");
   });
+
+  it("hands cases the twin's Housecall Pro answers as they are: its API key is in none of the names the cases give", async () => {
+    const { app: written } = createApp({ seed: 42 });
+    const twin = await twinTarget("http://twin.test", async (url, init) => written.request(url, init));
+    const created = await housecallpro(twin, "POST", "/customers", { last_name: "fieldtwin conformance kept as sent" });
+    expect(created.body.last_name).toBe("fieldtwin conformance kept as sent");
+  });
 });
 
 describe("the ORDERBY case", () => {
