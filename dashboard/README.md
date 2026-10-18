@@ -27,7 +27,7 @@ The Events and Business pages read the whole log once, then only what is new, an
 
 The control plane has no authentication, so the dashboard won't lend it to anyone else ([`lib/request-guard.ts`](lib/request-guard.ts)). It listens on 127.0.0.1, answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]` (a site that rebinds its DNS name to this machine still sends its own name), and takes changes only from its own pages (browsers send `Origin` with every POST and PUT).
 
-Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the ones the Jobber twin has today (`payInvoices`, `newClients`); Housecall Pro has none yet.
+Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the Jobber twin's (`payInvoices`, `newClients`). Housecall Pro's (`newCustomers`, `completeJobs`, `invoiceJobs`, `payInvoices`) aren't buttons yet: run them from a scenario's timeline, `POST /_twin/actions/housecallpro/<action>`, or the `twin_run_action` MCP tool.
 
 ## Working on it
 
