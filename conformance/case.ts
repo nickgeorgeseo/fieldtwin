@@ -67,23 +67,27 @@ function refuseUnrecordable(
   if (answer.status === 401 && ownToken) throw new Error(`${vendor} stopped accepting ${stoppedAccepting}`);
 }
 
-/** A QuickBooks request. `realmId` and `token` override the target's, for the cases about wrong ones. */
+/**
+ * A QuickBooks request. `realmId` and `token` override the target's, for the cases about wrong ones; `text` is a body
+ * sent as it is, for the case about one that isn't JSON.
+ */
 export async function quickbooks(
   target: Target,
   method: "GET" | "POST",
   path: string,
   body?: unknown,
-  options: RequestOptions & { realmId?: string } = {},
+  options: RequestOptions & { realmId?: string; text?: string } = {},
 ): Promise<Answer> {
   const { apiBase, realmId, accessToken } = target.quickbooks;
+  const sent = options.text ?? (body === undefined ? undefined : JSON.stringify(body));
   const response = await target.fetch(`${apiBase}/company/${options.realmId ?? realmId}/${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${options.token ?? accessToken}`,
       Accept: "application/json",
-      ...(body !== undefined && { "Content-Type": "application/json" }),
+      ...(sent !== undefined && { "Content-Type": "application/json" }),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: sent,
   });
   const answer = { status: response.status, body: await response.json().catch(() => null) };
   if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, options.token === undefined);
@@ -95,11 +99,14 @@ export function quickbooksQuery(target: Target, statement: string): Promise<Answ
   return quickbooks(target, "GET", `query?query=${encodeURIComponent(statement)}`);
 }
 
-/** A Jobber GraphQL request. `version: null` sends no version header; `token` overrides the target's. */
+/**
+ * A Jobber GraphQL request. `version: null` sends no version header; `token` overrides the target's; `text` is a body
+ * sent as it is, in place of the query and its variables, for the cases about bodies that aren't a GraphQL request.
+ */
 export async function jobber(
   target: Target,
   query: string,
-  options: RequestOptions & { variables?: Record<string, unknown>; version?: string | null } = {},
+  options: RequestOptions & { variables?: Record<string, unknown>; version?: string | null; text?: string } = {},
 ): Promise<Answer> {
   const version = options.version === undefined ? "2025-04-16" : options.version;
   const response = await target.fetch(target.jobber.apiUrl, {
@@ -109,7 +116,7 @@ export async function jobber(
       "Content-Type": "application/json",
       ...(version !== null && { "X-JOBBER-GRAPHQL-VERSION": version }),
     },
-    body: JSON.stringify({ query, variables: options.variables ?? {} }),
+    body: options.text ?? JSON.stringify({ query, variables: options.variables ?? {} }),
   });
   const answer = { status: response.status, body: await response.json().catch(() => null) };
   if (!options.anyAnswer) refuseUnrecordable("Jobber", answer, options.token === undefined);

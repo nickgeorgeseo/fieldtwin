@@ -16,6 +16,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 - Injected faults carry the headers a vendor sends with that error, through a new optional `errorHeaders` on the vendor contract: a Housecall Pro 429 has `RateLimit-Reset`, the epoch second a minute later in twin time, so backoff code that reads it can be tested.
 - The fake business has a street address, zip code, and phone number of its own (in `GET /_twin`), which Housecall Pro's `GET /company` shows. They are drawn after everything else, so every seed still makes the same customers, technicians, and history.
 
+### Fixed
+
+- Conformance recorder: the cases that send a body as it is (QuickBooks' and Jobber's `body-not-json`, and Jobber's `variables-as-a-string`) stop on an answer that says nothing about the API, as every other case does. A 429, a 502 to 504, Jobber's `THROTTLED`, or a 401 once the run's own token expired could be saved as their evidence.
+
 ## 0.4.1 - 2026-10-15
 
 Faster to watch and to query. The dashboard reads only what is new in the event log and in the changes since a checkpoint, so following a long run no longer costs the whole history at every change, and it no longer shows events a rewind undid. Your own tools can follow the log the same way, with `?after=` and the `X-Twin-Log-Position` header. Jobber queries no longer slow down as the business grows: on a 400-customer world, a page of 100 clients with their jobs and invoices answers in 3.1 ms instead of 8.1 ms.

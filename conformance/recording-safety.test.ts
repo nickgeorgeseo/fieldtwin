@@ -90,6 +90,10 @@ describe("recording against a sandbox", () => {
 describe("answers that are never evidence", () => {
   const readMissing = CASES.find((testCase) => caseId(testCase) === "quickbooks/read-missing-entity")!;
   const jobberSyntax = CASES.find((testCase) => caseId(testCase) === "jobber/syntax-error")!;
+  // The cases that send a body as it is, rather than one their request helper writes.
+  const rawBodies = ["quickbooks/body-not-json", "jobber/body-not-json", "jobber/variables-as-a-string"].map(
+    (id) => CASES.find((testCase) => caseId(testCase) === id)!,
+  );
 
   it.each([429, 502, 503, 504])(
     "stop a case when the sandbox answers HTTP %i, throttling or down, rather than record it",
@@ -97,16 +101,25 @@ describe("answers that are never evidence", () => {
       await expect(readMissing.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
       await expect(jobberSyntax.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
       await expect(housecallpro(sandboxAnswering(status), "GET", "/company")).rejects.toThrow("try again later");
+      for (const rawBody of rawBodies) {
+        await expect(rawBody.observe(sandboxAnswering(status)), caseId(rawBody)).rejects.toThrow("try again later");
+      }
     },
   );
 
   it("stop a case when Jobber says it is throttling, which it answers with HTTP 200", async () => {
     const throttled = { errors: [{ message: "Throttled", extensions: { code: "THROTTLED" } }] };
     await expect(jobberSyntax.observe(sandboxAnswering(200, throttled))).rejects.toThrow("throttling");
+    for (const rawBody of rawBodies.filter((testCase) => testCase.vendor === "jobber")) {
+      await expect(rawBody.observe(sandboxAnswering(200, throttled)), caseId(rawBody)).rejects.toThrow("throttling");
+    }
   });
 
   it("stop a case when the run's own token stops working part way, but not one that sends a bad token on purpose", async () => {
     await expect(readMissing.observe(sandboxAnswering(401))).rejects.toThrow("get a fresh one");
+    for (const rawBody of rawBodies) {
+      await expect(rawBody.observe(sandboxAnswering(401)), caseId(rawBody)).rejects.toThrow("get a fresh one");
+    }
     const badToken = CASES.find((testCase) => caseId(testCase) === "quickbooks/unknown-access-token")!;
     await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
   });
