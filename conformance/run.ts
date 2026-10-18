@@ -1,4 +1,4 @@
-import { type ConformanceCase, caseId, type Observation, type Observations, type Target } from "./case.ts";
+import { type ConformanceCase, caseId, type Observation, type Observations, type Target, VENDORS } from "./case.ts";
 import type { Recording } from "./recordings.ts";
 
 /** What each case observed, by caseId. A case that couldn't finish records why, instead of observations. */
@@ -36,12 +36,16 @@ export function compare(recorded: Observations, twin: Observations): Comparison 
   return { matched: keys.length - differences.length, total: keys.length, differences };
 }
 
+/** Every vendor's name takes the room of the longest, so case names line up whichever vendor they belong to. */
+const VENDOR_WIDTH = Math.max(...VENDORS.map((vendor) => vendor.length));
+
 /**
  * A plain-text fidelity report: each case with its score and differences, then a score per endpoint and overall.
  * Cases nobody has recorded yet are listed, so the gaps stay visible.
  */
 export function report(cases: ConformanceCase[], twin: Results, recordings: Partial<Record<ConformanceCase["vendor"], Recording>>): string {
   const lines: string[] = [];
+  // Per vendor and endpoint: two vendors may well have an endpoint by the same name.
   const byEndpoint = new Map<string, { matched: number; total: number }>();
   let matched = 0;
   let total = 0;
@@ -50,7 +54,7 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
     const recording = recordings[testCase.vendor];
     const recorded = recording?.cases[testCase.name];
     const observed = twin[caseId(testCase)] ?? { error: "not run" };
-    const label = `${testCase.vendor.padEnd(10)} ${testCase.name.padEnd(34)}`;
+    const label = `${testCase.vendor.padEnd(VENDOR_WIDTH)} ${testCase.name.padEnd(34)}`;
     if (!recorded) {
       lines.push(`${label} not recorded yet`);
       continue;
@@ -59,17 +63,18 @@ export function report(cases: ConformanceCase[], twin: Results, recordings: Part
     const result = "error" in observed ? { matched: 0, total: Object.keys(recorded).length, differences: [] } : compare(recorded, observed);
     matched += result.matched;
     total += result.total;
-    const endpoint = byEndpoint.get(testCase.endpoint) ?? { matched: 0, total: 0 };
-    byEndpoint.set(testCase.endpoint, { matched: endpoint.matched + result.matched, total: endpoint.total + result.total });
+    const where = `${testCase.vendor.padEnd(VENDOR_WIDTH)} ${testCase.endpoint}`;
+    const endpoint = byEndpoint.get(where) ?? { matched: 0, total: 0 };
+    byEndpoint.set(where, { matched: endpoint.matched + result.matched, total: endpoint.total + result.total });
     if ("error" in observed) lines.push(`${label} 0/${result.total}  the twin couldn't run it: ${observed.error}`);
     else lines.push(`${label} ${result.matched}/${result.total}${result.differences.length ? "" : "  matches"}`);
     for (const { key, recorded: real, twin: ours } of result.differences) {
-      lines.push(`${" ".repeat(46)}${key}: real ${shown(real)}, twin ${shown(ours)}   (FIDELITY.md: ${testCase.fidelity})`);
+      lines.push(`${" ".repeat(label.length + 1)}${key}: real ${shown(real)}, twin ${shown(ours)}   (FIDELITY.md: ${testCase.fidelity})`);
     }
   }
 
   if (byEndpoint.size) lines.push("", "By endpoint:");
-  for (const [endpoint, score] of byEndpoint) lines.push(`  ${endpoint.padEnd(34)} ${percent(score)}`);
+  for (const [where, score] of byEndpoint) lines.push(`  ${where.padEnd(VENDOR_WIDTH + 1 + 34)} ${percent(score)}`);
   lines.push("", `Fidelity: ${total ? percent({ matched, total }) : "nothing recorded yet. Run npm run conformance:record."}`);
   return lines.join("\n");
 }

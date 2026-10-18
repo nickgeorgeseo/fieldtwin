@@ -18,11 +18,11 @@ The **test** ([`conformance.test.ts`](conformance.test.ts)) runs every case agai
 The **score** (`npm run conformance`) is the same comparison as a report: each case, each difference with its FIDELITY.md row, a score per endpoint, and one overall.
 
 ```text
-quickbooks read-missing-entity                1/3
-                                              status: real 404, twin 400   (FIDELITY.md: HTTP status of 610 on a read)
+quickbooks   read-missing-entity                1/3
+                                                status: real 404, twin 400   (FIDELITY.md: HTTP status of 610 on a read)
 ...
 By endpoint:
-  GET /customer/{id}                 1/3 observations match (33%)
+  quickbooks   GET /customer/{id}                 1/3 observations match (33%)
 
 Fidelity: 41/44 observations match (93%)
 ```

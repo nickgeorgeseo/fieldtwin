@@ -229,7 +229,7 @@ describe("npm run conformance", () => {
     const tsx = import.meta.resolve("tsx"); // the outer process finds tsx wherever it runs; the twin it starts must too
     const run = spawnSync(process.execPath, ["--import", tsx, cli, "score"], { cwd: tmpdir(), encoding: "utf8", timeout: 30_000 });
     expect(run.stderr).not.toContain("didn't start");
-    expect(run.stdout).toContain("quickbooks cdc-nothing-changed");
+    expect(run.stdout).toMatch(/^quickbooks +cdc-nothing-changed +not recorded yet$/m);
     expect(run.status).toBe(0);
   }, 30_000);
 });
