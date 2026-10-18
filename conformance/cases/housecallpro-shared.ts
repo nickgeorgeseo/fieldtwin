@@ -1,9 +1,9 @@
 import { type Answer, expectOk, housecallpro, type Observation, type Observations, type Target, unique } from "../case.ts";
 
 /**
- * How the Housecall Pro cases boil answers down to observations. A twin and a real account hold different records,
- * with different ids, names, and times, so cases keep only what can't differ: statuses, the shape of a body, and
- * yes-or-no facts.
+ * What the Housecall Pro cases share: how they boil answers down to observations, and the records they make. A twin
+ * and a real account hold different records, with different ids, names, and times, so cases keep only what can't
+ * differ: statuses, the shape of a body, and yes-or-no facts.
  */
 
 /** A body's shape without its values: each key, in order, with the kind of value it holds ("string", a list, ...). */
@@ -74,4 +74,41 @@ export async function eventually(target: Target, found: () => Promise<boolean>):
 export async function aSecondLater(target: Target): Promise<void> {
   await target.now();
   await target.pause?.(1100);
+}
+
+interface JobsCustomer {
+  id: string;
+  addressId: string;
+}
+const jobsCustomers = new WeakMap<Target, Promise<JobsCustomer>>();
+
+/**
+ * The customer every job the cases make is for, with an address and notes, made the first time a case asks: one per
+ * run, since Housecall Pro's API can delete neither jobs nor customers.
+ */
+export function jobsCustomer(target: Target): Promise<JobsCustomer> {
+  let made = jobsCustomers.get(target);
+  if (!made) {
+    made = newCustomer(target, "jobs", { notes: "fieldtwin conformance notes", addresses: [ADDRESS] }).then((customer) => {
+      const addressId = customer.addresses?.[0]?.id;
+      if (typeof addressId !== "string")
+        throw new Error("The new customer came back without the address sent with them, so no job can be made.");
+      return { id: customer.id, addressId };
+    });
+    jobsCustomers.set(target, made);
+  }
+  return made;
+}
+
+/** A new job for the jobs customer, at their address, with `fields` from JobCreate. */
+export async function newJob(target: Target, fields: object = {}): Promise<Answer["body"]> {
+  const { id, addressId } = await jobsCustomer(target);
+  return expectOk(await housecallpro(target, "POST", "/jobs", { customer_id: id, address_id: addressId, ...fields }), "create a job");
+}
+
+/** Whether the jobs customer's jobs, filtered by `query`, include the job with `id`. */
+export async function customersJobsInclude(target: Target, id: string, query = ""): Promise<boolean> {
+  const customer = await jobsCustomer(target);
+  const answer = expectOk(await housecallpro(target, "GET", `/jobs?customer_id=${customer.id}&page_size=100${query}`), "list jobs");
+  return (answer.jobs ?? []).some((job: { id: string }) => job.id === id);
 }

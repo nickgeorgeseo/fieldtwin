@@ -1,4 +1,5 @@
 import { housecallproCases } from "./housecallpro.ts";
+import { housecallproJobWriteCases } from "./housecallpro-job-writes.ts";
 import { housecallproRecordCases } from "./housecallpro-records.ts";
 import { housecallproWriteCases } from "./housecallpro-writes.ts";
 import { jobberCases } from "./jobber.ts";
@@ -13,4 +14,5 @@ export const CASES = [
   ...housecallproCases,
   ...housecallproRecordCases,
   ...housecallproWriteCases,
+  ...housecallproJobWriteCases,
 ];
