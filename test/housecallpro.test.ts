@@ -127,4 +127,38 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
 
     expect((await qboGet("/customer/1")).status).toBe(200);
   });
+
+  it("puts RateLimit-Reset on an injected 429, as Housecall Pro documents: the epoch second a minute later, in twin time", async () => {
+    const { twin, hcpGet } = setup();
+    twin.faultRules = [{ name: "throttled", vendor: "housecallpro", rate: 1, effect: { status: 429 } }];
+    const response = await hcpGet("/jobs");
+    expect(response.status).toBe(429);
+    expect(response.headers.get("X-Twin-Fault")).toBe("throttled");
+    expect(response.headers.get("RateLimit-Reset")).toBe(String(Date.parse("2026-07-13T11:01:00Z") / 1000));
+
+    twin.clock.advance(90_000);
+    expect((await hcpGet("/jobs")).headers.get("RateLimit-Reset")).toBe(String(Date.parse("2026-07-13T11:02:30Z") / 1000));
+  });
+
+  it("puts RateLimit-Reset on a 429 whose answer is lost after the work is done, too", async () => {
+    const { twin, hcpPost } = setup();
+    twin.faultRules = [{ name: "lost", vendor: "housecallpro", method: "POST", rate: 1, effect: { status: 429, lostResponse: true } }];
+    const before = twin.log.length;
+    const response = await hcpPost("/customers", { first_name: "Throttled" });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("RateLimit-Reset")).toBe(String(Date.parse("2026-07-13T11:01:00Z") / 1000));
+    expect(twin.log.length).toBe(before + 1); // the customer was created all the same
+  });
+
+  it("sends RateLimit-Reset only with a 429, and only from Housecall Pro", async () => {
+    const { twin, hcpGet, qboGet } = setup();
+    twin.faultRules = [
+      { name: "down", vendor: "housecallpro", rate: 1, effect: { status: 503 } },
+      { name: "qbo-throttled", vendor: "quickbooks", rate: 1, effect: { status: 429 } },
+    ];
+    expect((await hcpGet("/jobs")).headers.get("RateLimit-Reset")).toBeNull();
+    const qbo = await qboGet("/customer/1");
+    expect(qbo.status).toBe(429);
+    expect(qbo.headers.get("RateLimit-Reset")).toBeNull();
+  });
 });

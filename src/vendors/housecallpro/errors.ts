@@ -20,6 +20,17 @@ export function hcpUnauthorized(message: string): { message: string } {
   return { message };
 }
 
+/**
+ * "429 responses will include a header (RateLimit-Reset) with the time (in epoch format) that the user rate limit will
+ * be reset" (https://docs.housecallpro.com/). The docs give no window, so the twin says a minute after the request,
+ * as QuickBooks asks clients to wait, in epoch seconds of twin time (FIDELITY.md).
+ */
+export function hcpErrorHeaders(status: number, nowMs: number): Record<string, string> {
+  return status === 429 ? { "RateLimit-Reset": String(Math.ceil((nowMs + RATE_LIMIT_WINDOW_MS) / 1000)) } : {};
+}
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 /** The body an injected fault, or the twin's own trouble, answers with. */
 export function hcpErrorForStatus(status: number, message: string): HcpError | { message: string } {
   return status === 401 ? hcpUnauthorized(message) : hcpError(message);

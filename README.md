@@ -77,7 +77,7 @@ fieldtwin is built by Nick George. Its page, with both demo videos, is at [nickg
 | Records | Customers, items, invoices, payments | Clients, jobs, visits, quotes, invoices, users | Customers and their addresses, employees, jobs with appointments and line items, estimates, invoices |
 | Reading | By Id; the query language (`WHERE` with `=`, `<`, `>`, `LIKE`, `IN`, joined by `AND`; `ORDERBY`; paging; `COUNT(*)`); change data capture | GraphQL, with Relay pagination both ways, encoded ids, and dated API versions | REST lists with `page` and `page_size`, sorting, customer search, and the documented job and invoice filters |
 | Writing | Customers and invoices created and updated with SyncTokens (5010 when stale), sparse or full; payments created and applied; `requestid` for safe retries | `clientCreate` | Customers created and updated, addresses added; jobs created, scheduled, and dispatched |
-| Rate limits | 500 requests a minute per company: HTTP 429 | The query-cost budget: 10,000 points refilling 500 a second, `THROTTLED` | Not published, so only through fault rules |
+| Rate limits | 500 requests a minute per company: HTTP 429 | The query-cost budget: 10,000 points refilling 500 a second, `THROTTLED` | Not published: fault rules make 429s, with `RateLimit-Reset` |
 | Webhooks | CloudEvents, signed, retried on Intuit's schedule | HMAC-signed, delivered at least once, retried | The whole record, signed with `Api-Timestamp` and `Api-Signature`, tried once |
 | OAuth 2.0 | Authorize, tokens, refresh (rolling 100 days), revoke | Authorize with PKCE, tokens, refresh tokens that rotate | Authorize, tokens (30 days), refresh tokens that rotate; API keys as `Authorization: Token` |
 
@@ -373,7 +373,7 @@ faults:
     effect: { status: 429, message: "ThrottleExceeded" }
 ```
 
-Injected failures come back in the vendor's own error format and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs. An `effect` can also slow a request down (`latencyMs`), or lose its answer: with `lostResponse: true` the twin does the work first and then answers with the error anyway, the way a gateway timeout hides a write that succeeded. That is the failure a retried write has to survive without happening twice (for QuickBooks, send a `requestid`):
+Injected failures come back in the vendor's own error format, with the headers it sends (a Housecall Pro 429 has `RateLimit-Reset`, in twin time), and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs. An `effect` can also slow a request down (`latencyMs`), or lose its answer: with `lostResponse: true` the twin does the work first and then answers with the error anyway, the way a gateway timeout hides a write that succeeded. That is the failure a retried write has to survive without happening twice (for QuickBooks, send a `requestid`):
 
 ```yaml
   - name: qbo-lost-answers

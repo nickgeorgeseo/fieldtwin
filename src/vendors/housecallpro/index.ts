@@ -1,5 +1,5 @@
 import type { VendorTwin } from "../../core/vendor-twin.ts";
-import { hcpErrorForStatus } from "./errors.ts";
+import { hcpErrorForStatus, hcpErrorHeaders } from "./errors.ts";
 import { describeHcpEvent } from "./events.ts";
 import { HCP } from "./routes/base.ts";
 import { housecallproRoutes } from "./routes/index.ts";
@@ -18,4 +18,5 @@ export const housecallproTwin: VendorTwin<HcpState> = {
   routes: housecallproRoutes,
   webhooks: housecallproWebhooks,
   errorBody: (status, message) => hcpErrorForStatus(status, message),
+  errorHeaders: (status, twin) => hcpErrorHeaders(status, twin.clock.nowMs()),
 };

@@ -42,6 +42,12 @@ export interface VendorTwin<State = unknown> {
   errorBody(status: number, message: string, twin: Twin): unknown;
 
   /**
+   * Headers the vendor sends with an error of this status, like Housecall Pro's `RateLimit-Reset` on a 429, so an
+   * injected fault carries them too. Optional: a vendor without it sends only the body.
+   */
+  errorHeaders?(status: number, twin: Twin): Record<string, string>;
+
+  /**
    * What a scenario timeline can make happen in this vendor, by name ("newClients", "payInvoices").
    * Optional: a vendor without actions simply can't be scripted. See "Scenario timelines" in ARCHITECTURE.md.
    */

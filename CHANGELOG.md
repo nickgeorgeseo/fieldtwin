@@ -12,6 +12,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
   - Invoices, paid or open, filtered as Get Invoices documents, and estimates, approved or awaiting a response.
   - Webhooks (`customer.created`, `customer.updated`, `job.created`, `job.scheduled`) that carry the whole record, signed with `Api-Timestamp` and `Api-Signature` as documented.
   - API keys (`Authorization: Token <key>`), and an OAuth 2.0 server with 30-day access tokens and rotating refresh tokens.
+- Injected faults carry the headers a vendor sends with that error, through a new optional `errorHeaders` on the vendor contract: a Housecall Pro 429 has `RateLimit-Reset`, the epoch second a minute later in twin time, so backoff code that reads it can be tested.
 - The fake business has a street address, zip code, and phone number of its own (in `GET /_twin`), which Housecall Pro's `GET /company` shows. They are drawn after everything else, so every seed still makes the same customers, technicians, and history.
 
 ## 0.4.1 - 2026-10-15

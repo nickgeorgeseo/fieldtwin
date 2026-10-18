@@ -7,7 +7,8 @@ import type { VendorTwin } from "../core/vendor-twin.ts";
  * Wraps a vendor's routes and makes them misbehave according to twin.faultRules.
  *
  * Vendor code never knows this exists. The middleware asks the vendor for an error body
- * in its own format, so a 429 from the QuickBooks twin looks like a QuickBooks 429.
+ * in its own format, and any headers it sends with one, so a 429 from the QuickBooks twin
+ * looks like a QuickBooks 429 and one from Housecall Pro carries its RateLimit-Reset.
  *
  * Rules layer: every rule that matches the request gets its own roll of the dice, in order.
  * Latencies add up, and the first error that fires answers the request.
@@ -26,7 +27,7 @@ export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandl
         const answer = new Response(JSON.stringify(vendor.errorBody(rule.effect.status, message, twin)), {
           status: rule.effect.status,
           // X-Twin-Fault, so you can tell injected failures from real bugs
-          headers: { "Content-Type": "application/json", "X-Twin-Fault": rule.name },
+          headers: { ...vendor.errorHeaders?.(rule.effect.status, twin), "Content-Type": "application/json", "X-Twin-Fault": rule.name },
         });
         if (!rule.effect.lostResponse) return answer;
         await next(); // the work happens, events and all
