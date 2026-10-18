@@ -11,6 +11,7 @@ const VENDORS = [
   { vendor: "", label: "All vendors" },
   { vendor: "quickbooks", label: "QuickBooks" },
   { vendor: "jobber", label: "Jobber" },
+  { vendor: "housecallpro", label: "Housecall Pro" },
 ];
 const SOURCES = [
   { source: "api", label: "Your code" },

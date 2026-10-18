@@ -1,5 +1,5 @@
-import type { CustomerRow, InvoiceRow } from "@/lib/match-books.ts";
-import { CUSTOMER_STATUSES, INVOICE_STATUSES, money } from "./book-statuses.ts";
+import type { CustomerRow, FieldService, InvoiceRow } from "@/lib/match-books.ts";
+import { customerStatuses, FIELD_SERVICES, invoiceStatuses, money } from "./book-statuses.ts";
 import { Badge } from "./ui.tsx";
 
 const CELL = "px-3 py-2";
@@ -19,17 +19,19 @@ function Head({ headings }: { headings: string[] }) {
   );
 }
 
-export function CustomerTable({ rows }: { rows: CustomerRow[] }) {
+export function CustomerTable({ service, rows }: { service: FieldService; rows: CustomerRow[] }) {
+  const { name, customer } = FIELD_SERVICES[service];
+  const statuses = customerStatuses(name);
   return (
     <table className="w-full text-left text-sm">
-      <Head headings={["Email", "Jobber client", "QuickBooks customer", ""]} />
+      <Head headings={["Email", `${name} ${customer}`, "QuickBooks customer", ""]} />
       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
         {rows.map((row) => {
-          const { label, tone } = CUSTOMER_STATUSES[row.status];
+          const { label, tone } = statuses[row.status];
           return (
-            <tr key={`${row.email}-${row.jobber?.id}-${row.quickbooks?.id}`}>
+            <tr key={`${row.email}-${row.field?.id}-${row.quickbooks?.id}`}>
               <td className={`${CELL} font-mono text-xs`}>{row.email || <span className="text-zinc-400">no email</span>}</td>
-              <td className={CELL}>{row.jobber ? row.jobber.name : MISSING}</td>
+              <td className={CELL}>{row.field ? row.field.name : MISSING}</td>
               <td className={CELL}>
                 {row.quickbooks ? (
                   <>
@@ -50,19 +52,21 @@ export function CustomerTable({ rows }: { rows: CustomerRow[] }) {
   );
 }
 
-export function InvoiceTable({ rows }: { rows: InvoiceRow[] }) {
+export function InvoiceTable({ service, rows }: { service: FieldService; rows: InvoiceRow[] }) {
+  const { name, customer } = FIELD_SERVICES[service];
+  const statuses = invoiceStatuses(name);
   return (
     <table className="w-full text-left text-sm">
-      <Head headings={["Number", "Jobber client", "Jobber total", "Jobber", "QuickBooks customer", "QuickBooks total", "Balance", ""]} />
+      <Head headings={["Number", `${name} ${customer}`, `${name} total`, name, "QuickBooks customer", "QuickBooks total", "Balance", ""]} />
       <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
         {rows.map((row) => {
-          const { label, tone } = INVOICE_STATUSES[row.status];
+          const { label, tone } = statuses[row.status];
           return (
-            <tr key={row.number}>
+            <tr key={`${row.number}-${row.quickbooks?.id}`}>
               <td className={`${CELL} font-mono text-xs`}>#{row.number}</td>
-              <td className={CELL}>{row.jobber ? row.jobber.client : MISSING}</td>
-              <td className={CELL}>{money(row.jobber?.total)}</td>
-              <td className={CELL}>{row.jobber && (row.jobber.paid ? <Badge tone="green">paid</Badge> : <Badge>open</Badge>)}</td>
+              <td className={CELL}>{row.field ? row.field.customer : MISSING}</td>
+              <td className={CELL}>{money(row.field?.total)}</td>
+              <td className={CELL}>{row.field && (row.field.paid ? <Badge tone="green">paid</Badge> : <Badge>open</Badge>)}</td>
               <td className={CELL}>{row.quickbooks ? row.quickbooks.customer : MISSING}</td>
               <td className={CELL}>{money(row.quickbooks?.total)}</td>
               <td className={CELL}>{money(row.quickbooks?.balance)}</td>

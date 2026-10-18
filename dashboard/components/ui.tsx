@@ -62,6 +62,7 @@ const BADGE_TONES = {
   sky: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
   amber: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   red: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+  pink: "bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-300",
 };
 
 export type BadgeTone = keyof typeof BADGE_TONES;
@@ -79,6 +80,7 @@ export function VendorBadge({ vendor }: { vendor: string }) {
   const known: Record<string, { tone: BadgeTone; label: string }> = {
     quickbooks: { tone: "green", label: "QuickBooks" },
     jobber: { tone: "sky", label: "Jobber" },
+    housecallpro: { tone: "pink", label: "Housecall Pro" },
   };
   const { tone, label } = known[vendor] ?? { tone: "neutral" as const, label: vendor };
   return <Badge tone={tone}>{label}</Badge>;

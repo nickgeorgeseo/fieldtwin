@@ -1,7 +1,7 @@
 import type { TwinEvent } from "./twin-types.ts";
 
 /**
- * Both vendors' records as they stand now, rebuilt from the event log. Every "...Created" and "...Updated" event
+ * Every vendor's records as they stand now, rebuilt from the event log. Every "...Created" and "...Updated" event
  * carries the whole record (src/vendors/<vendor>/events.ts), so the last one for an Id is the record now. Reading
  * the log changes nothing in the twin: reading through the vendor APIs would spend their rate limits and draw from
  * the seeded faults your own code meets.
@@ -39,9 +39,29 @@ export interface JobberInvoice {
   paidAt: string | null;
 }
 
+export interface HcpCustomer {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company: string | null;
+  email: string | null;
+  mobile_number: string | null;
+  home_number: string | null;
+  work_number: string | null;
+}
+
+export interface HcpInvoice {
+  id: string;
+  invoice_number: string; // its job's, and the number the books carry, as Jobber's is
+  customer_id: string;
+  items: { unit_price: number; quantity: number }[]; // unit prices in cents
+  paid_at: string | null;
+}
+
 export interface Books {
   quickbooks: { customers: QboCustomer[]; invoices: QboInvoice[] };
   jobber: { clients: JobberClient[]; invoices: JobberInvoice[] };
+  housecallpro: { customers: HcpCustomer[]; invoices: HcpInvoice[] };
 }
 
 export function readBooks(events: TwinEvent[]): Books {
@@ -50,7 +70,17 @@ export function readBooks(events: TwinEvent[]): Books {
   return {
     quickbooks: { customers: all<QboCustomer>("quickbooks", "customer"), invoices: all<QboInvoice>("quickbooks", "invoice") },
     jobber: { clients: all<JobberClient>("jobber", "client"), invoices: all<JobberInvoice>("jobber", "invoice") },
+    housecallpro: { customers: all<HcpCustomer>("housecallpro", "customer"), invoices: all<HcpInvoice>("housecallpro", "invoice") },
   };
+}
+
+/**
+ * A Housecall Pro line in cents, as the twin works it out (src/vendors/housecallpro/amounts.ts): the quantity, counted
+ * in hundredths, times the unit price in cents, to the nearest cent, half a cent up. Multiplying the quantity as it is
+ * would round some half cents down: 2.01 × 3450 is 6934.4999... in floating point.
+ */
+export function hcpLineCents({ quantity, unit_price }: { quantity: number; unit_price: number }): number {
+  return Math.round((Math.round(quantity * 100) * unit_price) / 100);
 }
 
 /** "quickbooks:customer" → Id → the customer as its latest event left it. */

@@ -1,6 +1,6 @@
 # fieldtwin dashboard
 
-A web dashboard for a running fieldtwin. Drive the twin from a browser, and watch what your code or agent does to Jobber and QuickBooks while it runs.
+A web dashboard for a running fieldtwin. Drive the twin from a browser, and watch what your code or agent does to Jobber, Housecall Pro, and QuickBooks while it runs.
 
 ```bash
 npm start                                   # in the project folder: the twin, at http://localhost:4010
@@ -15,19 +15,19 @@ cd dashboard && npm ci && npm run dev       # in another terminal: the dashboard
 |---|---|
 | **Control room** | The company, its twin time in its own time zone, and how the twin is set up. Move the clock, with what the scenario has scheduled next. Load a ready-made scenario or your own YAML, and reset. Make Jobber customers pay or new clients call in. Switch between any-token and real OAuth. Mark checkpoints, list what changed since (everything, or only what your code did), download the log since one, and rewind. Set fault rules from presets, and webhook subscriptions, and watch each delivery: its tries, the last answer, and the fault that duplicated or delayed it |
 | **Events** | The event log as it grows, newest first. Filter by vendor and by who made each change, search for a name or Id, pause. Each event opens to the whole record it carries |
-| **Business** | Jobber and QuickBooks side by side. Customers matched by email and invoices by number, each marked with how the systems agree: the same, spelled differently, inactive in the books, only in one, a payment not recorded, a paid invoice never booked. Load `mismatched-books`, then run `npm run example:sync` and watch the red go |
+| **Business** | QuickBooks side by side with a field-service system, Jobber or Housecall Pro. Customers matched by email and invoices by number, as the seeded books carry the field-service system's numbers, each marked with how the systems agree: the same, spelled differently, inactive in the books, only in one, a payment not recorded, a paid invoice never booked, totals that differ. Load `mismatched-books`, then run `npm run example:sync` and watch Jobber's red go |
 
 ## How it reaches the twin
 
 Like `examples/`, the dashboard is a client of the twin and imports nothing from `src/` (`test/import-boundaries.test.ts` checks). Its pages call `/api/twin/...`, which the dashboard's server forwards to the twin's `/_twin/...` control plane and nowhere else ([`lib/forward.ts`](lib/forward.ts)).
 
-It never calls the vendor APIs. The Business page rebuilds both vendors' records from the event log instead, since every event carries the whole record it changed ([`lib/books.ts`](lib/books.ts)). Reading through the vendor APIs would spend their rate limits and draw from the seeded faults your own code meets, so watching would change what you're watching.
+It never calls the vendor APIs. The Business page rebuilds every vendor's records from the event log instead, since every event carries the whole record it changed ([`lib/books.ts`](lib/books.ts)). Reading through the vendor APIs would spend their rate limits and draw from the seeded faults your own code meets, so watching would change what you're watching.
 
 The Events and Business pages read the whole log once, then only what is new, and the control room does the same with the changes since a checkpoint: each read sends back where the last one ended (`?after=`, from its `X-Twin-Log-Position` header), so following a long run costs what changes rather than everything every time it grows. When the log is no longer the history that position is in (a reset, a rewind, a scenario, or a restarted twin), the twin answers 409 and the page reads it again from the start ([`lib/follow.ts`](lib/follow.ts)).
 
 The control plane has no authentication, so the dashboard won't lend it to anyone else ([`lib/request-guard.ts`](lib/request-guard.ts)). It listens on 127.0.0.1, answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]` (a site that rebinds its DNS name to this machine still sends its own name), and takes changes only from its own pages (browsers send `Origin` with every POST and PUT).
 
-Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the ones the Jobber twin has today (`payInvoices`, `newClients`).
+Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the ones the Jobber twin has today (`payInvoices`, `newClients`); Housecall Pro has none yet.
 
 ## Working on it
 
