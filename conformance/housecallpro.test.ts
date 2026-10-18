@@ -61,3 +61,53 @@ describe("recording a Housecall Pro account", () => {
     await expect(unknownLocation.observe(keyDeletedPartWay)).rejects.toThrow("stopped accepting the API key");
   });
 });
+
+describe("cases that read records the account already has", () => {
+  const empty = account(() => ({ body: { customers: [], jobs: [], invoices: [], estimates: [] } }));
+
+  it.each([
+    "customer-not-found",
+    "job-not-found",
+    "invoice-not-found",
+    "estimate-not-found",
+    "job-for-unknown-customer",
+    "invoice-number-sort",
+    "multi-visit-schedule",
+    "amount-due-in-cents",
+    "invoice-number-is-job-number",
+    "invoice-items-are-job-lines",
+  ])("%s records nothing from an account without those records, which could never match the twin's", async (name) => {
+    await expect(housecallproCase(name).observe(empty)).rejects.toThrow("can't tell");
+  });
+
+  it("tells job numbers sorted as text from numbers sorted as numbers, and can't tell from numbers as long as each other", async () => {
+    const sort = housecallproCase("invoice-number-sort");
+    const numbered = (...numbers: string[]) => account(() => ({ body: { jobs: numbers.map((invoice_number) => ({ invoice_number })) } }));
+    await expect(sort.observe(numbered("1", "10", "2"))).resolves.toEqual({ sortedAs: "text" });
+    await expect(sort.observe(numbered("1", "2", "10"))).resolves.toEqual({ sortedAs: "numbers" });
+    await expect(sort.observe(numbered("101", "102"))).rejects.toThrow("can't tell");
+  });
+
+  it("tells amount_due read as dollars from amount_due read as cents", async () => {
+    const invoice = { id: "invoice_1", due_amount: 64100 };
+    const readingDollars = account((url) => {
+      const [min, max] = ["amount_due_min", "amount_due_max"].map((name) => url.searchParams.get(name));
+      const found = min === null || (Number(min) * 100 <= invoice.due_amount && Number(max) * 100 >= invoice.due_amount);
+      return { body: { invoices: found ? [invoice] : [] } };
+    });
+    await expect(housecallproCase("amount-due-in-cents").observe(readingDollars)).resolves.toEqual({ readAs: "dollars" });
+  });
+
+  it("tells a schedule that ends with the first of two visits from one that runs to the last", async () => {
+    const visit = (day: string) => ({ start_time: `2026-07-0${day}T15:00:00Z`, end_time: `2026-07-0${day}T17:00:00Z` });
+    const schedule = {
+      scheduled_start: "2026-07-01T15:00:00Z",
+      scheduled_end: "2026-07-01T17:00:00Z",
+      appointments: [visit("1"), visit("2")],
+    };
+    const endingEarly = account(() => ({ body: { jobs: [{ schedule }] } }));
+    await expect(housecallproCase("multi-visit-schedule").observe(endingEarly)).resolves.toEqual({
+      scheduleRunsFromFirstVisitToLast: false,
+    });
+  });
+});
