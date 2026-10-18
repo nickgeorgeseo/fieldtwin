@@ -492,7 +492,7 @@ test/          tests by vendor and area, plus core and the architecture guards
 
 ## Contributing
 
-Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row; every vendor folder has the same shape, so once you've read one you can read them all. If you have a QuickBooks sandbox company or a Jobber testing account, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
+Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row; every vendor folder has the same shape, so once you've read one you can read them all. If you have a QuickBooks sandbox company, a Jobber testing account, or a Housecall Pro account on the MAX plan that you keep for testing, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
 
 Where it's going: more Jobber writes as their inputs reach the public docs, recordings from real sandboxes, more of Housecall Pro, then more vendors (Samsara or Motive, EDI trading partners) and a benchmark for dispatch and operations agents. [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) has the roadmap.
 
