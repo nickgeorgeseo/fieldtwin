@@ -63,18 +63,7 @@ export const jobberCases: ConformanceCase[] = [
     vendor: "jobber",
     endpoint: "POST /api/graphql",
     fidelity: "A body that isn't a GraphQL request",
-    async observe(target) {
-      const response = await target.fetch(target.jobber.apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${target.jobber.accessToken}`,
-          "Content-Type": "application/json",
-          "X-JOBBER-GRAPHQL-VERSION": "2025-04-16",
-        },
-        body: "{not json",
-      });
-      return answerOf({ status: response.status, body: await response.json().catch(() => null) });
-    },
+    observe: async (target) => answerOf(await jobber(target, "", { text: "{not json" })),
   },
   {
     name: "variables-as-a-string",
@@ -82,16 +71,8 @@ export const jobberCases: ConformanceCase[] = [
     endpoint: "POST /api/graphql",
     fidelity: "A body that isn't a GraphQL request",
     async observe(target) {
-      const response = await target.fetch(target.jobber.apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${target.jobber.accessToken}`,
-          "Content-Type": "application/json",
-          "X-JOBBER-GRAPHQL-VERSION": "2025-04-16",
-        },
-        body: JSON.stringify({ query: "query First($n: Int) { clients(first: $n) { totalCount } }", variables: '{"n": 1}' }),
-      });
-      return answerOf({ status: response.status, body: await response.json().catch(() => null) });
+      const text = JSON.stringify({ query: "query First($n: Int) { clients(first: $n) { totalCount } }", variables: '{"n": 1}' });
+      return answerOf(await jobber(target, "", { text }));
     },
   },
   {

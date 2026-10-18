@@ -1,11 +1,11 @@
-import { jobber, quickbooks, type Target } from "./case.ts";
+import { housecallpro, jobber, quickbooks, type Target, type Vendor } from "./case.ts";
 
 /**
  * Before recording anything, make sure each sandbox accepts its token and its URL is right. Tokens last an hour,
  * and a recording made with a dead one is 401s from start to finish: committed, it would fail every case as if the
  * twin were wrong.
  */
-export async function checkTokens(target: Target, vendors: ("quickbooks" | "jobber")[]): Promise<void> {
+export async function checkTokens(target: Target, vendors: Vendor[]): Promise<void> {
   if (vendors.includes("quickbooks")) {
     const { status } = await reach(
       quickbooks(target, "GET", `companyinfo/${target.quickbooks.realmId}`, undefined, { anyAnswer: true }),
@@ -30,6 +30,21 @@ export async function checkTokens(target: Target, vendors: ("quickbooks" | "jobb
     }
     if (!answer.body?.data?.account) {
       throw new Error(`Jobber didn't answer { account { id } } (HTTP ${answer.status}). Check JOBBER_API_URL (${target.jobber.apiUrl}).`);
+    }
+  }
+  if (vendors.includes("housecallpro")) {
+    // "This API is available to any Pro on the MAX or XL Plan": https://docs.housecallpro.com/
+    const { apiBase } = target.housecallpro;
+    const answer = await reach(housecallpro(target, "GET", "/company", undefined, { anyAnswer: true }), "Housecall Pro", apiBase);
+    if (answer.status === 401 || answer.status === 403) {
+      throw new Error(
+        `Housecall Pro refused HOUSECALLPRO_API_KEY (HTTP ${answer.status}). Use one of the account's API keys: the API is for Pros on the MAX or XL plan.`,
+      );
+    }
+    if (answer.status !== 200 || typeof answer.body?.id !== "string") {
+      throw new Error(
+        `Housecall Pro didn't answer GET /company with a company (HTTP ${answer.status}). Check HOUSECALLPRO_API_URL (${apiBase}).`,
+      );
     }
   }
 }

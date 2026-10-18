@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { caseId, type Target } from "./case.ts";
+import { caseId, housecallpro, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
@@ -21,6 +21,7 @@ function sandboxAnswering(status: number, body: unknown = {}): Target {
     fetch: async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
     quickbooks: { apiBase: "https://sandbox-quickbooks.api.intuit.com/v3", realmId: "123", accessToken: "expired" },
     jobber: { apiUrl: "https://api.getjobber.com/api/graphql", accessToken: "expired" },
+    housecallpro: { apiBase: "https://api.housecallpro.com", apiKey: "deleted" },
     now: async () => "2026-10-12T00:00:00Z",
   };
 }
@@ -39,15 +40,39 @@ describe("recording against a sandbox", () => {
     await expect(checkTokens(sandboxAnswering(404), ["quickbooks"])).rejects.toThrow("QBO_API_BASE");
   });
 
-  it("goes ahead when every token works", async () => {
+  it("stops before recording a Housecall Pro account that refuses its API key, and says which accounts have keys", async () => {
+    await expect(checkTokens(sandboxAnswering(401, { message: "Unauthorized" }), ["housecallpro"])).rejects.toThrow(
+      "Housecall Pro refused HOUSECALLPRO_API_KEY (HTTP 401). Use one of the account's API keys: the API is for Pros on the MAX or XL plan",
+    );
+  });
+
+  it("stops when the Housecall Pro URL is wrong, rather than recording what something else answers", async () => {
+    await expect(checkTokens(sandboxAnswering(404), ["housecallpro"])).rejects.toThrow("HOUSECALLPRO_API_URL");
+    await expect(checkTokens(sandboxAnswering(200, { status: "ok" }), ["housecallpro"])).rejects.toThrow("HOUSECALLPRO_API_URL");
+  });
+
+  it("goes ahead when every token and key works", async () => {
     const working: Target = {
       ...sandboxAnswering(200),
-      fetch: async (url) =>
-        new Response(JSON.stringify(String(url).includes("graphql") ? { data: { account: { id: "a" } } } : { CompanyInfo: {} }), {
-          status: 200,
-        }),
+      fetch: async (url) => {
+        if (String(url).includes("graphql")) return Response.json({ data: { account: { id: "a" } } });
+        return Response.json(String(url).includes("housecallpro") ? { id: "c", name: "A company" } : { CompanyInfo: {} });
+      },
     };
-    await expect(checkTokens(working, ["quickbooks", "jobber"])).resolves.toBeUndefined();
+    await expect(checkTokens(working, ["quickbooks", "jobber", "housecallpro"])).resolves.toBeUndefined();
+  });
+
+  it("sends a Housecall Pro account its API key in the documented form, with the path straight after the host", async () => {
+    const sent: { url: string; authorization: string | null }[] = [];
+    const account: Target = {
+      ...sandboxAnswering(200),
+      fetch: async (url, init) => {
+        sent.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
+        return Response.json({});
+      },
+    };
+    await housecallpro(account, "GET", "/customers?page_size=1");
+    expect(sent).toEqual([{ url: "https://api.housecallpro.com/customers?page_size=1", authorization: "Token deleted" }]);
   });
 
   it("doesn't record the padding of ids from a testing account with no clients, which would never match", async () => {
@@ -65,24 +90,44 @@ describe("recording against a sandbox", () => {
 describe("answers that are never evidence", () => {
   const readMissing = CASES.find((testCase) => caseId(testCase) === "quickbooks/read-missing-entity")!;
   const jobberSyntax = CASES.find((testCase) => caseId(testCase) === "jobber/syntax-error")!;
+  // The cases that send a body as it is, rather than one their request helper writes.
+  const rawBodies = ["quickbooks/body-not-json", "jobber/body-not-json", "jobber/variables-as-a-string"].map(
+    (id) => CASES.find((testCase) => caseId(testCase) === id)!,
+  );
 
   it.each([429, 502, 503, 504])(
     "stop a case when the sandbox answers HTTP %i, throttling or down, rather than record it",
     async (status) => {
       await expect(readMissing.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
       await expect(jobberSyntax.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
+      await expect(housecallpro(sandboxAnswering(status), "GET", "/company")).rejects.toThrow("try again later");
+      for (const rawBody of rawBodies) {
+        await expect(rawBody.observe(sandboxAnswering(status)), caseId(rawBody)).rejects.toThrow("try again later");
+      }
     },
   );
 
   it("stop a case when Jobber says it is throttling, which it answers with HTTP 200", async () => {
     const throttled = { errors: [{ message: "Throttled", extensions: { code: "THROTTLED" } }] };
     await expect(jobberSyntax.observe(sandboxAnswering(200, throttled))).rejects.toThrow("throttling");
+    for (const rawBody of rawBodies.filter((testCase) => testCase.vendor === "jobber")) {
+      await expect(rawBody.observe(sandboxAnswering(200, throttled)), caseId(rawBody)).rejects.toThrow("throttling");
+    }
   });
 
   it("stop a case when the run's own token stops working part way, but not one that sends a bad token on purpose", async () => {
     await expect(readMissing.observe(sandboxAnswering(401))).rejects.toThrow("get a fresh one");
+    for (const rawBody of rawBodies) {
+      await expect(rawBody.observe(sandboxAnswering(401)), caseId(rawBody)).rejects.toThrow("get a fresh one");
+    }
     const badToken = CASES.find((testCase) => caseId(testCase) === "quickbooks/unknown-access-token")!;
     await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
+  });
+
+  it("stop a case when Housecall Pro stops taking the run's API key, but not when a case sends another on purpose", async () => {
+    await expect(housecallpro(sandboxAnswering(401), "GET", "/customers")).rejects.toThrow("stopped accepting the API key");
+    const withoutKey = housecallpro(sandboxAnswering(401), "GET", "/customers", undefined, { authorization: null });
+    await expect(withoutKey).resolves.toMatchObject({ status: 401 });
   });
 });
 
@@ -159,6 +204,20 @@ describe("which vendors a recording covers", () => {
     expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", JOBBER_ACCESS_TOKEN: "j" })).toThrow("QBO_REALM_ID");
     expect(() => sandboxTarget({ QBO_REALM_ID: "1" })).toThrow("QBO_ACCESS_TOKEN");
   });
+
+  it("records a Housecall Pro account, which has no sandbox, from its API key, at the real API's host unless told otherwise", () => {
+    const { target, vendors } = sandboxTarget({ HOUSECALLPRO_API_KEY: "k" });
+    expect(vendors).toEqual(["housecallpro"]);
+    expect(target.housecallpro).toEqual({ apiBase: "https://api.housecallpro.com", apiKey: "k" });
+    const elsewhere = sandboxTarget({ HOUSECALLPRO_API_KEY: "k", HOUSECALLPRO_API_URL: "http://localhost:4010/housecallpro/" });
+    expect(elsewhere.target.housecallpro.apiBase).toBe("http://localhost:4010/housecallpro");
+  });
+
+  it("says what each vendor needs when nothing is set", () => {
+    expect(() => sandboxTarget({})).toThrow(
+      /QBO_ACCESS_TOKEN and QBO_REALM_ID .*JOBBER_ACCESS_TOKEN .*HOUSECALLPRO_API_KEY \(a Housecall Pro/,
+    );
+  });
 });
 
 describe("scoring a twin that is already running", () => {
@@ -183,7 +242,7 @@ describe("npm run conformance", () => {
     const tsx = import.meta.resolve("tsx"); // the outer process finds tsx wherever it runs; the twin it starts must too
     const run = spawnSync(process.execPath, ["--import", tsx, cli, "score"], { cwd: tmpdir(), encoding: "utf8", timeout: 30_000 });
     expect(run.stderr).not.toContain("didn't start");
-    expect(run.stdout).toContain("quickbooks cdc-nothing-changed");
+    expect(run.stdout).toMatch(/^quickbooks +cdc-nothing-changed +not recorded yet$/m);
     expect(run.status).toBe(0);
   }, 30_000);
 });

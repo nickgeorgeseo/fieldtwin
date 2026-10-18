@@ -10,17 +10,22 @@ import { randomUUID } from "node:crypto";
 export type Observation = string | number | boolean | null | Observation[] | { [key: string]: Observation };
 export type Observations = Record<string, Observation>;
 
+export const VENDORS = ["quickbooks", "jobber", "housecallpro"] as const;
+export type Vendor = (typeof VENDORS)[number];
+
 export interface Target {
   kind: "twin" | "sandbox";
   fetch: (url: string, init?: RequestInit) => Promise<Response>;
   quickbooks: { apiBase: string; realmId: string; accessToken: string }; // apiBase ends in /v3
   jobber: { apiUrl: string; accessToken: string };
+  housecallpro: { apiBase: string; apiKey: string }; // paths follow apiBase, as they follow https://api.housecallpro.com
   now(): Promise<string>; // the target's current time, ISO 8601
+  pause?(ms: number): Promise<void>; // lets real time pass, for a sandbox that takes a moment to show a write. A twin needs none
 }
 
 export interface ConformanceCase {
   name: string; // stable: recordings are keyed by it
-  vendor: "quickbooks" | "jobber";
+  vendor: Vendor;
   endpoint: string; // what it exercises, e.g. "POST /payment"
   fidelity: string; // the FIDELITY.md row it checks
   writes?: boolean; // creates records in the target; the recorder lists these before it runs
@@ -48,34 +53,41 @@ interface RequestOptions {
  * An answer no case may observe: the vendor was throttling or down, or stopped accepting the run's own token (they
  * last an hour). It says nothing about the API, so the case stops, and a recording keeps what it observed last time.
  */
-function refuseUnrecordable(vendor: string, answer: Answer, ownToken: boolean): void {
+function refuseUnrecordable(
+  vendor: string,
+  answer: Answer,
+  ownToken: boolean,
+  stoppedAccepting = "the access token (HTTP 401). Tokens last an hour: get a fresh one",
+): void {
   const throttled = answer.status === 429 || answer.body?.errors?.[0]?.extensions?.code === "THROTTLED";
   if (throttled || [502, 503, 504].includes(answer.status)) {
     const what = throttled ? "that it is throttling" : `HTTP ${answer.status}`;
     throw new Error(`${vendor} answered ${what}, which says nothing about the API: try again later`);
   }
-  if (answer.status === 401 && ownToken) {
-    throw new Error(`${vendor} stopped accepting the access token (HTTP 401). Tokens last an hour: get a fresh one`);
-  }
+  if (answer.status === 401 && ownToken) throw new Error(`${vendor} stopped accepting ${stoppedAccepting}`);
 }
 
-/** A QuickBooks request. `realmId` and `token` override the target's, for the cases about wrong ones. */
+/**
+ * A QuickBooks request. `realmId` and `token` override the target's, for the cases about wrong ones; `text` is a body
+ * sent as it is, for the case about one that isn't JSON.
+ */
 export async function quickbooks(
   target: Target,
   method: "GET" | "POST",
   path: string,
   body?: unknown,
-  options: RequestOptions & { realmId?: string } = {},
+  options: RequestOptions & { realmId?: string; text?: string } = {},
 ): Promise<Answer> {
   const { apiBase, realmId, accessToken } = target.quickbooks;
+  const sent = options.text ?? (body === undefined ? undefined : JSON.stringify(body));
   const response = await target.fetch(`${apiBase}/company/${options.realmId ?? realmId}/${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${options.token ?? accessToken}`,
       Accept: "application/json",
-      ...(body !== undefined && { "Content-Type": "application/json" }),
+      ...(sent !== undefined && { "Content-Type": "application/json" }),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: sent,
   });
   const answer = { status: response.status, body: await response.json().catch(() => null) };
   if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, options.token === undefined);
@@ -87,11 +99,14 @@ export function quickbooksQuery(target: Target, statement: string): Promise<Answ
   return quickbooks(target, "GET", `query?query=${encodeURIComponent(statement)}`);
 }
 
-/** A Jobber GraphQL request. `version: null` sends no version header; `token` overrides the target's. */
+/**
+ * A Jobber GraphQL request. `version: null` sends no version header; `token` overrides the target's; `text` is a body
+ * sent as it is, in place of the query and its variables, for the cases about bodies that aren't a GraphQL request.
+ */
 export async function jobber(
   target: Target,
   query: string,
-  options: RequestOptions & { variables?: Record<string, unknown>; version?: string | null } = {},
+  options: RequestOptions & { variables?: Record<string, unknown>; version?: string | null; text?: string } = {},
 ): Promise<Answer> {
   const version = options.version === undefined ? "2025-04-16" : options.version;
   const response = await target.fetch(target.jobber.apiUrl, {
@@ -101,11 +116,62 @@ export async function jobber(
       "Content-Type": "application/json",
       ...(version !== null && { "X-JOBBER-GRAPHQL-VERSION": version }),
     },
-    body: JSON.stringify({ query, variables: options.variables ?? {} }),
+    body: options.text ?? JSON.stringify({ query, variables: options.variables ?? {} }),
   });
   const answer = { status: response.status, body: await response.json().catch(() => null) };
   if (!options.anyAnswer) refuseUnrecordable("Jobber", answer, options.token === undefined);
   return answer;
+}
+
+/**
+ * A Housecall Pro request, sending the target's API key as `Token <key>`, the form "the headers must follow".
+ * `authorization` sends another header instead (null sends none), for the cases about bad credentials; `companyId` names
+ * a location in X-Company-Id; `text` is a body sent as it is, for the case about one that isn't JSON.
+ * https://docs.housecallpro.com/docs/housecall-public-api/b87d37ae48a0d-authentication
+ */
+export async function housecallpro(
+  target: Target,
+  method: "GET" | "POST" | "PUT",
+  path: string,
+  body?: unknown,
+  options: Omit<RequestOptions, "token"> & { authorization?: string | null; companyId?: string; text?: string } = {},
+): Promise<Answer> {
+  const { apiBase, apiKey } = target.housecallpro;
+  const authorization = options.authorization === undefined ? `Token ${apiKey}` : options.authorization;
+  const sent = options.text ?? (body === undefined ? undefined : JSON.stringify(body));
+  const response = await target.fetch(`${apiBase}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      ...(authorization !== null && { Authorization: authorization }),
+      ...(options.companyId !== undefined && { "X-Company-Id": options.companyId }),
+      ...(sent !== undefined && { "Content-Type": "application/json" }),
+    },
+    body: sent,
+  });
+  // The recording is made in a real account: an answer that repeats its key loses it here, before any case sees it.
+  const text = await response.text();
+  const answer = { status: response.status, body: parsed(apiKey ? text.replaceAll(apiKey, "(the API key)") : text) };
+  // A 401 is about the key only when the key went alone: one naming a location may be refusing the location, so a
+  // case that names one asks again with the key alone afterwards.
+  const keyAlone = options.authorization === undefined && options.companyId === undefined && !/[?&]location_ids/.test(path);
+  const stopped = "the API key (HTTP 401). Check that HOUSECALLPRO_API_KEY is still one of the account's keys";
+  if (!options.anyAnswer) refuseUnrecordable("Housecall Pro", answer, keyAlone, stopped);
+  return answer;
+}
+
+function parsed(text: string): Answer["body"] {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** The body of a 2xx answer; anything else stops the case with what went wrong. */
+export function expectOk(answer: Answer, doing: string): Answer["body"] {
+  if (answer.status >= 200 && answer.status < 300) return answer.body;
+  throw new Error(`Couldn't ${doing}: HTTP ${answer.status} ${JSON.stringify(answer.body).slice(0, 300)}`);
 }
 
 /**

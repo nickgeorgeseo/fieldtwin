@@ -1,10 +1,10 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { type ConformanceCase, caseId, type Observations } from "./case.ts";
+import { type ConformanceCase, caseId, type Observations, VENDORS, type Vendor } from "./case.ts";
 import type { Results } from "./run.ts";
 
 /**
  * Recordings: what each case observed against a real vendor sandbox, one JSON file per vendor in recordings/.
- * They hold observations only (statuses, codes, shapes, yes/no facts), never tokens, Ids, names, or other data.
+ * They hold observations only (statuses, codes, shapes, yes/no facts), never tokens, keys, Ids, names, or other data.
  */
 export interface Recording {
   recordedAt: string;
@@ -12,13 +12,12 @@ export interface Recording {
   cases: Record<string, Observations>;
 }
 
-type Vendor = ConformanceCase["vendor"];
 const DIR = new URL("./recordings/", import.meta.url);
 const file = (vendor: Vendor) => new URL(`${vendor}.json`, DIR);
 
 export function readRecordings(): Partial<Record<Vendor, Recording>> {
   const recordings: Partial<Record<Vendor, Recording>> = {};
-  for (const vendor of ["quickbooks", "jobber"] as const) {
+  for (const vendor of VENDORS) {
     if (existsSync(file(vendor))) recordings[vendor] = JSON.parse(readFileSync(file(vendor), "utf8")) as Recording;
   }
   return recordings;

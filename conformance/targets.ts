@@ -1,4 +1,4 @@
-import type { Target } from "./case.ts";
+import type { Target, Vendor } from "./case.ts";
 
 type Fetch = Target["fetch"];
 
@@ -20,7 +20,8 @@ export async function runningTwin(url: string, fetchImpl: Fetch = (to, init) => 
 
 /**
  * A twin at baseUrl, reached over HTTP like any client. It is switched to real token checks (so the cases about
- * bad tokens mean something) and connected through its own OAuth endpoints, with no browser.
+ * bad tokens mean something) and connected through its own OAuth endpoints, with no browser. Housecall Pro is reached
+ * with an API key, as a real account is: the twin takes any key, in either auth mode.
  *
  * Twin time stands still between requests, where a sandbox's moves on, so asking for now moves it a second first:
  * otherwise a record written just before would count as changed since "now".
@@ -65,6 +66,8 @@ export async function twinTarget(baseUrl: string, fetchImpl: Fetch = (url, init)
     fetch: fetchImpl,
     quickbooks: { apiBase: `${baseUrl}/v3`, realmId: qbo.get("realmId") ?? "", accessToken: qboToken },
     jobber: { apiUrl: `${baseUrl}/api/graphql`, accessToken: jobberToken },
+    // Any key works on the twin. Not a word its answers use: an answer loses its target's key wherever it appears.
+    housecallpro: { apiBase: `${baseUrl}/housecallpro`, apiKey: "fieldtwin-conformance-key" },
     now: async () => {
       const advanced = await fetchImpl(`${baseUrl}/_twin/clock/advance`, {
         method: "POST",
@@ -82,26 +85,39 @@ export async function twinTarget(baseUrl: string, fetchImpl: Fetch = (url, init)
  *
  *   QBO_ACCESS_TOKEN, QBO_REALM_ID   a sandbox company; QBO_API_BASE defaults to the sandbox base URL
  *   JOBBER_ACCESS_TOKEN              a Jobber developer testing account; JOBBER_API_URL defaults to the real API
+ *   HOUSECALLPRO_API_KEY             one of a Housecall Pro account's API keys. Housecall Pro has no sandbox: its API is
+ *                                    for accounts on the MAX plan. HOUSECALLPRO_API_URL defaults to the real API
  *
- * Only the vendors you give a token for are recorded.
+ * Only the vendors you give a token or key for are recorded.
  */
 export const SANDBOX_DEFAULTS = {
   // "Use this base URL for sandbox companies": https://developer.intuit.com/app/developer/qbo/docs/develop/sandboxes/manage-your-sandboxes
   quickbooksApiBase: "https://sandbox-quickbooks.api.intuit.com/v3",
   jobberApiUrl: "https://api.getjobber.com/api/graphql",
+  // The reference's server, with paths straight after it: https://docs.housecallpro.com/docs/housecall-public-api/a4ca20a18010c-housecall-v1-api
+  housecallproApiUrl: "https://api.housecallpro.com",
 };
 
-export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors: ("quickbooks" | "jobber")[] } {
-  const vendors: ("quickbooks" | "jobber")[] = [];
+/** What each vendor's recording is made against, as the recorder says it and the recording keeps it. */
+export const SANDBOX_NAMES: Record<Vendor, string> = {
+  quickbooks: "QuickBooks Online sandbox company",
+  jobber: "Jobber developer testing account",
+  housecallpro: "Housecall Pro MAX-plan account (API key)",
+};
+
+export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors: Vendor[] } {
+  const vendors: Vendor[] = [];
   if (Boolean(env.QBO_ACCESS_TOKEN) !== Boolean(env.QBO_REALM_ID)) {
     const missing = env.QBO_ACCESS_TOKEN ? "QBO_REALM_ID (the sandbox company's id)" : "QBO_ACCESS_TOKEN";
-    throw new Error(`Set ${missing} too, to record QuickBooks, or neither, to record only Jobber.`);
+    throw new Error(`Set ${missing} too, to record QuickBooks, or neither, to record only the other vendors.`);
   }
   if (env.QBO_ACCESS_TOKEN && env.QBO_REALM_ID) vendors.push("quickbooks");
   if (env.JOBBER_ACCESS_TOKEN) vendors.push("jobber");
+  if (env.HOUSECALLPRO_API_KEY) vendors.push("housecallpro");
   if (!vendors.length) {
     throw new Error(
-      "Set QBO_ACCESS_TOKEN and QBO_REALM_ID (a QuickBooks sandbox company), JOBBER_ACCESS_TOKEN (a Jobber testing account), or both.",
+      "Set QBO_ACCESS_TOKEN and QBO_REALM_ID (a QuickBooks sandbox company), JOBBER_ACCESS_TOKEN (a Jobber testing account), " +
+        "HOUSECALLPRO_API_KEY (a Housecall Pro account on the MAX plan, by API key), or any of them together.",
     );
   }
   const quickbooksApiBase = env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase;
@@ -120,7 +136,12 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
         accessToken: env.QBO_ACCESS_TOKEN ?? "",
       },
       jobber: { apiUrl: env.JOBBER_API_URL ?? SANDBOX_DEFAULTS.jobberApiUrl, accessToken: env.JOBBER_ACCESS_TOKEN ?? "" },
+      housecallpro: {
+        apiBase: (env.HOUSECALLPRO_API_URL ?? SANDBOX_DEFAULTS.housecallproApiUrl).replace(/\/+$/, ""),
+        apiKey: env.HOUSECALLPRO_API_KEY ?? "",
+      },
       now: async () => new Date().toISOString(),
+      pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     },
   };
 }

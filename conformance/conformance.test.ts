@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { caseId, quickbooks, type Target } from "./case.ts";
+import { type ConformanceCase, caseId, housecallpro, quickbooks, type Target } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { readRecordings } from "./recordings.ts";
 import { compare, observeAll, report } from "./run.ts";
@@ -49,6 +49,19 @@ describe("a twin as a target", () => {
     const cdc = CASES.find((testCase) => caseId(testCase) === "quickbooks/cdc-nothing-changed")!;
     expect(await cdc.observe(twin)).toEqual({ status: 200, groupKeys: [] });
   });
+
+  it("reaches the twin's Housecall Pro the way a real account is reached: an API key, and paths after the base URL", async () => {
+    const company = await housecallpro(target, "GET", "/company");
+    expect(company.status).toBe(200);
+    expect(typeof company.body.id).toBe("string");
+  });
+
+  it("hands cases the twin's Housecall Pro answers as they are: its API key is in none of the names the cases give", async () => {
+    const { app: written } = createApp({ seed: 42 });
+    const twin = await twinTarget("http://twin.test", async (url, init) => written.request(url, init));
+    const created = await housecallpro(twin, "POST", "/customers", { last_name: "fieldtwin conformance kept as sent" });
+    expect(created.body.last_name).toBe("fieldtwin conformance kept as sent");
+  });
 });
 
 describe("the ORDERBY case", () => {
@@ -70,6 +83,7 @@ describe("the ORDERBY case", () => {
       },
       quickbooks: { apiBase: "https://books.test/v3", realmId: "1", accessToken: "t" },
       jobber: { apiUrl: "https://jobber.test/api/graphql", accessToken: "t" },
+      housecallpro: { apiBase: "https://housecallpro.test", apiKey: "k" },
       now: async () => "2026-10-12T00:00:00Z",
     };
   }
@@ -142,6 +156,33 @@ describe("the conformance score", () => {
   it("counts what only the twin observes, and tells a recorded null from nothing at all, as the test does", () => {
     expect(compare({ a: 1 }, { a: 1, b: 2 })).toMatchObject({ matched: 1, total: 2, differences: [{ key: "b", twin: 2 }] });
     expect(compare({ a: null }, {})).toMatchObject({ matched: 0, total: 1 });
+  });
+
+  it("lines up every vendor's cases and differences, the longest vendor name included, and says whose each endpoint is", () => {
+    const customerNotFound: ConformanceCase = {
+      name: "customer-not-found",
+      vendor: "housecallpro",
+      endpoint: "GET /customers/{id}",
+      fidelity: "GET /customers and GET /customers/{id}",
+      observe: async () => ({ status: 404 }),
+    };
+    const text = report(
+      [readMissing, customerNotFound],
+      { [caseId(readMissing)]: { status: 400 }, [caseId(customerNotFound)]: { status: 400 } },
+      {
+        quickbooks: recordingOf({ status: 404 }),
+        housecallpro: { recordedAt: "2026-10-17T00:00:00Z", target: "test", cases: { "customer-not-found": { status: 404 } } },
+      },
+    );
+    const lines = text.split("\n");
+    const [books, field] = [lines.find((line) => line.startsWith("quickbooks"))!, lines.find((line) => line.startsWith("housecallpro"))!];
+    expect(books.indexOf("read-missing-entity")).toBe(field.indexOf("customer-not-found"));
+    expect(books.indexOf("0/1")).toBe(field.indexOf("0/1"));
+    for (const difference of lines.filter((line) => line.trimStart().startsWith("status: real"))) {
+      expect(difference.indexOf("status")).toBe(books.indexOf("0/1"));
+    }
+    expect(text).toContain("  quickbooks   GET /customer/{id}                 0/1 observations match (0%)");
+    expect(text).toContain("  housecallpro GET /customers/{id}                0/1 observations match (0%)");
   });
 });
 
