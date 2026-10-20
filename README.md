@@ -362,7 +362,7 @@ npm start -- my-scenario.yaml
 |---|---|
 | `heat-wave-monday` | A busy HVAC Monday: 120 customers, throttled QuickBooks writes, a slow Jobber, and new clients calling in all morning |
 | `mismatched-books` | The field-service systems (Jobber and Housecall Pro) and QuickBooks disagree: customers spelled differently (same email), customers only in the field with unsynced work, customers only in QuickBooks, and a customer QuickBooks has as inactive who has paid for new work since |
-| `flaky-apis` | Retry testing: real OAuth checks plus layered faults (QuickBooks 429s, 503s, and writes whose answer is lost; Jobber 429s, 502s, and webhooks sent twice or late) while customers keep paying |
+| `flaky-apis` | Retry testing: real OAuth checks plus layered faults (QuickBooks 429s, 503s, and writes whose answer is lost; Jobber 429s, 502s, and webhooks sent twice or late; Housecall Pro 429s with `RateLimit-Reset`, 502s, writes whose answer is lost, and webhooks sent late) while customers keep paying |
 
 A fault rule matches requests by vendor, method, and path (`pathIncludes`, and `pathExcludes` to leave some alone, like a vendor's OAuth endpoints), and fires at a rate:
 

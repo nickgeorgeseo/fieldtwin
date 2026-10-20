@@ -196,4 +196,39 @@ describe("the flaky-apis scenario", () => {
     expect(qboFaults).toBeGreaterThan(25);
     expect(jobberFaults).toBeGreaterThan(10);
   });
+
+  it("fails a share of Housecall Pro requests too, with RateLimit-Reset on its 429s, and leaves its OAuth endpoints up", async () => {
+    const { app, twin, hcpGet } = setup();
+    loadScenario(twin, readFileSync("scenarios/flaky-apis.yaml", "utf8"));
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const response = await hcpGet("/jobs?page_size=1");
+      if (response.headers.get("X-Twin-Fault")) statuses.push(response.status);
+      if (response.status === 429) expect(response.headers.get("RateLimit-Reset")).toMatch(/^\d+$/);
+    }
+    expect(statuses.filter((status) => status === 429).length).toBeGreaterThan(10);
+    expect(statuses).toContain(502);
+
+    for (let i = 0; i < 30; i++) {
+      const authorize = await app.request("/housecallpro/oauth/authorize?response_type=code&client_id=a&redirect_uri=http://localhost/cb");
+      expect(authorize.status).toBe(302);
+    }
+  });
+
+  it("makes some Housecall Pro customers and then loses the answer, so a retry that doesn't look first makes a duplicate", async () => {
+    const { twin, hcpPost } = setup();
+    loadScenario(twin, readFileSync("scenarios/flaky-apis.yaml", "utf8"));
+    const before = twin.state<{ customers: Map<string, unknown> }>("housecallpro").customers.size;
+
+    let answered = 0;
+    let lost = 0;
+    for (let i = 0; i < 60; i++) {
+      const response = await hcpPost("/customers", { first_name: "Flaky", last_name: `Caller ${i}` });
+      if (response.status === 201) answered++;
+      if (response.headers.get("X-Twin-Fault") === "hcp-lost-answers") lost++;
+    }
+    expect(lost).toBeGreaterThan(0);
+    expect(twin.state<{ customers: Map<string, unknown> }>("housecallpro").customers.size - before).toBe(answered + lost);
+  });
 });

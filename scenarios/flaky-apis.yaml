@@ -2,10 +2,12 @@
 # Faults roll independently per request, so a run of retries can fail several times in a row.
 name: Flaky APIs
 description: >
-  Heavy fault rates on both vendors, with real OAuth checks. QuickBooks throttles nearly a third of requests
+  Heavy fault rates on every vendor, with real OAuth checks. QuickBooks throttles nearly a third of requests
   (429), is sometimes unavailable (503), and loses the answer to some writes after making them (504).
   Jobber's DDoS guard throttles one request in five (429) and its gateway sometimes fails (502), and its
-  webhooks come twice or late. Every response is a little slow.
+  webhooks come twice or late. Housecall Pro throttles one request in five (429, with RateLimit-Reset), its
+  gateway sometimes fails (502), it loses the answer to some writes after making them (504), and some of its
+  webhooks come late. Every QuickBooks response is a little slow.
 seed: 42
 startTime: "2026-07-13T11:00:00Z"
 auth: oauth
@@ -50,7 +52,34 @@ faults:
     webhook: "*"
     rate: 0.3
     effect: { delayMs: 300000 }
+  # Housecall Pro publishes no limits, only that a 429 says when to try again in RateLimit-Reset, which the twin sends.
+  # Its OAuth endpoints share the API's prefix here, and stay up, so connecting and refreshing still work. The lost
+  # answers come first, so every write gets its own chance at one: Housecall Pro takes no idempotency key, so look
+  # for the customer or job before making it again.
+  - name: hcp-lost-answers
+    vendor: housecallpro
+    method: POST
+    pathExcludes: /oauth/
+    rate: 0.1
+    effect: { status: 504, message: "Gateway timeout", lostResponse: true }
+  - name: hcp-throttled
+    vendor: housecallpro
+    pathExcludes: /oauth/
+    rate: 0.2
+    effect: { status: 429 }
+  - name: hcp-bad-gateway
+    vendor: housecallpro
+    pathExcludes: /oauth/
+    rate: 0.05
+    effect: { status: 502, message: "Bad gateway" }
+  # Housecall Pro tries each webhook once and promises no order: some come late enough to arrive after later ones.
+  - name: hcp-webhooks-late
+    vendor: housecallpro
+    webhook: "*"
+    rate: 0.2
+    effect: { delayMs: 300000 }
 timeline:
   # Customers keep paying while your sync struggles.
   - at: "+30m"
     jobber: { payInvoices: 2 }
+    housecallpro: { payInvoices: 2 } # the same two invoices, #23 and #25, as each system has them
