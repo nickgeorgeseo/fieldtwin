@@ -273,6 +273,15 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await response.json()).error.message).toMatch(/scheduled_end must be after/);
   });
 
+  it("refuses an arrival window too large to count in whole minutes, as it refuses such amounts", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const schedule = { ...SCHEDULE, arrival_window: 1e21 };
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toMatch(/arrival_window/);
+  });
+
   it("refuses to number a job after the largest invoice number it can count to, rather than repeat it", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);

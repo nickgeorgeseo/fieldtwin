@@ -96,8 +96,9 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   const [start, end] = (times as [number, number]).map((ms) => Math.floor(ms / 1000) * 1000) as [number, number];
   if (end <= start) return refuse("schedule.scheduled_end must be after schedule.scheduled_start, by a second or more.");
   const { arrival_window = 0 } = withoutNulls(value);
-  if (!Number.isInteger(arrival_window) || (arrival_window as number) < 0)
-    return refuse("schedule.arrival_window must be whole minutes of 0 or more.");
+  // A safe integer, so it is written as digits (never 1e+21) and a client can read it back as a whole number.
+  if (!Number.isSafeInteger(arrival_window) || (arrival_window as number) < 0)
+    return refuse(`schedule.arrival_window must be whole minutes of 0 or more, not ${shown(arrival_window)}.`);
   return { start: iso(start), end: iso(end), arrivalWindow: arrival_window as number };
 }
 
