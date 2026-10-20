@@ -156,7 +156,8 @@ export function parseAuthMode(mode: unknown): AuthMode {
 
 /**
  * Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults and schedule its
- * timeline. Everything is checked before anything changes, so a scenario that fails to load leaves the twin as it was.
+ * timeline. Everything is checked before anything changes, and the twin rebuilds all or nothing, so a scenario that
+ * fails to load leaves the twin as it was.
  */
 export function loadScenario(twin: Twin, yamlText: string) {
   const scenario = parseScenario(yamlText);
@@ -171,10 +172,10 @@ export function loadScenario(twin: Twin, yamlText: string) {
   for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
 
   const { drift, ...worldSize } = scenario.world ?? {};
-  twin.reconfigure({ seed: scenario.seed, scenario: scenario.name, startTime: scenario.startTime, worldSize, drift, faults });
+  twin.load({ seed: scenario.seed, scenario: scenario.name, startTime: scenario.startTime, worldSize, drift, faults }, (world) =>
+    entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, world.company.utcOffsetHours), ...entry })),
+  );
   twin.authMode = scenario.auth ?? twin.defaultAuthMode;
-  const utcOffsetHours = twin.world.company.utcOffsetHours;
-  twin.schedule(entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, utcOffsetHours), ...entry })));
   return describeTwin(twin); // its `scenario` is the name just loaded
 }
 

@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { describeTwin, loadScenario, loadScenarioByName, resetTwin, setFaults } from "../src/control/operations.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  advanceClock,
+  createCheckpoint,
+  describeTwin,
+  loadScenario,
+  loadScenarioByName,
+  resetTwin,
+  setFaults,
+} from "../src/control/operations.ts";
+import { jobberTwin } from "../src/vendors/jobber/index.ts";
+import type { JobberState } from "../src/vendors/jobber/types.ts";
 import { setup } from "./helpers.ts";
 
 /**
@@ -28,6 +38,47 @@ describe("loading a scenario that is wrong", () => {
     expect(() => loadScenario(twin, yaml)).toThrow(says);
     expect({ status: describeTwin(twin), log: twin.log.all() }).toEqual(before);
     expect(() => resetTwin(twin)).not.toThrow();
+  });
+});
+
+describe("a scheduled action that throws when it runs, though its check passed", () => {
+  // A stand-in for a bug in a vendor's action: Jobber's newClients, failing whenever it runs.
+  const breakNewClients = () =>
+    vi.spyOn(jobberTwin.scenarioActions!.newClients!, "run").mockImplementation(() => {
+      throw new Error("out of names");
+    });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("leaves the twin as it was when the action is due at load, and reset still goes back to the scenario before", () => {
+    const { twin } = setup();
+    loadScenarioByName(twin, "flaky-apis");
+    createCheckpoint(twin, "before");
+    const clients = () => [...twin.state<JobberState>("jobber").clients.keys()];
+    const budget = twin.rateLimit("jobber:test", () => ({ spent: 3 }));
+    const before = { status: describeTwin(twin), log: twin.log.toJsonl(), clients: clients() };
+    breakNewClients();
+
+    expect(() => loadScenario(twin, scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 2 }\n'))).toThrow("out of names");
+    expect({ status: describeTwin(twin), log: twin.log.toJsonl(), clients: clients() }).toEqual(before);
+    expect(twin.rateLimit("jobber:test", () => ({ spent: 0 }))).toBe(budget);
+    expect(resetTwin(twin)).toMatchObject({ scenario: "Flaky APIs", seed: 42, checkpoints: [] });
+  });
+
+  it("leaves the twin as it was when a reset meets it, and resets once the action runs again", async () => {
+    const { twin } = setup();
+    loadScenario(
+      twin,
+      scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 2 }\n  - at: "+2h"\n    jobber: { payInvoices: 1 }\n'),
+    );
+    await advanceClock(twin, 30);
+    createCheckpoint(twin, "later");
+    const before = { status: describeTwin(twin), log: twin.log.toJsonl() };
+    const run = breakNewClients();
+
+    expect(() => resetTwin(twin)).toThrow("out of names");
+    expect({ status: describeTwin(twin), log: twin.log.toJsonl() }).toEqual(before);
+    run.mockRestore();
+    expect(resetTwin(twin)).toMatchObject({ scenario: "Broken", twinTime: "2026-07-13T11:00:00.000Z", checkpoints: [] });
   });
 });
 

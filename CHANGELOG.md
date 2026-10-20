@@ -29,6 +29,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 - Two requests that answered 500 now get the 400 or 422 that says what's wrong:
   - an action named like a property every object has, such as `constructor` or `toString`;
   - a QuickBooks or Housecall Pro request body with a value nested thousands of lists deep.
+- A scenario whose timeline entry due at the start throws when it runs, though its check passed, leaves the twin as it was, like any other scenario that fails to load. Before, the twin had already been rebuilt from the new seed, its checkpoints gone, and every reset after that failed the same way. A reset that meets such an entry changes nothing either, rate-limit budgets and pending webhook deliveries included.
 - Conformance recorder: the cases that send a body as it is (QuickBooks' and Jobber's `body-not-json`, and Jobber's `variables-as-a-string`) stop on an answer that says nothing about the API, as every other case does. A 429, a 502 to 504, Jobber's `THROTTLED`, or a 401 once the run's own token expired could be saved as their evidence.
 
 ## 0.4.1 - 2026-10-15

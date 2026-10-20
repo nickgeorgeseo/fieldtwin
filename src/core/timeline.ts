@@ -58,6 +58,15 @@ export class Timeline {
     }
   }
 
+  /** The schedule as it stands, put back by calling what this returns: for a twin whose rebuild fails partway. */
+  save(): () => void {
+    const { entries, next } = this;
+    return () => {
+      this.entries = entries;
+      this.next = next;
+    };
+  }
+
   /** Make every entry after `ms` due again (after a rewind), or every entry (after a reset). */
   rearmAfter(ms: number): void {
     const index = this.entries.findIndex((entry) => entry.atMs > ms);

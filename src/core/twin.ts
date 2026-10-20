@@ -90,22 +90,19 @@ export class Twin {
   }
 
   /**
-   * Switch to a different seed, start time, or world size, then reset. Used when loading a scenario. If the new
-   * options can't make a world (a bad start time, more customers than there are names), this throws before anything
-   * changes.
+   * Switch to a scenario: a different seed, start time, world size, or faults, and its timeline, made from the new
+   * world (whose business hours a timeline's local times are in), with the entries already due applied. All or
+   * nothing: if the new options can't make a world, or an entry due at the start throws, the twin is left as it was.
    */
-  reconfigure(changes: Partial<Omit<TwinOptions, "vendors">>): void {
+  load(changes: Partial<Omit<TwinOptions, "vendors">>, timeline: (world: World) => TimelineEntry[]): void {
     const options = { ...this.options, ...changes };
     const start = startingPoint(options);
-    this.options = options;
-    this.timeline.schedule([]); // the old scenario's schedule doesn't belong in the new world
-    this.rebuild(start);
-  }
-
-  /** Schedule a scenario's timeline, replacing any other, and apply the entries already due. */
-  schedule(entries: TimelineEntry[]): void {
-    this.timeline.schedule(entries);
-    this.catchUp();
+    const entries = timeline(start.world);
+    this.startOver(() => {
+      this.options = options;
+      this.timeline.schedule(entries);
+      this.rebuild(start);
+    });
   }
 
   /** Move twin time forward, applying scheduled entries at their own times on the way. */
@@ -118,16 +115,38 @@ export class Twin {
     return this.timeline.upcoming(limit);
   }
 
-  /** Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical log. */
+  /**
+   * Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical
+   * log. All or nothing, like load(): if an entry due at the start throws, the twin is left as it was.
+   */
   reset(): void {
-    this.rebuild(startingPoint(this.options));
+    this.startOver(() => this.rebuild(startingPoint(this.options)));
+  }
+
+  /**
+   * Replace the twin's history by `rebuild`, all or nothing. If it throws, everything it replaced is put back, so the
+   * twin is exactly as it was. Once it works, rate-limit budgets start full and pending deliveries are dropped, since
+   * they are bookkeeping about the requests of the history it replaced.
+   */
+  private startOver(rebuild: () => void): void {
+    const { options, clock, log, world, faultRules, faultRandom, states, checkpoints } = this;
+    const restoreTimeline = this.timeline.save();
+    try {
+      rebuild();
+    } catch (error) {
+      Object.assign(this, { options, clock, log, world, faultRules, faultRandom, states, checkpoints });
+      restoreTimeline();
+      throw error;
+    }
+    this.bookkeeping.clearRateLimits();
+    this.webhooks.dropPending();
   }
 
   private rebuild({ clock, world }: { clock: TwinClock; world: World }): void {
     this.restart(clock, streams.faults(this.options.seed), []);
     this.world = world;
     this.faultRules = this.options.faults ?? [];
-    this.checkpoints.clear();
+    this.checkpoints = new Checkpoints(); // a new one, so a rebuild that fails can put the old one back
     this.asHistory(() => {
       for (const vendor of this.vendors.values()) {
         for (const event of vendor.seed(this.world)) this.record(event, "seed");
@@ -137,18 +156,13 @@ export class Twin {
     this.catchUp();
   }
 
-  /**
-   * Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. Rate-limit
-   * budgets start full and pending deliveries are dropped, since they are bookkeeping about requests.
-   */
+  /** Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. */
   private restart(clock: TwinClock, faultRandom: FaultRandom, history: readonly TwinEvent[]): void {
     this.clock = clock;
     this.faultRandom = faultRandom;
     this.log = new EventLog();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
     for (const event of history) this.vendor(event.vendor).apply(this.state(event.vendor), this.log.append(event));
-    this.bookkeeping.clearRateLimits();
-    this.webhooks.dropPending();
   }
 
   /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
@@ -193,8 +207,10 @@ export class Twin {
   rewind(name: string): void {
     const checkpoint = this.checkpoints.get(name);
     const faultRandom = copyFaultRandom(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
-    this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
-    this.timeline.rearmAfter(this.clock.nowMs());
+    this.startOver(() => {
+      this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
+      this.timeline.rearmAfter(this.clock.nowMs());
+    });
     this.checkpoints.forgetAfter(checkpoint.seq);
   }
 }
