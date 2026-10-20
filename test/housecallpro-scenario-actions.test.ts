@@ -256,6 +256,22 @@ describe("Housecall Pro invoiceJobs", () => {
     expect(state(harness).counts.invoices).toBe(37);
   });
 
+  it("leaves finished work with nothing to bill, since a $0 invoice would read paid with no payment and no paid_at", async () => {
+    const harness = setup();
+    const [customer] = (await (await harness.hcpGet("/customers?page_size=1")).json()).customers;
+    const morning = { scheduled_start: "2026-07-13T08:00:00Z", scheduled_end: "2026-07-13T09:00:00Z" };
+    const free = { name: "Warranty visit", unit_price: 0 };
+    for (const line_items of [[], [free]]) {
+      const body = { customer_id: customer.id, address_id: customer.addresses[0].id, schedule: morning, line_items };
+      expect((await harness.hcpPost("/jobs", body)).status).toBe(201);
+    }
+    expect((await runAction(harness.twin, "housecallpro", "completeJobs", 50)).events).toHaveLength(2);
+
+    expect(invoiced((await runAction(harness.twin, "housecallpro", "invoiceJobs", 50)).events)).toEqual(["#35"]);
+    expect(await jobInvoices(harness, "45")).toEqual([]);
+    expect(await jobInvoices(harness, "46")).toEqual([]);
+  });
+
   it("leaves invoices that payInvoices can pay, so work finished during a run ends up paid for", async () => {
     const harness = setup();
     await advanceClock(harness.twin, 9 * 60);

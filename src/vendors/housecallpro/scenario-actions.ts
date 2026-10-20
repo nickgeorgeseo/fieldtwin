@@ -2,6 +2,7 @@ import { shown } from "../../core/request-body.ts";
 import type { ScenarioAction } from "../../core/vendor-twin.ts";
 import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
 import { NET_DAYS } from "../../world/history-stories.ts";
+import { linesTotal } from "./amounts.ts";
 import { customerName } from "./events.ts";
 import { hcpId, hcpTime } from "./ids.ts";
 import { dueAmount } from "./routes/invoice-response.ts";
@@ -84,6 +85,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
   // A Pro invoices finished work and sends it at once, as the world's invoices were sent: the job's lines under the
   // job's own number, as seed-work.ts bills them, due on the world's terms (FIDELITY.md). The fields are Get Invoices':
   // https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
+  // Work with nothing to bill is left: a $0 invoice would be paid with no payment, and the docs don't say what then.
   invoiceJobs: {
     check: (count) => checkCount("invoiceJobs", count),
     run: (count, { state, nowIso }) => {
@@ -92,7 +94,8 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
       return [...state.jobs.values()]
         .flatMap((job) => {
           const finished = workTimestamps(job.appointments).completed_at;
-          return finished && !state.invoicesByJob.has(job.id) ? [{ job, finished }] : [];
+          const billable = finished && !state.invoicesByJob.has(job.id) && linesTotal(job.line_items) > 0;
+          return billable ? [{ job, finished }] : [];
         })
         .sort((a, b) => Date.parse(a.finished) - Date.parse(b.finished))
         .slice(0, count as number)
