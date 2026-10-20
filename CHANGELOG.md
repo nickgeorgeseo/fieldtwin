@@ -13,12 +13,22 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
   - Scenario actions, for timelines and `POST /_twin/actions/housecallpro/...`: `newCustomers` brings in people new to the business, `completeJobs` has techs finish the jobs whose visits began first, `invoiceJobs` invoices the work finished longest ago, and `payInvoices` pays the open invoices due longest ago in full.
   - Webhooks (`customer.created`, `customer.updated`, `job.created`, `job.scheduled`, `job.completed`, `job.paid`, `invoice.created`, `invoice.sent`, `invoice.payment.succeeded`, `invoice.paid`) that carry the whole record, signed with `Api-Timestamp` and `Api-Signature` as documented.
   - API keys (`Authorization: Token <key>`), and an OAuth 2.0 server with 30-day access tokens and rotating refresh tokens.
-- Conformance cases for Housecall Pro: 33 cases for 28 of its FIDELITY.md "check" rows, recorded with `HOUSECALLPRO_API_KEY=... npm run conformance:record`. Housecall Pro has no sandbox, so they run in an account on the MAX or XL plan, reached with one of its API keys, which is never written anywhere. The cases that write say so before they run, and leave customers and jobs named "fieldtwin conformance ..." in the account, since its API can delete neither. The rows a request can't settle (webhooks, OAuth tokens, 429s, and what the app records as work gets done) are listed in conformance/README.md.
+- Conformance cases for Housecall Pro: 33 cases for 28 of its FIDELITY.md "check" rows, for `HOUSECALLPRO_API_KEY=... npm run conformance:record` to record. Housecall Pro has no sandbox, so they run in an account on the MAX or XL plan, reached with one of its API keys, which is never written anywhere. The cases that write say so before they run, and leave customers and jobs named "fieldtwin conformance ..." in the account, since its API can delete neither. The rows a request can't settle (webhooks, OAuth tokens, 429s, and what the app records as work gets done) are listed in conformance/README.md.
 - Injected faults carry the headers a vendor sends with that error, through a new optional `errorHeaders` on the vendor contract: a Housecall Pro 429 has `RateLimit-Reset`, the epoch second a minute later in twin time, so backoff code that reads it can be tested.
 - The fake business has a street address, zip code, and phone number of its own (in `GET /_twin`), which Housecall Pro's `GET /company` shows. They are drawn after everything else, so every seed still makes the same customers, technicians, and history.
+- Housecall Pro in the dashboard. The Business page compares QuickBooks with Housecall Pro as well as with Jobber, the Events page names Housecall Pro's events and filters by them, and the control room makes its actions happen and offers two of its failures as fault presets: throttling with `RateLimit-Reset`, and customers created behind a lost answer.
+
+### Changed
+
+- An action run through the control plane (`POST /_twin/actions`, the `twin_run_action` MCP tool, or a dashboard button) draws its random choices from the length of the event log, and Housecall Pro's records make the seeded log longer: 410 events for the default seed instead of 282. So on the same seed, the same action makes different people than 0.4.1 did, and `jobber/newClients` names other clients. Scenario timelines draw theirs by their place in the timeline, so a scenario runs as before.
+- `newClients`, like Housecall Pro's `newCustomers`, brings in at most 1,000 people at a time. The twin can name about 7,600 in all, and a larger count used to pass the check when a scenario loaded, then fail once the twin was half rebuilt, and fail every reset after it.
+- The Business page pairs customers by email and invoices by number one to one. A customer or an invoice booked twice now shows as a row of its own, where before the second one hid the first: that duplicate is the bug a sync most needs to catch.
 
 ### Fixed
 
+- Two requests that answered 500 now get the 400 or 422 that says what's wrong:
+  - an action named like a property every object has, such as `constructor` or `toString`;
+  - a QuickBooks or Housecall Pro request body with a value nested thousands of lists deep.
 - Conformance recorder: the cases that send a body as it is (QuickBooks' and Jobber's `body-not-json`, and Jobber's `variables-as-a-string`) stop on an answer that says nothing about the API, as every other case does. A 429, a 502 to 504, Jobber's `THROTTLED`, or a 401 once the run's own token expired could be saved as their evidence.
 
 ## 0.4.1 - 2026-10-15
