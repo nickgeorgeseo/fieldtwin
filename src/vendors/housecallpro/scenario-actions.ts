@@ -1,5 +1,5 @@
 import type { ScenarioAction } from "../../core/vendor-twin.ts";
-import { newCustomer } from "../../world/generate-world.ts";
+import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
 import { NET_DAYS } from "../../world/history-stories.ts";
 import { customerName } from "./events.ts";
 import { hcpId, hcpTime } from "./ids.ts";
@@ -18,7 +18,7 @@ import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./ty
  */
 export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState>> = {
   newCustomers: {
-    check: (count) => checkCount("newCustomers", count),
+    check: (count) => checkCount("newCustomers", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
       // Customers the books have and Housecall Pro doesn't (drift's accountingOnly) are taken too, so emails never clash.
       const taken = new Set([...state.customers.values()].map(customerName));
@@ -144,8 +144,9 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
 
 const DAY_MS = 86_400_000;
 
-function checkCount(action: string, value: unknown): void {
-  if (!Number.isInteger(value) || (value as number) < 1) {
-    throw new Error(`housecallpro ${action} takes how many: a whole number of 1 or more, not ${JSON.stringify(value)}`);
+function checkCount(action: string, value: unknown, most?: number): void {
+  if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
+    const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
+    throw new Error(`housecallpro ${action} takes how many: a whole number ${range}, not ${JSON.stringify(value)}`);
   }
 }

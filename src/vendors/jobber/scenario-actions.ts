@@ -1,5 +1,5 @@
 import type { ScenarioAction } from "../../core/vendor-twin.ts";
-import { newCustomer } from "../../world/generate-world.ts";
+import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
 import { encodeId, nextIdNumber } from "./encoded-id.ts";
 import { clientName, type JobberClient, type JobberState } from "./types.ts";
 
@@ -12,7 +12,7 @@ import { clientName, type JobberClient, type JobberState } from "./types.ts";
  */
 export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> = {
   newClients: {
-    check: (count) => checkCount("newClients", count),
+    check: (count) => checkCount("newClients", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
       // Customers the books have and Jobber doesn't (drift's accountingOnly) are taken too, so emails never clash.
       const taken = new Set([...state.clients.values()].map(clientName));
@@ -50,8 +50,9 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
   },
 };
 
-function checkCount(action: string, value: unknown): void {
-  if (!Number.isInteger(value) || (value as number) < 1) {
-    throw new Error(`jobber ${action} takes how many: a whole number of 1 or more, not ${JSON.stringify(value)}`);
+function checkCount(action: string, value: unknown, most?: number): void {
+  if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
+    const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
+    throw new Error(`jobber ${action} takes how many: a whole number ${range}, not ${JSON.stringify(value)}`);
   }
 }

@@ -29,6 +29,7 @@ describe("control-plane mistakes", () => {
     ["POST", "/_twin/actions/jobber/payInvoices", "", "like 2"],
     ["POST", "/_twin/actions/housecallpro/constructor", "1", "has no scenario action"],
     ["POST", "/_twin/actions/jobber/toString", "1", "has no scenario action"],
+    ["POST", "/_twin/actions/housecallpro/newCustomers", "4294967296", "1,000"],
   ])("%s %s with the body %j says what to send", async (method, path, body, says) => {
     const { status, error } = await errorOf(await send(setup().app, method, path, body));
     expect(status).toBe(400);
