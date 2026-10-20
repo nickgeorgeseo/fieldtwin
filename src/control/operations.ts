@@ -35,7 +35,8 @@ export function resetTwin(twin: Twin) {
 
 /**
  * Move twin time forward. Scheduled scenario events happen on the way, each at its own time, and the webhook
- * deliveries they cause (and any retries now due) have been answered by the time this resolves.
+ * deliveries they cause (and any retries now due) have been answered by the time this resolves. An entry whose action
+ * throws stops the clock at its time, still due (ARCHITECTURE.md, "Scenario timelines").
  */
 const MAX_ADVANCE_MINUTES = 10 * 365 * 24 * 60; // ten years: far beyond any test, and far inside what a date can hold
 

@@ -45,16 +45,19 @@ export class Timeline {
     this.twin.clock.advance(targetMs - this.twin.clock.nowMs());
   }
 
-  /** Run the entries due at or before `ms` that haven't run yet. */
+  /**
+   * Run the entries due at or before `ms` that haven't run yet. One whose action throws has recorded nothing and stays
+   * due, so the schedule never moves on past something that didn't happen.
+   */
   runDue(ms: number): void {
     const { twin } = this;
     while (this.next < this.entries.length && this.entries[this.next]!.atMs <= ms) {
-      const position = this.next++;
-      const entry = this.entries[position]!;
-      const random = streams.timelineEntry(twin.seed, position);
+      const entry = this.entries[this.next]!;
+      const random = streams.timelineEntry(twin.seed, this.next);
       const context = { state: twin.state(entry.vendor), world: twin.world, random, nowIso: twin.clock.nowIso() };
-      const action = scenarioActionOf(twin.vendor(entry.vendor), entry.action);
-      for (const event of action.run(entry.params, context)) twin.record(event, "scenario");
+      const events = scenarioActionOf(twin.vendor(entry.vendor), entry.action).run(entry.params, context);
+      this.next++;
+      for (const event of events) twin.record(event, "scenario");
     }
   }
 

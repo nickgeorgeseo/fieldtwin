@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { advanceClock, createCheckpoint, describeTwin, listChanges, loadScenario, rewindTo } from "../src/control/operations.ts";
+import { jobberTwin } from "../src/vendors/jobber/index.ts";
 import { setup } from "./helpers.ts";
 
 const scenario = (timeline: string) => `
@@ -125,5 +126,42 @@ describe("scenario timelines", () => {
     );
     expect(() => loadScenario(harness.twin, scenario(`  - at: "lunchtime"\n    jobber: { newClients: 1 }`))).toThrow(/"lunchtime"/);
     expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    jobber: { newClients: -2 }`))).toThrow(/newClients/);
+  });
+});
+
+describe("a scheduled action that throws when it runs, though its check passed", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("stops the clock at its time with it still due, rather than skipping it, and runs it there once it can", async () => {
+    const harness = setup();
+    const timeline = [
+      `  - at: "+1h"\n    jobber: { payInvoices: 1 }`,
+      `  - at: "+2h"\n    jobber: { newClients: 3 }`,
+      `  - at: "+3h"\n    jobber: { payInvoices: 1 }`,
+    ];
+    loadScenario(harness.twin, scenario(timeline.join("\n")));
+    createCheckpoint(harness.twin, "loaded");
+    const changes = () => listChanges(harness.twin, "loaded").map((change) => [change.type, change.at]);
+    // A stand-in for a bug in a vendor's action: Jobber's newClients, failing whenever it runs.
+    const run = vi.spyOn(jobberTwin.scenarioActions!.newClients!, "run").mockImplementation(() => {
+      throw new Error("out of names");
+    });
+
+    await expect(advanceClock(harness.twin, 4 * 60)).rejects.toThrow("out of names");
+    expect(harness.twin.clock.nowIso()).toBe("2026-07-13T13:00:00.000Z");
+    expect(describeTwin(harness.twin).upcoming.map(({ at, action }) => [action, at])).toEqual([
+      ["newClients", "2026-07-13T13:00:00.000Z"],
+      ["payInvoices", "2026-07-13T14:00:00.000Z"],
+    ]);
+    expect(changes()).toEqual([["InvoiceUpdated", "2026-07-13T12:00:00.000Z"]]);
+    await expect(advanceClock(harness.twin, 60)).rejects.toThrow("out of names"); // tried again, not skipped
+
+    run.mockRestore();
+    await advanceClock(harness.twin, 60);
+    expect(changes()).toEqual([
+      ["InvoiceUpdated", "2026-07-13T12:00:00.000Z"],
+      ...Array(3).fill(["ClientCreated", "2026-07-13T13:00:00.000Z"]),
+      ["InvoiceUpdated", "2026-07-13T14:00:00.000Z"],
+    ]);
   });
 });
