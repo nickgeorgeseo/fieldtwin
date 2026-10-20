@@ -1,4 +1,5 @@
 import { fromCents, toCents } from "../../core/money.ts";
+import { shown } from "../../core/request-body.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 
 /**
@@ -22,17 +23,13 @@ export function readAmount(value: unknown, element: string, now: string): number
   if (value === undefined || value === null) return qboErrors.missingField(element, now);
   const amount = numberFrom(value);
   if (amount === undefined || Math.abs(amount) > MAX_AMOUNT) {
-    return qboErrors.invalidAmount(element, `${element} must be an amount up to ${MAX_AMOUNT}, not ${JSON.stringify(value)}.`, now);
+    return qboErrors.invalidAmount(element, `${element} must be an amount up to ${MAX_AMOUNT}, not ${shown(value)}.`, now);
   }
   if (amount < 0) return qboErrors.negativeAmount(element, now);
   // Floating point stores 136216566.02 as a hair under, so allow for its rounding, which grows with the amount.
   const cents = amount * 100;
   if (Math.abs(cents - Math.round(cents)) > Math.max(1e-6, Math.abs(cents) * Number.EPSILON * 4)) {
-    return qboErrors.invalidAmount(
-      element,
-      `${element} is in fractions of a cent: ${JSON.stringify(value)}. Round it to two decimals.`,
-      now,
-    );
+    return qboErrors.invalidAmount(element, `${element} is in fractions of a cent: ${shown(value)}. Round it to two decimals.`, now);
   }
   return fromCents(toCents(amount));
 }
@@ -47,7 +44,7 @@ export function readOptionalNumber(
   if (value === undefined || value === null) return undefined;
   const number = numberFrom(value);
   if (number !== undefined) return number;
-  const detail = `${element} must be a number, not ${JSON.stringify(value)}.`;
+  const detail = `${element} must be a number, not ${shown(value)}.`;
   return kind === "quantity" ? qboErrors.invalidQuantity(element, detail, now) : qboErrors.invalidAmount(element, detail, now);
 }
 
@@ -61,7 +58,7 @@ export function readTextFields(fields: object, names: readonly string[], now: st
     const value = record[name];
     if (typeof value === "number" && Number.isFinite(value)) record[name] = String(value);
     else if (value !== undefined && value !== null && typeof value !== "string") {
-      return qboErrors.invalidProperty(name, `${name} must be text, not ${JSON.stringify(value)}.`, now);
+      return qboErrors.invalidProperty(name, `${name} must be text, not ${shown(value)}.`, now);
     }
   }
   return undefined;

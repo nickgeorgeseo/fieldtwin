@@ -38,6 +38,18 @@ export function redirectUriProblem(redirectUri: string): string | undefined {
     : `redirect_uri must be an absolute URL, like http://localhost:3000/callback, not "${redirectUri}".`;
 }
 
+/**
+ * A value a client sent, as JSON, for an error message about it. JSON.parse reads lists nested far deeper than
+ * JSON.stringify can write back, so a value too deep to write is named instead, and the request is still a 4xx.
+ */
+export function shown(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return `${Array.isArray(value) ? "a list" : "an object"} nested too deeply to show`;
+  }
+}
+
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

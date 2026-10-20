@@ -1,4 +1,4 @@
-import { isObject } from "../../../core/request-body.ts";
+import { isObject, shown } from "../../../core/request-body.ts";
 import { lineAmount } from "../amounts.ts";
 import type { HcpLineItem } from "../types/index.ts";
 
@@ -16,7 +16,7 @@ export type Refusal = { status: 422 | 501; problem: string };
 
 export function readLineItems(value: unknown): LineFields[] | Refusal {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) return refuse(`line_items must be a list of line items, not ${JSON.stringify(value)}.`);
+  if (!Array.isArray(value)) return refuse(`line_items must be a list of line items, not ${shown(value)}.`);
   const lines: LineFields[] = [];
   for (const [index, entry] of value.entries()) {
     const line = readLineItem(entry, `line_items[${index}]`);
@@ -41,7 +41,7 @@ function readLineItem(value: unknown, path: string): LineFields | Refusal {
     ["unit_cost", unit_cost],
   ] as const) {
     if (!Number.isSafeInteger(cents) || (cents as number) < 0) {
-      return refuse(`${path}.${field} must be whole cents of 0 or more, like 8900 for $89.00, not ${JSON.stringify(cents)}.`);
+      return refuse(`${path}.${field} must be whole cents of 0 or more, like 8900 for $89.00, not ${shown(cents)}.`);
     }
   }
   if (
@@ -50,13 +50,13 @@ function readLineItem(value: unknown, path: string): LineFields | Refusal {
     quantity < 0 ||
     Math.round(quantity * 100) / 100 !== quantity // two decimal places, however large: 1234567.89 is, 1.125 isn't
   ) {
-    return refuse(`${path}.quantity must be a number of 0 or more, with up to two decimal places, not ${JSON.stringify(quantity)}.`);
+    return refuse(`${path}.quantity must be a number of 0 or more, with up to two decimal places, not ${shown(quantity)}.`);
   }
   // lineAmount multiplies hundredths of the quantity by the price, so that product has to stay exact too.
   if (!Number.isSafeInteger(Math.round(quantity * 100) * (unit_price as number))) {
     return refuse(`${path}: quantity times unit_price comes to more cents than the twin can count exactly. No real line is that big.`);
   }
-  if (!KINDS.includes(kind as string)) return refuse(`${path}.kind must be one of ${KINDS.join(", ")}, not ${JSON.stringify(kind)}.`);
+  if (!KINDS.includes(kind as string)) return refuse(`${path}.kind must be one of ${KINDS.join(", ")}, not ${shown(kind)}.`);
   if (kind !== "labor" && kind !== "materials") {
     return { status: 501, problem: `${path}.kind: the twin doesn't model ${kind} lines yet, only labor and materials.` };
   }

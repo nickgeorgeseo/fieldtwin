@@ -1,4 +1,4 @@
-import { isObject } from "../../../core/request-body.ts";
+import { isObject, shown } from "../../../core/request-body.ts";
 import { readTime } from "../dates.ts";
 import { hcpTime } from "../ids.ts";
 import type { HcpState } from "../types/index.ts";
@@ -71,7 +71,7 @@ function readInvoiceNumber(sent: unknown, state: HcpState): string | undefined |
   const value = typeof sent === "string" && /^\d+$/.test(sent) ? Number(sent) : sent;
   // A safe integer, so it prints as digits ("5000", never "1e+21") and the number after it is one more.
   if (!Number.isSafeInteger(value) || (value as number) < 1) {
-    return refuse(`invoice_number must be a whole number from 1 to ${Number.MAX_SAFE_INTEGER}, not ${JSON.stringify(sent)}.`);
+    return refuse(`invoice_number must be a whole number from 1 to ${Number.MAX_SAFE_INTEGER}, not ${shown(sent)}.`);
   }
   const taken = [...state.jobs.values()].some((job) => job.invoice_number === String(value));
   if (taken) return refuse(`invoice_number ${value} is taken: it must be unique across all of a company's jobs.`);
@@ -89,7 +89,7 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
     const text = value[name];
     const ms = typeof text === "string" ? readTime(text) : undefined;
     if (ms === undefined)
-      return refuse(`schedule.${name} is required, as an ISO-8601 date and time like 2026-07-20T14:00:00, not ${JSON.stringify(text)}.`);
+      return refuse(`schedule.${name} is required, as an ISO-8601 date and time like 2026-07-20T14:00:00, not ${shown(text)}.`);
     times.push(ms);
   }
   // Times are kept to the second (hcpTime), so compare them as kept: 14:00:00.1 to 14:00:00.9 would be no time at all.

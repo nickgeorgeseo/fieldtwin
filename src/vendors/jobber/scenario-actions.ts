@@ -1,3 +1,4 @@
+import { shown } from "../../core/request-body.ts";
 import type { ScenarioAction } from "../../core/vendor-twin.ts";
 import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
 import { encodeId, nextIdNumber } from "./encoded-id.ts";
@@ -53,6 +54,6 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
 function checkCount(action: string, value: unknown, most?: number): void {
   if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
     const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
-    throw new Error(`jobber ${action} takes how many: a whole number ${range}, not ${JSON.stringify(value)}`);
+    throw new Error(`jobber ${action} takes how many: a whole number ${range}, not ${shown(value)}`);
   }
 }

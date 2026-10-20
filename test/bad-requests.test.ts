@@ -155,3 +155,32 @@ describe("request bodies too big to be real", () => {
     expect((await response.json()).error).toContain("10 MB");
   });
 });
+
+describe("values nested too deeply to write out", () => {
+  // JSON.parse reads a list nested thousands deep, which JSON.stringify can't write back: 4,000 deep is about 8 KB.
+  const deep = (depth = 4000) => `${"[".repeat(depth)}"x"${"]".repeat(depth)}`;
+
+  it("answer QuickBooks' 2010 naming the field, not a 500", async () => {
+    const response = await qboRaw(setup(), "/customer", `{"DisplayName": ${deep()}}`);
+    expect(response.status).toBe(400);
+    expect((await response.json()).Fault.Error[0]).toMatchObject({ code: "2010", element: "DisplayName" });
+  });
+
+  it.each([
+    ["/customers", (value: string) => `{"first_name": ${value}}`, "first_name"],
+    ["/customers", (value: string) => `{"first_name": "Ada", "tags": ${value}}`, "tags"],
+    ["/customers", (value: string) => `{"first_name": "Ada", "addresses": [{"street": ${value}}]}`, "addresses[0].street"],
+    ["/jobs", (value: string) => `{"customer_id": "c", "address_id": "a", "invoice_number": ${value}}`, "invoice_number"],
+  ])("answer Housecall Pro's 422 naming the field, not a 500, on POST %s", async (path, body, field) => {
+    const harness = setup();
+    const [customer] = (await (await harness.hcpGet("/customers?page_size=1")).json()).customers;
+    const sent = body(deep()).replace('"c"', `"${customer.id}"`).replace('"a"', `"${customer.addresses[0].id}"`);
+    const response = await harness.app.request(`/housecallpro${path}`, {
+      method: "POST",
+      headers: { Authorization: "Token test-key", "Content-Type": "application/json" },
+      body: sent,
+    });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toContain(field);
+  });
+});
