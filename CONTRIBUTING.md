@@ -38,7 +38,7 @@ This is the workflow for almost every contribution, whether it is a new QuickBoo
 5. **Events.** Add the event payloads to `events.ts` (past tense: `InvoiceCreated`, `PaymentApplied`) and a line in `describeEvent()`. Events carry complete records, never "field X changed".
 6. **`apply()`.** Teach `state.ts` to apply the new events. It must be deterministic and must not look at the clock, the network, or anything outside the event.
 7. **Route or resolver.** Validate and decide, then call `twin.record()`. Return the vendor's real error body for every failure (`errors.ts` for REST vendors, `userErrors` or top-level `errors` for GraphQL). Put a comment with the docs link above any behavior a reader might be surprised by.
-8. **Seed data**, if the entity should exist in the starting world. Seeds are built from the vendor-neutral world in `src/world/`, so both vendors describe the same business.
+8. **Seed data**, if the entity should exist in the starting world. Seeds are built from the vendor-neutral world in `src/world/`, so every vendor describes the same business.
 9. **Run everything:** `npm test && npm run typecheck && npm run lint`.
 10. **CHANGELOG.md.** Add a line under `Unreleased`.
 

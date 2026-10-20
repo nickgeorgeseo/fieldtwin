@@ -13,7 +13,7 @@ cd dashboard && npm ci && npm run dev       # in another terminal: the dashboard
 
 | Page | What it does |
 |---|---|
-| **Control room** | The company, its twin time in its own time zone, and how the twin is set up. Move the clock, with what the scenario has scheduled next. Load a ready-made scenario or your own YAML, and reset. Make Jobber customers pay or new clients call in. Switch between any-token and real OAuth. Mark checkpoints, list what changed since (everything, or only what your code did), download the log since one, and rewind. Set fault rules from presets, and webhook subscriptions, and watch each delivery: its tries, the last answer, and the fault that duplicated or delayed it |
+| **Control room** | The company, its twin time in its own time zone, and how the twin is set up. Move the clock, with what the scenario has scheduled next. Load a ready-made scenario or your own YAML, and reset. Make customers pay, new customers call in, and, in Housecall Pro, techs finish jobs and the Pro invoices them. Switch between any-token and real OAuth. Mark checkpoints, list what changed since (everything, or only what your code did), download the log since one, and rewind. Set fault rules from presets, and webhook subscriptions, and watch each delivery: its tries, the last answer, and the fault that duplicated or delayed it |
 | **Events** | The event log as it grows, newest first. Filter by vendor and by who made each change, search for a name or Id, pause. Each event opens to the whole record it carries |
 | **Business** | QuickBooks side by side with a field-service system, Jobber or Housecall Pro. Customers matched by email and invoices by number, as the seeded books carry the field-service system's numbers, each marked with how the systems agree: the same, spelled differently, inactive in the books, only in one, a payment not recorded, a paid invoice never booked, totals that differ. Load `mismatched-books`, then run `npm run example:sync` and watch Jobber's red go |
 
@@ -27,7 +27,7 @@ The Events and Business pages read the whole log once, then only what is new, an
 
 The control plane has no authentication, so the dashboard won't lend it to anyone else ([`lib/request-guard.ts`](lib/request-guard.ts)). It listens on 127.0.0.1, answers only requests addressed to `localhost`, `127.0.0.1`, or `[::1]` (a site that rebinds its DNS name to this machine still sends its own name), and takes changes only from its own pages (browsers send `Origin` with every POST and PUT).
 
-Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list. The actions it offers are the Jobber twin's (`payInvoices`, `newClients`). Housecall Pro's (`newCustomers`, `completeJobs`, `invoiceJobs`, `payInvoices`) aren't buttons yet: run them from a scenario's timeline, `POST /_twin/actions/housecallpro/<action>`, or the `twin_run_action` MCP tool.
+Two things it can't show, because the twin doesn't say: the fault rules themselves (`GET /_twin` names the active ones) and webhook secrets. So the fault and webhook editors replace the whole list.
 
 ## Working on it
 

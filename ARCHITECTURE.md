@@ -118,7 +118,7 @@ With a correct SyncToken, step 3 instead builds the full updated record, calls `
 
 **Hand-written schema subsets instead of importing vendor specs.** A generated client of a 500-type schema is unreadable and mostly unused. We add fields as tests need them, each one traceable to the public docs.
 
-**Vendors don't sync with each other.** Both are seeded from one world, so they start out consistent, but after that they drift exactly like real systems. A scenario can even seed deliberate mismatches (the same customer spelled two ways) to test sync logic.
+**Vendors don't sync with each other.** All of them are seeded from one world, so they start out consistent, but after that they drift exactly like real systems. A scenario can even seed deliberate mismatches (the same customer spelled two ways) to test sync logic.
 
 **Faults are data.** Fault rules are plain objects in YAML. The middleware asks the vendor for an error body in its own format, and for any headers it sends with one (`errorHeaders`, optional: Housecall Pro's `RateLimit-Reset` on a 429), so vendors never contain fault logic and every vendor gets every fault type for free.
 
