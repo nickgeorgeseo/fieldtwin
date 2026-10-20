@@ -410,7 +410,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `GET /_twin` | Company, seed, loaded scenario, twin time, event count, auth mode, active faults, webhook subscriptions, checkpoints, what's scheduled next |
 | `POST /_twin/reset` | Back to the start: the seeded world (the loaded scenario's, if any), with its timeline and faults |
 | `POST /_twin/clock/advance` `{"minutes": 60}` | Move time forward (rate limits refill, tokens expire, scheduled events and their webhooks happen) |
-| `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2`, `jobber/newClients` with `3`, `housecallpro/completeJobs` with `1` |
+| `POST /_twin/actions/:vendor/:action` (body: params) | Make something happen now, as if done in the vendor's own app: `jobber/payInvoices` with `2`, `jobber/newClients` with `3`, `housecallpro/invoiceJobs` with `1` |
 | `POST /_twin/checkpoints/:name` | Name this moment |
 | `GET /_twin/checkpoints/:name/changes?source=api` | What your code changed since then (or `seed`, `scenario`, `control`; everything without `source`): each event, with a one-line `summary`. Like the log, it takes `after=` to read on from an earlier read |
 | `POST /_twin/checkpoints/:name/rewind` | Undo everything after the checkpoint. The same requests then meet the same faults |
@@ -498,7 +498,7 @@ test/          tests by vendor and area, plus core and the architecture guards
 
 ## Contributing
 
-Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row; every vendor folder has the same shape, so once you've read one you can read them all. If you have a QuickBooks sandbox company, a Jobber testing account, or a Housecall Pro account on the MAX plan that you keep for testing, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
+Contributions are welcome, especially ones that make the twins more faithful. [CONTRIBUTING.md](CONTRIBUTING.md) walks through adding an endpoint, from the vendor's docs page to the test to the FIDELITY.md row; every vendor folder has the same shape, so once you've read one you can read them all. If you have a QuickBooks sandbox company, a Jobber testing account, or a Housecall Pro account on the MAX or XL plan that you keep for testing, the most valuable thing you can do is record the [conformance suite](conformance/README.md) against it: `npm run conformance:record` turns the twin's guesses into evidence. Build only from public documentation; never paste vendor code, private docs, or real customer data.
 
 Where it's going: more Jobber writes as their inputs reach the public docs, recordings from real sandboxes, more of Housecall Pro, then more vendors (Samsara or Motive, EDI trading partners) and a benchmark for dispatch and operations agents. [ARCHITECTURE.md](ARCHITECTURE.md#roadmap) has the roadmap.
 
