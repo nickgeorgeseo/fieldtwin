@@ -27,22 +27,30 @@ const CUSTOMER_ORDER: CustomerStatus[] = [
   "same",
 ];
 
+/**
+ * Pairs customers one to one, as invoices are: a customer either system has twice under one email shows as a row of its
+ * own, since a sync that makes duplicates is what this page has to catch. A customer without an email pairs with none.
+ */
 export function matchCustomers(books: Books, service: FieldService): CustomerRow[] {
-  const rows = new Map<string, CustomerRow>();
-  for (const { id, name, email } of fieldSide(books, service).customers) {
-    rows.set(email || `${service}:${id}`, { email, field: { id, name }, status: "only-in-field-service" });
-  }
-  for (const customer of books.quickbooks.customers) {
-    const email = customerEmail(customer);
-    const key = email || `quickbooks:${customer.Id}`;
-    const row = rows.get(key) ?? { email, status: "only-in-quickbooks" };
-    row.quickbooks = { id: customer.Id, name: customer.DisplayName, active: customer.Active !== false };
+  const field = fieldSide(books, service).customers;
+  const pairs = pairUp(field, (customer) => customer.email, books.quickbooks.customers, customerEmail);
+  const rows: CustomerRow[] = field.map((customer) => {
+    const row: CustomerRow = { email: customer.email, field: { id: customer.id, name: customer.name }, status: "only-in-field-service" };
+    const booked = pairs.get(customer);
+    if (booked) row.quickbooks = asBookedCustomer(booked);
     row.status = customerStatus(row);
-    rows.set(key, row);
+    return row;
+  });
+  const paired = new Set(pairs.values());
+  for (const customer of books.quickbooks.customers) {
+    if (!paired.has(customer))
+      rows.push({ email: customerEmail(customer), quickbooks: asBookedCustomer(customer), status: "only-in-quickbooks" });
   }
-  return [...rows.values()].sort(
-    (a, b) => CUSTOMER_ORDER.indexOf(a.status) - CUSTOMER_ORDER.indexOf(b.status) || nameOf(a).localeCompare(nameOf(b)),
-  );
+  return rows.sort((a, b) => CUSTOMER_ORDER.indexOf(a.status) - CUSTOMER_ORDER.indexOf(b.status) || nameOf(a).localeCompare(nameOf(b)));
+}
+
+function asBookedCustomer(customer: QboCustomer): CustomerRow["quickbooks"] {
+  return { id: customer.Id, name: customer.DisplayName, active: customer.Active !== false };
 }
 
 function customerStatus({ field, quickbooks }: CustomerRow): CustomerStatus {
@@ -115,20 +123,20 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
   );
 }
 
-/** Pairs each field-service invoice with the first invoice in the books that has the same key and isn't paired yet. */
-function pairUp<F, B>(field: F[], fieldKey: (invoice: F) => string, books: B[], booksKey: (invoice: B) => string): Map<F, B> {
+/** Pairs each field-service record with the first record in the books that has the same key and isn't paired yet. */
+function pairUp<F, B>(field: F[], fieldKey: (record: F) => string, books: B[], booksKey: (record: B) => string): Map<F, B> {
   const waiting = new Map<string, B[]>();
-  for (const invoice of books) {
-    const key = booksKey(invoice);
+  for (const record of books) {
+    const key = booksKey(record);
     if (!key) continue;
     const queue = waiting.get(key) ?? [];
-    queue.push(invoice);
+    queue.push(record);
     waiting.set(key, queue);
   }
   const pairs = new Map<F, B>();
-  for (const invoice of field) {
-    const match = waiting.get(fieldKey(invoice))?.shift();
-    if (match) pairs.set(invoice, match);
+  for (const record of field) {
+    const match = waiting.get(fieldKey(record))?.shift();
+    if (match) pairs.set(record, match);
   }
   return pairs;
 }

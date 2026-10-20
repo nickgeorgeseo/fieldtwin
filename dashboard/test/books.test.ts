@@ -120,6 +120,36 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
   it("lists the differences before the customers that agree", () => {
     assert.equal(matchCustomers(books, "jobber").at(-1)?.status, "same");
   });
+
+  it("keeps a customer the books have twice under one email as a row of its own, since a sync that books one twice is the bug to catch", () => {
+    const twice = readBooks([
+      event("jobber", "ClientCreated", { client: client(1, "Kendall", "Dunmore", "kendall@example.com") }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Kendall Dunmore", "kendall@example.com") }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("2", "Kendall Dunmore", "Kendall@Example.com") }),
+    ]);
+    assert.deepEqual(
+      matchCustomers(twice, "jobber").map((row) => [row.field?.id, row.quickbooks?.id, row.status]),
+      [
+        [undefined, "2", "only-in-quickbooks"],
+        ["client-1", "1", "same"],
+      ],
+    );
+  });
+
+  it("keeps a field-service customer entered twice under one email as a row of its own too", () => {
+    const twice = readBooks([
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(1, "Kendall", "Dunmore", "kendall@example.com") }),
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(2, "Kendall", "Dunmore", "KENDALL@example.com") }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Kendall Dunmore", "kendall@example.com") }),
+    ]);
+    assert.deepEqual(
+      matchCustomers(twice, "housecallpro").map((row) => [row.field?.id, row.quickbooks?.id, row.status]),
+      [
+        ["cus_2", undefined, "only-in-field-service"],
+        ["cus_1", "1", "same"],
+      ],
+    );
+  });
 });
 
 describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () => {
