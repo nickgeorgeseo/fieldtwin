@@ -44,7 +44,9 @@ export function housecallproRoutes(twin: Twin): Hono {
   // Anything else is an endpoint the twin doesn't model yet. 501, which the real API never sends, so a client can't
   // mistake it for "that record doesn't exist" (a 404) or a request it should fix (a 400 or 422).
   app.all(`${HCP}/*`, (c) => {
-    const detail = `The twin doesn't model ${c.req.method} ${c.req.path.slice(HCP.length)} yet. It serves ${SERVED}; see FIDELITY.md.`;
+    const path = c.req.path.slice(HCP.length) || "/";
+    const slash = path.length > 1 && path.endsWith("/") ? ` Its paths take no trailing slash: try ${path.replace(/\/+$/, "")}.` : "";
+    const detail = `The twin doesn't model ${c.req.method} ${path} yet.${slash} It serves ${SERVED}; see FIDELITY.md.`;
     return c.json(hcpError(detail), 501);
   });
   return app;

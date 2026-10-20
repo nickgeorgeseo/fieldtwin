@@ -106,6 +106,14 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
     expect((await response.json()).error.message).toMatch(/doesn't model GET \/leads yet.*company/);
   });
 
+  it("names the path it was asked for, the base URL's own included, and says when a trailing slash is the trouble", async () => {
+    const { hcpGet } = setup();
+    expect((await (await hcpGet("")).json()).error.message).toMatch(/doesn't model GET \/ yet/);
+    const response = await hcpGet("/customers/");
+    expect(response.status).toBe(501);
+    expect((await response.json()).error.message).toMatch(/GET \/customers\/ yet\. .*no trailing slash: try \/customers\./);
+  });
+
   it("lists exactly the operations it serves when it answers 501, so a write it doesn't model isn't claimed", async () => {
     const { hcpPost } = setup();
     const response = await hcpPost("/jobs/job_x/line_items", { name: "Extra" });
