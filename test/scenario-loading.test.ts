@@ -16,6 +16,7 @@ describe("loading a scenario that is wrong", () => {
     ["a timeline time it can't read", scenario('timeline:\n  - at: "noon"\n    jobber: { newClients: 1 }\n'), "noon"],
     ["a timeline time far beyond any date", scenario('timeline:\n  - at: "+999999999d"\n    jobber: { newClients: 1 }\n'), "+999999999d"],
     ["a timeline action with bad parameters", scenario('timeline:\n  - at: "+1h"\n    jobber: { newClients: "lots" }\n'), "newClients"],
+    ["an action named as every object's own", scenario('timeline:\n  - at: "+1h"\n    housecallpro: { constructor: 1 }\n'), "constructor"],
     ["a world too big to name", scenario("world: { customers: 1000 }\n"), "customers"],
     ["a key it doesn't know", scenario("fault:\n  - { name: x, vendor: jobber, rate: 1, effect: { status: 503 } }\n"), "fault"],
   ])("leaves the twin as it was, given %s", (_label, yaml, says) => {

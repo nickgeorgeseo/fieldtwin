@@ -63,7 +63,8 @@ export interface VendorTwin<State = unknown> {
 /** A vendor's scenario action by name, or an error naming the ones it has. */
 export function scenarioActionOf(vendor: VendorTwin, name: string): ScenarioAction {
   const actions = vendor.scenarioActions ?? {};
-  const action = actions[name];
+  // Its own actions only: "constructor" and "toString" are on every object, and aren't actions.
+  const action = Object.hasOwn(actions, name) ? actions[name] : undefined;
   if (!action) throw new Error(`${vendor.name} has no scenario action "${name}". Available: ${Object.keys(actions).join(", ") || "none"}`);
   return action;
 }
