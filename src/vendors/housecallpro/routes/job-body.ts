@@ -90,6 +90,9 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
     const ms = typeof text === "string" ? readTime(text) : undefined;
     if (ms === undefined)
       return refuse(`schedule.${name} is required, as an ISO-8601 date and time like 2026-07-20T14:00:00, not ${shown(text)}.`);
+    // Before standard time, a zone's offset had seconds in it (Chicago's was -05:50:36), which no ISO-8601 offset can
+    // write, so the _local times would be wrong. No real job is scheduled that long ago.
+    if (new Date(ms).getUTCFullYear() < 1900) return refuse(`schedule.${name} must be in 1900 or later, not ${shown(text)}.`);
     times.push(ms);
   }
   // Times are kept to the second (hcpTime), so compare them as kept: 14:00:00.1 to 14:00:00.9 would be no time at all.

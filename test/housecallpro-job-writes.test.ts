@@ -282,6 +282,17 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await response.json()).error.message).toMatch(/arrival_window/);
   });
 
+  it("refuses a schedule before 1900, when the company's zone had no offset in whole minutes to write its local times with", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    for (const day of ["0999-06-01", "1883-01-01"]) {
+      const schedule = { scheduled_start: `${day}T15:00:00Z`, scheduled_end: `${day}T16:00:00Z` };
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
+      expect(response.status, day).toBe(422);
+      expect((await response.json()).error.message).toMatch(/scheduled_start.*1900/);
+    }
+  });
+
   it("refuses to number a job after the largest invoice number it can count to, rather than repeat it", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);
