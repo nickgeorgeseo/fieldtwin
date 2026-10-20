@@ -20,6 +20,10 @@ describe("writing fault rules from presets", () => {
     assert.deepEqual(JSON.parse(withRule('{"name": "x"}', slow)), [slow]);
   });
 
+  it("offers presets for every vendor the twin serves", () => {
+    assert.deepEqual([...new Set(FAULT_PRESETS.map((preset) => preset.rule.vendor))], ["quickbooks", "jobber", "housecallpro"]);
+  });
+
   it("names every preset differently, so adding one never replaces another", () => {
     const names = FAULT_PRESETS.map((preset) => preset.rule.name);
     assert.equal(new Set(names).size, names.length);

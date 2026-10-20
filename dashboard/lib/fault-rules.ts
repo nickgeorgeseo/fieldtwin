@@ -44,6 +44,22 @@ export const FAULT_PRESETS: { label: string; rule: FaultRule }[] = [
     label: "Jobber sends 1 in 5 webhooks 5 minutes late",
     rule: { name: "jobber-webhooks-late", vendor: "jobber", webhook: "*", rate: 0.2, effect: { delayMs: 300_000 } },
   },
+  {
+    label: "Housecall Pro throttles 1 in 5 requests (429, with RateLimit-Reset)",
+    rule: { name: "hcp-throttled", vendor: "housecallpro", rate: 0.2, effect: { status: 429 } },
+  },
+  {
+    // Customers only: a lost answer from the token endpoint would cost a client its rotated refresh token for good.
+    label: "Housecall Pro loses 1 in 10 answers after creating a customer (504)",
+    rule: {
+      name: "hcp-lost-customers",
+      vendor: "housecallpro",
+      method: "POST",
+      pathIncludes: "/customers",
+      rate: 0.1,
+      effect: { status: 504, lostResponse: true },
+    },
+  },
 ];
 
 /** The rules written so far (JSON text) with `rule` added, or put in place of the rule with its name. */
