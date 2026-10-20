@@ -49,6 +49,11 @@ describe("fault rules", () => {
     );
   });
 
+  it("rejects a webhook rule that names paths, since it matches deliveries rather than requests", () => {
+    const rule = { name: "late", vendor: "housecallpro", webhook: "*", pathExcludes: "/oauth/", rate: 1, effect: { delayMs: 1000 } };
+    expect(() => setFaults(setup().twin, [rule])).toThrow(/pathExcludes/);
+  });
+
   it("rejects a webhook rule for a topic the vendor never sends, naming the ones it does", () => {
     const rule = { name: "late", vendor: "jobber", webhook: "INVOICE_UPDATED", rate: 1, effect: { delayMs: 1000 } };
     expect(() => setFaults(setup().twin, [rule])).toThrow(/INVOICE_UPDATED.*INVOICE_UPDATE/);

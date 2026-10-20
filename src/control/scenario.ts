@@ -18,6 +18,7 @@ const FaultRuleSchema = z
     vendor: z.enum(VENDOR_NAMES),
     method: z.string().optional(),
     pathIncludes: z.string().optional(),
+    pathExcludes: z.string().optional(),
     webhook: z.string().optional(),
     rate: z.number().min(0).max(1),
     effect: z
@@ -44,8 +45,8 @@ const FaultRuleSchema = z
       } else if (requestEffects.status === undefined && requestEffects.latencyMs === undefined) {
         problem("a request rule needs a status or latencyMs in its effect, or it does nothing");
       }
-    } else if (rule.method !== undefined || rule.pathIncludes !== undefined) {
-      problem("webhook rules match deliveries, not requests: drop method and pathIncludes");
+    } else if (rule.method !== undefined || rule.pathIncludes !== undefined || rule.pathExcludes !== undefined) {
+      problem("webhook rules match deliveries, not requests: drop method, pathIncludes, and pathExcludes");
     } else if (Object.values(requestEffects).some((value) => value !== undefined) || (!duplicate && !delayMs)) {
       problem("webhook rules take duplicate or delayMs, and nothing else");
     }

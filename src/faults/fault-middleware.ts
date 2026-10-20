@@ -45,7 +45,8 @@ function matches(rule: FaultRule, vendor: string, method: string, path: string):
     rule.webhook === undefined && // webhook rules are for deliveries; see webhook-faults.ts
     rule.vendor === vendor &&
     (!rule.method || rule.method.toUpperCase() === method.toUpperCase()) &&
-    (!rule.pathIncludes || path.includes(rule.pathIncludes))
+    (!rule.pathIncludes || path.includes(rule.pathIncludes)) &&
+    (!rule.pathExcludes || !path.includes(rule.pathExcludes))
   );
 }
 

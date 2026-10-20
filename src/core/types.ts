@@ -56,6 +56,7 @@ export interface FaultRule {
   vendor: VendorName;
   method?: string; // e.g. "POST". Omit to match any method.
   pathIncludes?: string; // e.g. "/customer". Omit to match any path.
+  pathExcludes?: string; // e.g. "/oauth/": paths with this in them are left alone, like OAuth endpoints under an API's prefix
   webhook?: string; // a topic ("INVOICE_UPDATE") or "*": the rule matches webhook deliveries instead of requests
   rate: number; // share of matching requests (or deliveries) affected, 0 to 1
   effect: {

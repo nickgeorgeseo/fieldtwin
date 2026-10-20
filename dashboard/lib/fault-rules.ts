@@ -8,6 +8,7 @@ export interface FaultRule {
   vendor: string;
   method?: string;
   pathIncludes?: string;
+  pathExcludes?: string;
   webhook?: string;
   rate: number;
   effect: Record<string, unknown>;

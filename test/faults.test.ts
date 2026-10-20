@@ -29,6 +29,17 @@ describe("fault rules", () => {
     expect(twin.faultRules).toEqual([]); // nothing half-applied
   });
 
+  it("leave alone the paths a rule excludes, such as the OAuth endpoints a vendor serves under its API's prefix", async () => {
+    const { app, hcpGet } = setup();
+    const rule = { name: "hcp-down", vendor: "housecallpro", pathExcludes: "/oauth/", rate: 1, effect: { status: 503 } };
+    expect((await putFaults(app, [rule])).status).toBe(200);
+
+    expect((await hcpGet("/company")).status).toBe(503);
+    const authorize = await app.request("/housecallpro/oauth/authorize?response_type=code&client_id=a&redirect_uri=http://localhost/cb");
+    expect(authorize.status).toBe(302);
+    expect(authorize.headers.get("X-Twin-Fault")).toBeNull();
+  });
+
   it("reject a rate outside 0 to 1 and an unknown vendor", async () => {
     const { app } = setup();
     const badRate = await putFaults(app, [{ name: "x", vendor: "quickbooks", rate: 5, effect: { status: 500 } }]);

@@ -364,7 +364,7 @@ npm start -- my-scenario.yaml
 | `mismatched-books` | The field-service systems (Jobber and Housecall Pro) and QuickBooks disagree: customers spelled differently (same email), customers only in the field with unsynced work, customers only in QuickBooks, and a customer QuickBooks has as inactive who has paid for new work since |
 | `flaky-apis` | Retry testing: real OAuth checks plus layered faults (QuickBooks 429s, 503s, and writes whose answer is lost; Jobber 429s, 502s, and webhooks sent twice or late) while customers keep paying |
 
-A fault rule matches requests by vendor, method, and path, and fires at a rate:
+A fault rule matches requests by vendor, method, and path (`pathIncludes`, and `pathExcludes` to leave some alone, like a vendor's OAuth endpoints), and fires at a rate:
 
 ```yaml
 faults:
