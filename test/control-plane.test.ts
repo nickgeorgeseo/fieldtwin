@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.ts";
 import { controlRoutes } from "../src/control/http.ts";
+import { jobberTwin } from "../src/vendors/jobber/index.ts";
 import { setup } from "./helpers.ts";
 
 /**
@@ -16,7 +17,7 @@ let logged: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   logged = vi.spyOn(console, "error").mockImplementation(() => {});
 });
-afterEach(() => logged.mockRestore());
+afterEach(() => vi.restoreAllMocks());
 
 describe("control-plane mistakes", () => {
   it.each([
@@ -54,6 +55,23 @@ describe("a bug in the twin behind the control plane", () => {
     const response = await app.request("/_twin/checkpoints/before", { method: "POST" });
     expect(response.status).toBe(500);
     expect(String(logged.mock.calls[0]?.[0])).toContain("reading 'seq'");
+  });
+
+  it("is a 500 when a scheduled action throws though its check passed, naming the entry and logging where it threw", async () => {
+    const { app } = setup();
+    await send(
+      app,
+      "POST",
+      "/_twin/scenario",
+      'name: Busy\nseed: 42\nstartTime: "2026-07-13T11:00:00Z"\ntimeline:\n  - at: "+1h"\n    jobber: { newClients: 3 }\n',
+    );
+    vi.spyOn(jobberTwin.scenarioActions!.newClients!, "run").mockImplementation(function runsOutOfNames() {
+      throw new Error("out of names");
+    });
+    const { status, error } = await errorOf(await send(app, "POST", "/_twin/clock/advance", '{"minutes": 120}'));
+    expect(status).toBe(500);
+    expect(error).toContain("jobber newClients at 2026-07-13T12:00:00.000Z failed: out of names");
+    expect(String(logged.mock.calls[0]?.[0])).toContain("runsOutOfNames");
   });
 });
 

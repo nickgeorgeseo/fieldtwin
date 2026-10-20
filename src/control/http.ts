@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import { LogChangedError } from "../core/event-log.ts";
 import { isObject } from "../core/request-body.ts";
+import { ScenarioEntryError } from "../core/timeline.ts";
 import type { Twin } from "../core/twin.ts";
 import * as ops from "./operations.ts";
 
@@ -39,12 +40,14 @@ export function controlRoutes(twin: Twin): Hono {
     return c.text(read.jsonl, 200, { "X-Twin-Log-Position": read.position });
   });
 
-  // Control-plane mistakes (unknown checkpoint, bad scenario) come back as readable 400s. A TypeError and its kin
-  // mean a bug in the twin, not the request: a 500, logged with its stack. A log read after a position from another
-  // history is neither: a 409, so the reader knows to read the log again from the start.
+  // Control-plane mistakes (unknown checkpoint, bad scenario) come back as readable 400s. A TypeError and its kin, or
+  // a scheduled action that throws though its check passed, mean a bug in the twin, not the request: a 500, logged
+  // with its stack and its cause's. A log read after a position from another history is neither: a 409, so the reader
+  // knows to read the log again from the start.
   app.onError((error, c) => {
-    if (error instanceof TypeError || error instanceof RangeError || error instanceof ReferenceError) {
-      console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${error.stack ?? error.message}`);
+    const bug = [TypeError, RangeError, ReferenceError, ScenarioEntryError].some((kind) => error instanceof kind);
+    if (bug) {
+      console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${stackOf(error)}`);
       return c.json(
         { error: `The twin hit an unexpected error (${error.message}). This is a bug in fieldtwin: its log has the details.` },
         500,
@@ -73,4 +76,10 @@ async function objectBody(c: Context, example: string): Promise<Record<string, u
   const value = await body(c, example);
   if (!isObject(value)) throw new Error(`Send a JSON object, like ${example}.`);
   return value;
+}
+
+/** An error's stack, then its cause's: for a scheduled action that threw, where in the action it threw. */
+function stackOf(error: Error): string {
+  const own = error.stack ?? error.message;
+  return error.cause instanceof Error ? `${own}\nCaused by: ${stackOf(error.cause)}` : own;
 }

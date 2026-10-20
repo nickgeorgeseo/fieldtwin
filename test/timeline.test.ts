@@ -147,7 +147,9 @@ describe("a scheduled action that throws when it runs, though its check passed",
       throw new Error("out of names");
     });
 
-    await expect(advanceClock(harness.twin, 4 * 60)).rejects.toThrow("out of names");
+    await expect(advanceClock(harness.twin, 4 * 60)).rejects.toThrow(
+      "jobber newClients at 2026-07-13T13:00:00.000Z failed: out of names; the clock stopped there, with it still due",
+    );
     expect(harness.twin.clock.nowIso()).toBe("2026-07-13T13:00:00.000Z");
     expect(describeTwin(harness.twin).upcoming.map(({ at, action }) => [action, at])).toEqual([
       ["newClients", "2026-07-13T13:00:00.000Z"],

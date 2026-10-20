@@ -58,7 +58,9 @@ describe("a scheduled action that throws when it runs, though its check passed",
     const before = { status: describeTwin(twin), log: twin.log.toJsonl(), clients: clients() };
     breakNewClients();
 
-    expect(() => loadScenario(twin, scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 2 }\n'))).toThrow("out of names");
+    expect(() => loadScenario(twin, scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 2 }\n'))).toThrow(
+      "jobber newClients at 2026-07-13T11:00:00.000Z failed: out of names",
+    );
     expect({ status: describeTwin(twin), log: twin.log.toJsonl(), clients: clients() }).toEqual(before);
     expect(twin.rateLimit("jobber:test", () => ({ spent: 0 }))).toBe(budget);
     expect(resetTwin(twin)).toMatchObject({ scenario: "Flaky APIs", seed: 42, checkpoints: [] });
@@ -75,7 +77,7 @@ describe("a scheduled action that throws when it runs, though its check passed",
     const before = { status: describeTwin(twin), log: twin.log.toJsonl() };
     const run = breakNewClients();
 
-    expect(() => resetTwin(twin)).toThrow("out of names");
+    expect(() => resetTwin(twin)).toThrow("jobber newClients at 2026-07-13T11:00:00.000Z failed: out of names");
     expect({ status: describeTwin(twin), log: twin.log.toJsonl() }).toEqual(before);
     run.mockRestore();
     expect(resetTwin(twin)).toMatchObject({ scenario: "Broken", twinTime: "2026-07-13T11:00:00.000Z", checkpoints: [] });
