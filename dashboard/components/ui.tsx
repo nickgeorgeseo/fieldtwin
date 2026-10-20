@@ -76,14 +76,19 @@ export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; childr
 }
 
 /** Each vendor keeps one color everywhere: in badges, the event feed, and the business view. */
+const VENDORS: Record<string, { tone: BadgeTone; label: string }> = {
+  quickbooks: { tone: "green", label: "QuickBooks" },
+  jobber: { tone: "sky", label: "Jobber" },
+  housecallpro: { tone: "pink", label: "Housecall Pro" },
+};
+
+/** A vendor's name as people write it ("Housecall Pro"), from the twin's name for it ("housecallpro"). */
+export function vendorLabel(vendor: string): string {
+  return VENDORS[vendor]?.label ?? vendor;
+}
+
 export function VendorBadge({ vendor }: { vendor: string }) {
-  const known: Record<string, { tone: BadgeTone; label: string }> = {
-    quickbooks: { tone: "green", label: "QuickBooks" },
-    jobber: { tone: "sky", label: "Jobber" },
-    housecallpro: { tone: "pink", label: "Housecall Pro" },
-  };
-  const { tone, label } = known[vendor] ?? { tone: "neutral" as const, label: vendor };
-  return <Badge tone={tone}>{label}</Badge>;
+  return <Badge tone={VENDORS[vendor]?.tone ?? "neutral"}>{vendorLabel(vendor)}</Badge>;
 }
 
 /** Who made a change: your code through the APIs, the scenario's timeline, the control plane, or the seed. */

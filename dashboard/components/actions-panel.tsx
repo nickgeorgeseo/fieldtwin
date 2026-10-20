@@ -1,33 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { ACTIONS, actionKey } from "@/lib/actions.ts";
 import { twinSend } from "@/lib/twin-api.ts";
 import { ChangeList } from "./change-list.tsx";
 import { useTwin } from "./twin-provider.tsx";
-import { Button, Card, NoticeLine, TextInput, VendorBadge } from "./ui.tsx";
+import { Button, Card, NoticeLine, TextInput, VendorBadge, vendorLabel } from "./ui.tsx";
 import { useAction } from "./use-action.ts";
-
-/** The things a scenario timeline can make happen, now, as if done in the vendor's own app (POST /_twin/actions). */
-const ACTIONS = [
-  { vendor: "jobber", action: "payInvoices", label: "Customers pay", help: "The longest-open invoices get paid", initial: "2" },
-  {
-    vendor: "jobber",
-    action: "newClients",
-    label: "New clients call in",
-    help: "New clients, as from calls and online bookings",
-    initial: "3",
-  },
-];
 
 export function ActionsPanel() {
   const { status } = useTwin();
   const { busy, notice, run } = useAction();
-  const [counts, setCounts] = useState<Record<string, string>>(Object.fromEntries(ACTIONS.map(({ action, initial }) => [action, initial])));
+  const [counts, setCounts] = useState<Record<string, string>>(
+    Object.fromEntries(ACTIONS.map((entry) => [actionKey(entry), entry.initial])),
+  );
   const [happened, setHappened] = useState<string[]>([]);
 
-  const act = (vendor: string, action: string) =>
+  const act = (key: string) =>
     run(async () => {
-      const result = await twinSend<{ events: string[] }>("POST", `/actions/${vendor}/${action}`, Number(counts[action]));
+      const result = await twinSend<{ events: string[] }>("POST", `/actions/${key}`, Number(counts[key]));
       setHappened(result.events);
       return result.events.length === 1
         ? "1 thing happened, and its webhooks went out."
@@ -37,27 +28,31 @@ export function ActionsPanel() {
   return (
     <Card title="Make something happen">
       <ul className="space-y-3">
-        {ACTIONS.map(({ vendor, action, label, help }) => (
-          <li key={action} className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 text-sm font-medium">
-                {label} <VendorBadge vendor={vendor} />
-              </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">{help}</p>
-            </div>
-            <TextInput
-              aria-label={`How many: ${label}`}
-              type="number"
-              min={1}
-              value={counts[action]}
-              onChange={(event) => setCounts({ ...counts, [action]: event.target.value })}
-              className="w-16"
-            />
-            <Button aria-label={`Go: ${label}`} disabled={busy || !status} onClick={() => act(vendor, action)}>
-              Go
-            </Button>
-          </li>
-        ))}
+        {ACTIONS.map(({ vendor, action, label, help }) => {
+          const key = actionKey({ vendor, action });
+          const name = `${label} (${vendorLabel(vendor)})`;
+          return (
+            <li key={key} className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                  {label} <VendorBadge vendor={vendor} />
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{help}</p>
+              </div>
+              <TextInput
+                aria-label={`How many: ${name}`}
+                type="number"
+                min={1}
+                value={counts[key]}
+                onChange={(event) => setCounts({ ...counts, [key]: event.target.value })}
+                className="w-16"
+              />
+              <Button aria-label={`Go: ${name}`} disabled={busy || !status} onClick={() => act(key)}>
+                Go
+              </Button>
+            </li>
+          );
+        })}
       </ul>
       <NoticeLine notice={notice} />
       {happened.length > 0 && (
