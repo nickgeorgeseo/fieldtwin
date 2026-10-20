@@ -45,7 +45,12 @@ export async function advanceClock(twin: Twin, minutes: number) {
     throw new Error(`minutes must be a number from 0 to ${MAX_ADVANCE_MINUTES.toLocaleString("en-US")} (ten years)`);
   }
   const before = twin.log.length;
-  twin.advance(minutes * 60_000);
+  try {
+    twin.advance(minutes * 60_000);
+  } catch (error) {
+    await twin.deliverWebhooks(); // what happened on the way, before the entry that failed, is news all the same
+    throw error;
+  }
   const scenarioEvents = twin.log.length - before; // counted now: API writes may arrive while webhooks go out
   await twin.deliverWebhooks();
   return { twinTime: twin.clock.nowIso(), scenarioEvents };
