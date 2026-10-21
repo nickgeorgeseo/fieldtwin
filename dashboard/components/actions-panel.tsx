@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { ACTIONS, actionKey } from "@/lib/actions.ts";
 import { twinSend } from "@/lib/twin-api.ts";
+import { vendorLabel } from "@/lib/vendors.ts";
 import { ChangeList } from "./change-list.tsx";
 import { useTwin } from "./twin-provider.tsx";
-import { Button, Card, NoticeLine, TextInput, VendorBadge, vendorLabel } from "./ui.tsx";
+import { Button, Card, NoticeLine, TextInput, VendorBadge } from "./ui.tsx";
 import { useAction } from "./use-action.ts";
 
 export function ActionsPanel() {

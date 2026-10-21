@@ -1,11 +1,12 @@
 import type { FieldService } from "@/lib/field-side.ts";
 import type { CustomerStatus, InvoiceStatus } from "@/lib/match-books.ts";
+import { VENDOR_LABELS } from "@/lib/vendors.ts";
 import type { BadgeTone } from "./ui.tsx";
 
 /** What each field-service system is called, and what it calls a customer. */
 export const FIELD_SERVICES: Record<FieldService, { name: string; customer: string }> = {
-  jobber: { name: "Jobber", customer: "client" },
-  housecallpro: { name: "Housecall Pro", customer: "customer" },
+  jobber: { name: VENDOR_LABELS.jobber, customer: "client" },
+  housecallpro: { name: VENDOR_LABELS.housecallpro, customer: "customer" },
 };
 
 interface Status {

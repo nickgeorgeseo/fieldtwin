@@ -2,17 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type EventFilter, filterEvents } from "@/lib/events.ts";
+import { VENDOR_LABELS } from "@/lib/vendors.ts";
 import { EventRow } from "./event-row.tsx";
 import { useTwin } from "./twin-provider.tsx";
 import { Button, TextInput } from "./ui.tsx";
 import { useEventLog } from "./use-event-log.ts";
 
-const VENDORS = [
-  { vendor: "", label: "All vendors" },
-  { vendor: "quickbooks", label: "QuickBooks" },
-  { vendor: "jobber", label: "Jobber" },
-  { vendor: "housecallpro", label: "Housecall Pro" },
-];
+const VENDORS = [{ vendor: "", label: "All vendors" }, ...Object.entries(VENDOR_LABELS).map(([vendor, label]) => ({ vendor, label }))];
 const SOURCES = [
   { source: "api", label: "Your code" },
   { source: "scenario", label: "Scenario" },

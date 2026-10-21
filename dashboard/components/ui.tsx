@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { vendorLabel } from "@/lib/vendors.ts";
 
 /** The few building blocks every panel shares, so the pages read as one tool. */
 
@@ -76,19 +77,10 @@ export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; childr
 }
 
 /** Each vendor keeps one color everywhere: in badges, the event feed, and the business view. */
-const VENDORS: Record<string, { tone: BadgeTone; label: string }> = {
-  quickbooks: { tone: "green", label: "QuickBooks" },
-  jobber: { tone: "sky", label: "Jobber" },
-  housecallpro: { tone: "pink", label: "Housecall Pro" },
-};
-
-/** A vendor's name as people write it ("Housecall Pro"), from the twin's name for it ("housecallpro"). */
-export function vendorLabel(vendor: string): string {
-  return VENDORS[vendor]?.label ?? vendor;
-}
+const VENDOR_TONES: Record<string, BadgeTone> = { quickbooks: "green", jobber: "sky", housecallpro: "pink" };
 
 export function VendorBadge({ vendor }: { vendor: string }) {
-  return <Badge tone={VENDORS[vendor]?.tone ?? "neutral"}>{vendorLabel(vendor)}</Badge>;
+  return <Badge tone={VENDOR_TONES[vendor] ?? "neutral"}>{vendorLabel(vendor)}</Badge>;
 }
 
 /** Who made a change: your code through the APIs, the scenario's timeline, the control plane, or the seed. */
