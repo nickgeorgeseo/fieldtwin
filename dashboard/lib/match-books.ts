@@ -1,4 +1,4 @@
-import { type Books, type HcpCustomer, hcpLineCents, type JobberClient, type QboCustomer, type QboInvoice } from "./books.ts";
+import { type Books, type HcpCustomer, hcpLinesCents, type JobberClient, type QboCustomer, type QboInvoice } from "./books.ts";
 
 /**
  * Where a field-service system and QuickBooks agree about the business, and where they have drifted apart. The twin
@@ -181,7 +181,7 @@ function fieldSide(books: Books, service: FieldService): FieldSide {
     invoices: books.housecallpro.invoices.map((invoice) => ({
       number: invoice.invoice_number,
       customerId: invoice.customer_id,
-      cents: invoice.items.reduce((sum, line) => sum + hcpLineCents(line), 0), // in cents already
+      cents: hcpLinesCents(invoice.items), // in cents already
       paid: invoice.paid_at !== null,
     })),
   };

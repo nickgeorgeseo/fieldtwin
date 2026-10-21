@@ -1,4 +1,4 @@
-import { hcpLineCents } from "./books.ts";
+import { hcpLinesCents } from "./books.ts";
 import type { TwinEvent } from "./twin-types.ts";
 
 /**
@@ -100,10 +100,9 @@ function amount(record: Fields): string {
     .join(" or ");
 }
 
-/** Housecall Pro's lines, in cents, added up as the twin adds them. */
+/** Housecall Pro's lines, in cents, whatever an event's lines hold. */
 function centsOf(lines: unknown[]): number {
-  const priced = lines.map((line) => ({ quantity: Number(field(line, "quantity")), unit_price: Number(field(line, "unit_price")) }));
-  return priced.reduce((total, line) => total + hcpLineCents(line), 0);
+  return hcpLinesCents(lines.map((line) => ({ quantity: Number(field(line, "quantity")), unit_price: Number(field(line, "unit_price")) })));
 }
 
 function field(value: unknown, key: string): unknown {
