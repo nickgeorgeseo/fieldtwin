@@ -51,34 +51,40 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
   notify(event, state): WebhookNotification[] {
     const data = asHcpEvent(event);
     const at = Date.parse(event.at);
+    const now = hcpTime(event.at); // as the records write it, to tell what this very event did
     const announce = (topic: string, itemId: string) => ({ topic, itemId, occurredAtMs: at });
-    if (data.type === "CustomerCreated") return [announce("customer.created", data.customer.id)];
-    if (data.type === "CustomerUpdated") return [announce("customer.updated", data.customer.id)];
-    // Completed by this very update: the last of its work was marked done just now.
-    if (data.type === "JobUpdated") {
-      const { completed_at } = workTimestamps(data.job.appointments);
-      return completed_at === hcpTime(event.at) ? [announce("job.completed", data.job.id)] : [];
+    switch (data.type) {
+      case "CustomerCreated":
+        return [announce("customer.created", data.customer.id)];
+      case "CustomerUpdated":
+        return [announce("customer.updated", data.customer.id)];
+      // "Job created", and "Job scheduled" too if it was made with a schedule.
+      case "JobCreated": {
+        const created = announce("job.created", data.job.id);
+        return data.job.appointments.length ? [created, announce("job.scheduled", data.job.id)] : [created];
+      }
+      // Completed by this very update: the last of its work was marked done just now.
+      case "JobUpdated":
+        return workTimestamps(data.job.appointments).completed_at === now ? [announce("job.completed", data.job.id)] : [];
+      // "Invoice created", and "Invoice sent to customer" too if it was sent as it was made.
+      case "InvoiceCreated": {
+        const created = announce("invoice.created", data.invoice.id);
+        return data.invoice.sent_at === now ? [created, announce("invoice.sent", data.invoice.id)] : [created];
+      }
+      // Paid by this very update: each payment made just now, the invoice if they cover it, and then its job if
+      // nothing more is owed on it.
+      case "InvoiceUpdated": {
+        const { invoice } = data;
+        const payments = invoice.payments
+          .filter((payment) => payment.paid_at === now && payment.status === "succeeded")
+          .map(() => announce("invoice.payment.succeeded", invoice.id));
+        if (invoice.paid_at !== now || invoiceStatus(invoice) !== "paid") return payments;
+        const jobPaid = outstandingBalance(state.jobs.get(invoice.job_id)!, state) === 0;
+        return [...payments, announce("invoice.paid", invoice.id), ...(jobPaid ? [announce("job.paid", invoice.job_id)] : [])];
+      }
+      default:
+        return [];
     }
-    // "Invoice created", and "Invoice sent to customer" too if it was sent as it was made.
-    if (data.type === "InvoiceCreated") {
-      const created = announce("invoice.created", data.invoice.id);
-      return data.invoice.sent_at === hcpTime(event.at) ? [created, announce("invoice.sent", data.invoice.id)] : [created];
-    }
-    // Paid by this very update: each payment made just now, the invoice if they cover it, and then its job if nothing
-    // more is owed on it.
-    if (data.type === "InvoiceUpdated") {
-      const { invoice } = data;
-      const now = hcpTime(event.at);
-      const payments = invoice.payments
-        .filter((payment) => payment.paid_at === now && payment.status === "succeeded")
-        .map(() => announce("invoice.payment.succeeded", invoice.id));
-      if (invoice.paid_at !== now || invoiceStatus(invoice) !== "paid") return payments;
-      const jobPaid = outstandingBalance(state.jobs.get(invoice.job_id)!, state) === 0;
-      return [...payments, announce("invoice.paid", invoice.id), ...(jobPaid ? [announce("job.paid", invoice.job_id)] : [])];
-    }
-    if (data.type !== "JobCreated") return [];
-    const created = announce("job.created", data.job.id);
-    return data.job.appointments.length ? [created, announce("job.scheduled", data.job.id)] : [created];
   },
 
   // Called as the event is recorded, so the record is as the event left it, even if the delivery goes out later.
