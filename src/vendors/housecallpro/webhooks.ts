@@ -5,6 +5,7 @@ import { asHcpEvent } from "./events.ts";
 import { customerResponse } from "./routes/customers.ts";
 import { invoiceResponse, invoiceStatus } from "./routes/invoice-response.ts";
 import { jobResponse, outstandingBalance } from "./routes/job-response.ts";
+import { NOTHING_EXPANDED } from "./routes/lists.ts";
 import { workTimestamps } from "./routes/work.ts";
 import type { HcpState } from "./types/index.ts";
 
@@ -109,5 +110,4 @@ function record(notification: WebhookNotification, state: HcpState) {
   return { job: { ...jobResponse(job, state, WITH_ATTACHMENTS), appointments } };
 }
 
-const NOTHING_EXPANDED = new Set<string>();
 const WITH_ATTACHMENTS = new Set(["attachments"]); // the Job Webhook Protocol always has them; the API only when expanded

@@ -108,12 +108,20 @@ function compare(a: Sortable, b: Sortable): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
+/** A list in the query string, as `name[]=a&name[]=b` (what Rails clients send) or `name=a`, without empty values. */
+export function listParam(req: ListRequest, name: string): string[] {
+  return [...(req.queries(`${name}[]`) ?? []), ...(req.queries(name) ?? [])].filter(Boolean);
+}
+
+/** For a record answered as it is, with nothing `expand` adds: what writes and webhooks send. */
+export const NOTHING_EXPANDED: ReadonlySet<string> = new Set();
+
 /**
  * The `expand` values asked for, as `expand[]=a&expand[]=b` (what Rails clients send) or `expand=a`, or what's wrong
  * with them. Each list documents the values it takes.
  */
 export function readExpand(req: ListRequest, allowed: readonly string[]): Set<string> | { problem: string } {
-  const asked = [...(req.queries("expand[]") ?? []), ...(req.queries("expand") ?? [])].filter(Boolean); // as filters ignore empties
+  const asked = listParam(req, "expand");
   const unknown = asked.find((value) => !allowed.includes(value));
   if (unknown !== undefined) return { problem: `expand takes ${allowed.join(" and ")}, not "${unknown}".` };
   return new Set(asked);

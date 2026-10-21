@@ -1,14 +1,9 @@
 import { readUtcTime } from "../../../core/clock.ts";
-import type { ListRequest } from "./lists.ts";
+import { type ListRequest, listParam } from "./lists.ts";
 
 /** Pieces the lists' filters share. Each list documents its own filters; see work-filters.ts and invoices.ts. */
 
 export type Test<T> = (record: T) => boolean;
-
-/** A list in the query string, as `name[]=a&name[]=b` (what Rails clients send) or `name=a`. */
-export function listParam(req: ListRequest, name: string): string[] {
-  return [...(req.queries(`${name}[]`) ?? []), ...(req.queries(name) ?? [])].filter(Boolean);
-}
 
 /**
  * `<field>_min` and `<field>_max` filters on times: "greater than or equal to" and "less than or equal to the date

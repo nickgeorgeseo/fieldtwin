@@ -2,6 +2,7 @@ import { lineAmount } from "../amounts.ts";
 import { zonedTime } from "../dates.ts";
 import type { HcpAppointment, HcpCompany, HcpLineItem, HcpState } from "../types/index.ts";
 import { customerResponse } from "./customers.ts";
+import { NOTHING_EXPANDED } from "./lists.ts";
 
 /**
  * What jobs and estimates share: "An estimate functions similarly to a job; they're scheduled, dispatched, and have
@@ -79,8 +80,6 @@ export function workCustomer(customerId: string, state: HcpState) {
 export function workAddress(customerId: string, addressId: string | null, state: HcpState) {
   return state.customers.get(customerId)!.addresses.find((address) => address.id === addressId) ?? null;
 }
-
-const NOTHING_EXPANDED = new Set<string>();
 
 /** A line item as the line item lists answer with it (the reference's LineItemResponse). */
 export function lineItemResponse(line: HcpLineItem, index: number) {

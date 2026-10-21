@@ -1,13 +1,13 @@
-import type { Context, Hono } from "hono";
+import type { Hono } from "hono";
 import { readJsonObject } from "../../../core/request-body.ts";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpTime } from "../dates.ts";
 import { hcpError } from "../errors.ts";
 import { hcpId } from "../ids.ts";
 import { ADDRESS_TEXT_FIELDS, type HcpCompany, type HcpCustomer, type HcpState } from "../types/index.ts";
-import { HCP } from "./base.ts";
+import { HCP, notFound } from "./base.ts";
 import { identityProblem, noCustomerText, readAddressList, readCustomerFields } from "./customer-body.ts";
-import { pageOf, readExpand, readList, sorted } from "./lists.ts";
+import { NOTHING_EXPANDED, pageOf, readExpand, readList, sorted } from "./lists.ts";
 
 /**
  * Customers. Get Customers:   https://docs.housecallpro.com/docs/housecall-public-api/042bd3bf861ae-get-customers
@@ -29,7 +29,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 
   app.get(`${HCP}/customers/:id`, (c) => {
     const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return notFound(c);
+    if (!customer) return notFound(c, "customer");
     const expand = readExpand(c.req, EXPANDABLE);
     if ("problem" in expand) return c.json(hcpError(expand.problem), 400);
     return c.json(customerResponse(customer, state().company, expand));
@@ -67,7 +67,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
     if ("problem" in read) return c.json(hcpError(read.problem), 400);
     // Only now, with the whole body read, is the customer looked up: nothing can change it between the read and the write.
     const existing = state().customers.get(c.req.param("id"));
-    if (!existing) return notFound(c);
+    if (!existing) return notFound(c, "customer");
     const fields = readCustomerFields(read.body);
     if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
     const missing = identityProblem({ ...existing, ...fields });
@@ -85,14 +85,9 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 
 const SORTABLE = ["created_at", "updated_at", "first_name", "last_name", "email", "company"] as const;
 const EXPANDABLE = ["attachments", "do_not_service"];
-const NOTHING_EXPANDED = new Set<string>();
-
-export function notFound(c: Context, what = "customer") {
-  return c.json(hcpError(`${what} not found`), 404);
-}
 
 /** A customer as the API answers with it: the record, the company it belongs to, and anything `expand` asked for. */
-export function customerResponse(customer: HcpCustomer, company: HcpCompany, expand: Set<string>) {
+export function customerResponse(customer: HcpCustomer, company: HcpCompany, expand: ReadonlySet<string>) {
   return {
     ...customer,
     company_name: company.name,

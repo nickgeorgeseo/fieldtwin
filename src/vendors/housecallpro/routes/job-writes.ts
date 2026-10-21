@@ -8,6 +8,7 @@ import type { HcpJob, HcpState } from "../types/index.ts";
 import { HCP } from "./base.ts";
 import { readJobRequest } from "./job-body.ts";
 import { jobResponse } from "./job-response.ts";
+import { NOTHING_EXPANDED } from "./lists.ts";
 
 /** Create a Job: https://docs.housecallpro.com/docs/housecall-public-api/2dcf481ed7d69-create-a-job */
 export function jobWriteRoutes(app: Hono, twin: Twin): void {
@@ -59,8 +60,6 @@ export function jobWriteRoutes(app: Hono, twin: Twin): void {
     return c.json(jobResponse(job, state(), NOTHING_EXPANDED), 201);
   });
 }
-
-const NOTHING_EXPANDED = new Set<string>();
 
 /**
  * "If left blank, one will be automatically generated": the twin takes the number after the highest so far, or none

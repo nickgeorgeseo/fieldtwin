@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
 import type { HcpState } from "../types/index.ts";
-import { listParam } from "./filters.ts";
+import { listParam } from "./lists.ts";
 
 /**
  * Multi-location accounts say which location a request is for with an `X-Company-Id` header or, the older way, a

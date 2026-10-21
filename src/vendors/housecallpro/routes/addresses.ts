@@ -4,9 +4,8 @@ import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
 import { hcpId } from "../ids.ts";
 import type { HcpAddress, HcpState } from "../types/index.ts";
-import { HCP } from "./base.ts";
+import { HCP, notFound } from "./base.ts";
 import { readAddress } from "./customer-body.ts";
-import { notFound } from "./customers.ts";
 import { pageOf, readList } from "./lists.ts";
 
 /**
@@ -22,7 +21,7 @@ export function addressRoutes(app: Hono, twin: Twin): void {
   // added in, and the list keeps it.
   app.get(`${HCP}/customers/:id/addresses`, (c) => {
     const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return notFound(c);
+    if (!customer) return notFound(c, "customer");
     const list = readList(c.req, { sortable: ["created_at", "updated_at"], sortBy: "created_at", expandable: [] });
     if ("problem" in list) return c.json(hcpError(list.problem), 400);
     const addresses = list.sort.descending ? [...customer.addresses].reverse() : customer.addresses;
@@ -35,7 +34,7 @@ export function addressRoutes(app: Hono, twin: Twin): void {
     if ("problem" in read) return c.json(hcpError(read.problem), 400);
     // Only now, with the whole body read, is the customer looked up: a reset or rewind meanwhile may have removed them.
     const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return notFound(c);
+    if (!customer) return notFound(c, "customer");
     const fields = readAddress(read.body, "address");
     if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
     const missing = REQUIRED.filter((name) => !fields[name]?.trim());
@@ -49,7 +48,7 @@ export function addressRoutes(app: Hono, twin: Twin): void {
 
   app.get(`${HCP}/customers/:id/addresses/:addressId`, (c) => {
     const customer = state().customers.get(c.req.param("id"));
-    if (!customer) return notFound(c);
+    if (!customer) return notFound(c, "customer");
     const address = customer.addresses.find((candidate) => candidate.id === c.req.param("addressId"));
     return address ? c.json(address) : notFound(c, "address");
   });
