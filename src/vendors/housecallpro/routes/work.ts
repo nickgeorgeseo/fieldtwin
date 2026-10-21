@@ -1,4 +1,3 @@
-import { localTime } from "../../../core/local-time.ts";
 import { lineAmount } from "../amounts.ts";
 import { zonedTime } from "../dates.ts";
 import type { HcpAppointment, HcpCompany, HcpLineItem, HcpState } from "../types/index.ts";
@@ -44,14 +43,14 @@ export function schedule(appointments: readonly HcpAppointment[], company: HcpCo
   const first = appointments[0];
   const last = appointments.at(-1);
   const zone = first ? company.time_zone : null;
-  const local = (time: string) => zonedTime(Date.parse(time), zone!);
+  const local = (time: string) => zonedTime(Date.parse(time), company.time_zone);
   return {
     scheduled_start: first?.start_time ?? null,
     scheduled_end: last?.end_time ?? null,
     arrival_window: first?.arrival_window_minutes ?? 0,
     time_zone: zone,
-    scheduled_start_local: first && zone ? local(first.start_time) : null,
-    scheduled_end_local: last && zone ? local(last.end_time) : null,
+    scheduled_start_local: first ? local(first.start_time) : null,
+    scheduled_end_local: last ? local(last.end_time) : null,
     ...(withAppointments && { appointments: appointments.map((appointment) => appointmentResponse(appointment, company)) }),
   };
 }
@@ -61,7 +60,7 @@ export function appointmentResponse(appointment: HcpAppointment, company: HcpCom
   const start = Date.parse(appointment.start_time);
   return {
     id: appointment.id,
-    start_date: (company.time_zone ? zonedTime(start, company.time_zone) : localTime(start, company.utcOffsetHours)).slice(0, 10),
+    start_date: zonedTime(start, company.time_zone).slice(0, 10),
     start_time: appointment.start_time,
     end_time: appointment.end_time,
     anytime: false,

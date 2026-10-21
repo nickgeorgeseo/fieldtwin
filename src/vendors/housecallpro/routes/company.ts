@@ -11,7 +11,6 @@ import { HCP } from "./base.ts";
  */
 export function companyRoutes(app: Hono, twin: Twin): void {
   app.get(`${HCP}/company`, (c) => {
-    const { utcOffsetHours: _, ...company } = twin.state<HcpState>("housecallpro").company;
-    return c.json({ ...company, default_arrival_window: null, locations: [] });
+    return c.json({ ...twin.state<HcpState>("housecallpro").company, default_arrival_window: null, locations: [] });
   });
 }

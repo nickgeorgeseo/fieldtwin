@@ -12,9 +12,8 @@ export interface HcpCompany {
   support_email: string | null;
   logo_url: string | null;
   website: string | null;
-  time_zone: string | null; // an IANA zone, like the Schedule object's time_zone
+  time_zone: string; // an IANA zone, like the Schedule object's time_zone
   address: HcpCompanyAddress;
-  utcOffsetHours: number; // not an API field; the business's offset, for local times
 }
 
 /** The company's address, in the shape the reference calls AddressCreate. */

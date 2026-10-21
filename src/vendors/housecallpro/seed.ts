@@ -1,6 +1,7 @@
 import { stableUuid } from "../../core/ids.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
+import { CITIES } from "../../world/word-lists.ts";
 import { hcpTime } from "./ids.ts";
 import { SeedIds } from "./seed-ids.ts";
 import { seedWork } from "./seed-work.ts";
@@ -99,7 +100,7 @@ const FIELD_TECH: HcpEmployee["permissions"] = {
 };
 
 function company(world: World): HcpCompany {
-  const { name, city, state, utcOffsetHours, street, postalCode, phone } = world.company;
+  const { name, city, state, street, postalCode, phone } = world.company;
   return {
     id: stableUuid("housecallpro/company"), // the docs don't show a company id's format; a UUID is the plainest guess
     name,
@@ -107,16 +108,7 @@ function company(world: World): HcpCompany {
     support_email: null,
     logo_url: null,
     website: null,
-    time_zone: TIME_ZONES[state] ?? null,
+    time_zone: CITIES.find((home) => home.city === city)!.timeZone, // the city's IANA zone, daylight saving and all
     address: { street, street_line_2: null, city, state, zip: postalCode, country: "US" },
-    utcOffsetHours,
   };
 }
-
-/** The IANA zone of each state the world's cities are in (world/word-lists.ts). */
-const TIME_ZONES: Record<string, string> = {
-  GA: "America/New_York",
-  NC: "America/New_York",
-  SC: "America/New_York",
-  TX: "America/Chicago",
-};
