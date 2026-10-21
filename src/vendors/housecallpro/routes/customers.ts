@@ -40,8 +40,8 @@ export function customerRoutes(app: Hono, twin: Twin): void {
     if ("problem" in read) return c.json(hcpError(read.problem), 400);
     const fields = readCustomerFields(read.body);
     const addresses = readAddressList(read.body.addresses);
-    if ("problem" in fields) return c.json(hcpError(fields.problem), 422);
-    if ("problem" in addresses) return c.json(hcpError(addresses.problem), 422);
+    if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
+    if ("problem" in addresses) return c.json(hcpError(addresses.problem), addresses.status);
     const missing = identityProblem(fields);
     if (missing) return c.json(hcpError(missing), 422);
 
@@ -69,7 +69,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
     const existing = state().customers.get(c.req.param("id"));
     if (!existing) return notFound(c);
     const fields = readCustomerFields(read.body);
-    if ("problem" in fields) return c.json(hcpError(fields.problem), 422);
+    if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
     const missing = identityProblem({ ...existing, ...fields });
     if (missing) return c.json(hcpError(missing), 422);
 

@@ -1,6 +1,7 @@
 import { isObject, shown } from "../../../core/request-body.ts";
 import { lineAmount } from "../amounts.ts";
 import type { HcpLineItem } from "../types/index.ts";
+import { type Refusal, refuse, withoutNulls } from "./body.ts";
 
 /**
  * Reading the line items a client sends (the reference's LineItemCreate and JobLineItemCreate). `name` is required.
@@ -10,9 +11,6 @@ import type { HcpLineItem } from "../types/index.ts";
  * total is never rounded, or answered as null.
  */
 export type LineFields = Omit<HcpLineItem, "id">;
-
-/** Something the twin can't take: what's wrong, and whether it is the request (422) or the twin (501). */
-export type Refusal = { status: 422 | 501; problem: string };
 
 export function readLineItems(value: unknown): LineFields[] | Refusal {
   if (value === undefined || value === null) return [];
@@ -31,7 +29,7 @@ export function readLineItems(value: unknown): LineFields[] | Refusal {
 
 function readLineItem(value: unknown, path: string): LineFields | Refusal {
   if (!isObject(value)) return refuse(`${path} must be a line item, like {"name": "Service call", "unit_price": 8900}.`);
-  if (value.pricing_form != null) return { status: 501, problem: `${path}.pricing_form: the twin doesn't model price forms yet.` };
+  if (value.pricing_form != null) return refuse(`${path}.pricing_form: the twin doesn't model price forms yet.`, 501);
   const fields = withoutNulls(value); // a field sent as null takes its default, as one not sent does
   const { name, description = null, unit_price = 0, unit_cost = 0, quantity = 1, kind = "labor", taxable = true } = fields;
   if (typeof name !== "string" || !name.trim()) return refuse(`${path}.name is required: a line item needs a name.`);
@@ -58,19 +56,10 @@ function readLineItem(value: unknown, path: string): LineFields | Refusal {
   }
   if (!KINDS.includes(kind as string)) return refuse(`${path}.kind must be one of ${KINDS.join(", ")}, not ${shown(kind)}.`);
   if (kind !== "labor" && kind !== "materials") {
-    return { status: 501, problem: `${path}.kind: the twin doesn't model ${kind} lines yet, only labor and materials.` };
+    return refuse(`${path}.kind: the twin doesn't model ${kind} lines yet, only labor and materials.`, 501);
   }
   if (typeof taxable !== "boolean") return refuse(`${path}.taxable must be true or false.`);
   return { name, description, unit_price: unit_price as number, unit_cost: unit_cost as number, quantity, kind, taxable };
 }
 
 const KINDS = ["materials", "labor", "fixed gratuity", "fixed discount", "percent discount"];
-
-export function refuse(problem: string): Refusal {
-  return { status: 422, problem };
-}
-
-/** The fields of `body` that aren't null: an optional field sent as null reads as one not sent. */
-export function withoutNulls(body: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null));
-}

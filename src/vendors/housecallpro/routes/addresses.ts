@@ -37,7 +37,7 @@ export function addressRoutes(app: Hono, twin: Twin): void {
     const customer = state().customers.get(c.req.param("id"));
     if (!customer) return notFound(c);
     const fields = readAddress(read.body, "address");
-    if ("problem" in fields) return c.json(hcpError(fields.problem), 422);
+    if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
     const missing = REQUIRED.filter((name) => !fields[name]?.trim());
     if (missing.length) return c.json(hcpError(`An address needs ${REQUIRED.join(", ")}. Missing: ${missing.join(", ")}.`), 422);
 

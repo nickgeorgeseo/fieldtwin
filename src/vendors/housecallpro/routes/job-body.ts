@@ -2,7 +2,8 @@ import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
 import { hcpTimeAt } from "../dates.ts";
 import type { HcpState } from "../types/index.ts";
-import { type LineFields, type Refusal, readLineItems, refuse, withoutNulls } from "./line-item-body.ts";
+import { type Refusal, refuse, withoutNulls } from "./body.ts";
+import { type LineFields, readLineItems } from "./line-item-body.ts";
 
 /**
  * Reading a Create a Job request (the reference's JobCreate): "Create a job with the ID for an already existing
@@ -21,22 +22,22 @@ export interface JobRequest {
 }
 
 /** The job a request asks for, or why the twin can't make it: 422 for the request, 404 for what it names, 501 for the twin. */
-export function readJobRequest(body: Record<string, unknown>, state: HcpState): JobRequest | Refusal | { status: 404; problem: string } {
+export function readJobRequest(body: Record<string, unknown>, state: HcpState): JobRequest | Refusal {
   const missing = ["customer_id", "address_id"].filter((name) => typeof body[name] !== "string" || !body[name]);
   if (missing.length)
     return refuse(`A job needs ${missing.join(" and ")}: "Create a job with the ID for an already existing address and customer."`);
   const fields = body.job_fields;
   if (isObject(fields) && (fields.job_type_id != null || fields.business_unit_id != null)) {
-    return { status: 501, problem: "job_fields: the twin doesn't model job types or business units yet." };
+    return refuse("job_fields: the twin doesn't model job types or business units yet.", 501);
   }
 
   const customer = state.customers.get(body.customer_id as string);
-  if (!customer) return { status: 404, problem: "customer not found" };
-  if (!customer.addresses.some((address) => address.id === body.address_id)) return { status: 404, problem: "address not found" };
+  if (!customer) return refuse("customer not found", 404);
+  if (!customer.addresses.some((address) => address.id === body.address_id)) return refuse("address not found", 404);
   const employees = body.assigned_employee_ids ?? [];
   if (!Array.isArray(employees) || !employees.every((id) => typeof id === "string"))
     return refuse("assigned_employee_ids must be a list of employee ids.");
-  if (employees.some((id) => !state.employees.has(id))) return { status: 404, problem: "employee not found" };
+  if (employees.some((id) => !state.employees.has(id))) return refuse("employee not found", 404);
 
   const invoiceNumber = readInvoiceNumber(body.invoice_number, state);
   if (typeof invoiceNumber === "object") return invoiceNumber;
@@ -83,7 +84,7 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   if (value === undefined || value === null) return undefined;
   if (!isObject(value))
     return refuse('schedule must be an object, like {"scheduled_start": "2026-07-20T14:00:00", "scheduled_end": "2026-07-20T16:00:00"}.');
-  if (value.anytime === true) return { status: 501, problem: "schedule.anytime: the twin doesn't model anytime schedules yet." };
+  if (value.anytime === true) return refuse("schedule.anytime: the twin doesn't model anytime schedules yet.", 501);
   const times: number[] = [];
   for (const name of ["scheduled_start", "scheduled_end"]) {
     const text = value[name];
