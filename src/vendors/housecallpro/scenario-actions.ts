@@ -5,9 +5,10 @@ import { linesTotal } from "./amounts.ts";
 import { hcpTime, hcpTimeAt } from "./dates.ts";
 import { customerName } from "./events.ts";
 import { hcpId } from "./ids.ts";
+import { customerFrom, invoiceFor, paidInFull } from "./records.ts";
 import { dueAmount } from "./routes/invoice-response.ts";
 import { workTimestamps } from "./routes/work.ts";
-import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./types/index.ts";
+import type { HcpJob, HcpState } from "./types/index.ts";
 
 /**
  * What a scenario timeline can make happen in Housecall Pro, as if a Pro did it in the app. Each returns complete
@@ -26,34 +27,9 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
       const firstNumber = state.counts.customers + 1;
       const people = newCustomers(random, world, firstNumber, count as number, [...state.customers.values()].map(customerName));
       return people.map((person, index) => {
-        const customer: HcpCustomer = {
-          id: hcpId("cus", firstNumber + index),
-          first_name: person.firstName,
-          last_name: person.lastName,
-          email: person.email,
-          mobile_number: person.phone,
-          home_number: null,
-          work_number: null,
-          company: null,
-          notifications_enabled: false, // as for one created through the API: the twin never assumes a customer agreed to messages
-          lead_source: null,
-          notes: null,
-          tags: [],
-          addresses: [
-            {
-              id: hcpId("adr", state.counts.addresses + 1 + index),
-              type: "service",
-              street: person.street,
-              street_line_2: null,
-              city: person.city,
-              state: person.state,
-              zip: person.postalCode,
-              country: "US",
-            },
-          ],
-          created_at: now,
-          updated_at: now,
-        };
+        const ids = { customer: hcpId("cus", firstNumber + index), address: hcpId("adr", state.counts.addresses + 1 + index) };
+        // Notifications off, as for a customer created through the API: the twin never assumes one agreed to messages.
+        const customer = customerFrom(person, ids, now, false);
         return { vendor: "housecallpro", type: "CustomerCreated", data: { customer } };
       });
     },
@@ -78,8 +54,8 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 
-  // A Pro invoices finished work and sends it at once, as the world's invoices were sent: the job's lines under the
-  // job's own number, as seed-work.ts bills them, due on the world's terms (FIDELITY.md). The fields are Get Invoices':
+  // A Pro invoices finished work and sends it at once, as the world's invoices were sent (records.ts), due on the
+  // world's terms (FIDELITY.md). The fields are Get Invoices':
   // https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
   // Work with nothing to bill is left: a $0 invoice would be paid with no payment, and the docs don't say what then.
   invoiceJobs: {
@@ -96,28 +72,14 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
         .sort((a, b) => Date.parse(a.finished) - Date.parse(b.finished))
         .slice(0, count as number)
         .map(({ job, finished }, index) => {
-          const invoice: HcpInvoice = {
-            id: hcpId("invoice", state.counts.invoices + 1 + index),
-            invoice_number: job.invoice_number,
-            job_id: job.id,
-            customer_id: job.customer_id,
-            items: job.line_items,
-            invoice_date: now,
-            service_date: finished,
-            sent_at: now,
-            due_at: dueAt,
-            paid_at: null,
-            payments: [],
-            created_at: now,
-            updated_at: now,
-          };
+          const times = { issuedAt: now, serviceDate: finished, dueAt, createdAt: now };
+          const invoice = invoiceFor(job, hcpId("invoice", state.counts.invoices + 1 + index), times);
           return { vendor: "housecallpro", type: "InvoiceCreated", data: { invoice } };
         });
     },
   },
 
-  // One payment for what is still owed, so the invoice is "paid". It is "external", like the world's payments: a
-  // scenario doesn't say how the customer paid (FIDELITY.md).
+  // One payment for what is still owed, so the invoice is "paid", as the world's paid invoices are (records.ts).
   payInvoices: {
     check: (count) => checkCount("housecallpro", "payInvoices", count),
     run: (count, { state, nowIso }) => {
@@ -127,15 +89,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
         .sort((a, b) => Date.parse(a.due_at) - Date.parse(b.due_at))
         .slice(0, count as number)
         .map((invoice, index) => {
-          const payment: HcpPayment = {
-            id: hcpId("pmt", state.counts.payments + 1 + index),
-            amount: dueAmount(invoice),
-            payment_method: "external",
-            status: "succeeded",
-            note: null,
-            paid_at: now,
-          };
-          const paid: HcpInvoice = { ...invoice, payments: [...invoice.payments, payment], paid_at: now, updated_at: now };
+          const paid = paidInFull(invoice, hcpId("pmt", state.counts.payments + 1 + index), now);
           return { vendor: "housecallpro", type: "InvoiceUpdated", data: { invoice: paid } };
         });
     },

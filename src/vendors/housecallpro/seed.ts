@@ -3,9 +3,10 @@ import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import { CITIES } from "../../world/word-lists.ts";
 import { hcpTime } from "./dates.ts";
+import { customerFrom } from "./records.ts";
 import { SeedIds } from "./seed-ids.ts";
 import { seedWork } from "./seed-work.ts";
-import type { HcpCompany, HcpCustomer, HcpEmployee } from "./types/index.ts";
+import type { HcpCompany, HcpEmployee } from "./types/index.ts";
 
 const SEED_TIME = hcpTime("2020-01-01T00:00:00.000Z");
 
@@ -19,34 +20,7 @@ export function seedHousecallPro(world: World): NewEvent[] {
   // everyone is spelled the way the field-service system has them (see world/drift.ts).
   for (const key of ids.customerKeys()) {
     const person = world.customers.find((candidate) => candidate.key === key)!;
-    const customer: HcpCustomer = {
-      id: ids.customer(key),
-      first_name: person.firstName,
-      last_name: person.lastName,
-      email: person.email,
-      mobile_number: person.phone,
-      home_number: null,
-      work_number: null,
-      company: null,
-      notifications_enabled: true,
-      lead_source: null,
-      notes: null,
-      tags: [],
-      addresses: [
-        {
-          id: ids.address(key),
-          type: "service",
-          street: person.street,
-          street_line_2: null,
-          city: person.city,
-          state: person.state,
-          zip: person.postalCode,
-          country: "US",
-        },
-      ],
-      created_at: SEED_TIME,
-      updated_at: SEED_TIME,
-    };
+    const customer = customerFrom(person, { customer: ids.customer(key), address: ids.address(key) }, SEED_TIME, true);
     record("CustomerCreated", { customer });
   }
 

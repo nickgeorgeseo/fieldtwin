@@ -2,10 +2,10 @@ import { toCents } from "../../core/money.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import type { WorldLineItem } from "../../world/history.ts";
-import { linesTotal } from "./amounts.ts";
 import { hcpTime } from "./dates.ts";
+import { invoiceFor, paidInFull } from "./records.ts";
 import type { SeedIds } from "./seed-ids.ts";
-import type { HcpEstimate, HcpInvoice, HcpJob, HcpLineItem } from "./types/index.ts";
+import type { HcpEstimate, HcpJob, HcpLineItem } from "./types/index.ts";
 
 /**
  * The business's work history in Housecall Pro: the world's quotes as estimates, each of its jobs with a visit as an
@@ -74,34 +74,16 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
     events.push({ vendor: "housecallpro", type: "JobCreated", data: { job } });
   }
 
-  // An invoice bills the job's lines under the job's own number. A paid one has a payment for all of it: the world
-  // doesn't say how customers paid, so it is "external", money that didn't go through Housecall Pro (FIDELITY.md).
+  // An invoice bills the job's lines, and a paid one has a payment for all of it (records.ts).
   for (const worldInvoice of world.history.invoices) {
     const job = jobs.get(worldInvoice.jobKey)!;
-    const paidAt = worldInvoice.paidAt ? hcpTime(worldInvoice.paidAt) : null;
-    const payment = paidAt && {
-      id: ids.next("pmt"),
-      amount: linesTotal(job.line_items),
-      payment_method: "external",
-      status: "succeeded",
-      note: null,
-      paid_at: paidAt,
-    };
-    const invoice: HcpInvoice = {
-      id: ids.numbered("invoice", worldInvoice.key),
-      invoice_number: job.invoice_number,
-      job_id: job.id,
-      customer_id: job.customer_id,
-      items: job.line_items,
-      invoice_date: hcpTime(worldInvoice.issuedAt),
-      service_date: job.appointments.at(-1)?.completed_at ?? null,
-      sent_at: hcpTime(worldInvoice.issuedAt),
-      due_at: hcpTime(worldInvoice.dueAt),
-      paid_at: paidAt,
-      payments: payment ? [payment] : [],
-      created_at: hcpTime(worldInvoice.createdAt),
-      updated_at: paidAt ?? hcpTime(worldInvoice.issuedAt),
-    };
+    const unpaid = invoiceFor(job, ids.numbered("invoice", worldInvoice.key), {
+      issuedAt: hcpTime(worldInvoice.issuedAt),
+      serviceDate: job.appointments.at(-1)?.completed_at ?? null,
+      dueAt: hcpTime(worldInvoice.dueAt),
+      createdAt: hcpTime(worldInvoice.createdAt),
+    });
+    const invoice = worldInvoice.paidAt ? paidInFull(unpaid, ids.next("pmt"), hcpTime(worldInvoice.paidAt)) : unpaid;
     events.push({ vendor: "housecallpro", type: "InvoiceCreated", data: { invoice } });
   }
   return events;
