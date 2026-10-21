@@ -1,4 +1,5 @@
-import { type Books, type HcpCustomer, hcpLinesCents, type JobberClient, type QboCustomer, type QboInvoice } from "./books.ts";
+import type { Books, QboCustomer, QboInvoice } from "./books.ts";
+import { type FieldService, fieldSide } from "./field-side.ts";
 
 /**
  * Where a field-service system and QuickBooks agree about the business, and where they have drifted apart. The twin
@@ -7,8 +8,6 @@ import { type Books, type HcpCustomer, hcpLinesCents, type JobberClient, type Qb
  * don't). Invoices match by number, one to one: the integration books the field-service system's invoice number as
  * QuickBooks' DocNumber, as the seeded books do (Jobber and Housecall Pro number each invoice as the world does).
  */
-
-export type FieldService = "jobber" | "housecallpro";
 
 export type CustomerStatus = "only-in-field-service" | "only-in-quickbooks" | "inactive-in-quickbooks" | "spelled-differently" | "same";
 
@@ -102,7 +101,7 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
       status: "in-sync",
     };
     const booked = pairs.get(invoice);
-    if (booked) row.quickbooks = asBooked(booked);
+    if (booked) row.quickbooks = asBookedInvoice(booked);
     row.status = invoiceStatus(row);
     return row;
   });
@@ -111,7 +110,7 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
     if (paired.has(invoice)) continue;
     rows.push({
       number: invoice.DocNumber ?? `Id ${invoice.Id}`,
-      quickbooks: asBooked(invoice),
+      quickbooks: asBookedInvoice(invoice),
       status: "only-in-quickbooks",
     });
   }
@@ -141,7 +140,7 @@ function pairUp<F, B>(field: F[], fieldKey: (record: F) => string, books: B[], b
   return pairs;
 }
 
-function asBooked(invoice: QboInvoice): InvoiceRow["quickbooks"] {
+function asBookedInvoice(invoice: QboInvoice): InvoiceRow["quickbooks"] {
   return { id: invoice.Id, customer: invoice.CustomerRef.name ?? "", total: invoice.TotalAmt, balance: invoice.Balance };
 }
 
@@ -154,55 +153,8 @@ function invoiceStatus({ field, quickbooks }: InvoiceRow): InvoiceStatus {
   return "in-sync";
 }
 
-/** A field-service system's customers and invoices, in the terms they are compared with the books in. */
-interface FieldSide {
-  customers: { id: string; name: string; email: string }[];
-  invoices: { number: string; customerId: string; cents: number; paid: boolean }[];
-}
-
-function fieldSide(books: Books, service: FieldService): FieldSide {
-  if (service === "jobber") {
-    return {
-      customers: books.jobber.clients.map((client) => ({ id: client.id, name: clientName(client), email: clientEmail(client) })),
-      invoices: books.jobber.invoices.map((invoice) => ({
-        number: invoice.invoiceNumber,
-        customerId: invoice.clientId,
-        cents: Math.round(invoice.lineItems.reduce((sum, line) => sum + line.totalPrice, 0) * 100),
-        paid: invoice.paidAt !== null,
-      })),
-    };
-  }
-  return {
-    customers: books.housecallpro.customers.map((customer) => ({
-      id: customer.id,
-      name: hcpCustomerName(customer),
-      email: customer.email?.toLowerCase() ?? "",
-    })),
-    invoices: books.housecallpro.invoices.map((invoice) => ({
-      number: invoice.invoice_number,
-      customerId: invoice.customer_id,
-      cents: hcpLinesCents(invoice.items), // in cents already
-      paid: invoice.paid_at !== null,
-    })),
-  };
-}
-
-function clientEmail(client: JobberClient): string {
-  return (client.emails.find((email) => email.primary) ?? client.emails[0])?.address.toLowerCase() ?? "";
-}
-
 function customerEmail(customer: QboCustomer): string {
   return customer.PrimaryEmailAddr?.Address?.toLowerCase() ?? "";
-}
-
-function clientName(client: JobberClient): string {
-  return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.companyName || "";
-}
-
-/** How Housecall Pro shows a customer: their name, or failing that their company, email, or a phone number. */
-function hcpCustomerName(customer: HcpCustomer): string {
-  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
-  return name || customer.company || customer.email || customer.mobile_number || customer.home_number || customer.work_number || "";
 }
 
 function nameOf(row: CustomerRow): string {

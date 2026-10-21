@@ -1,4 +1,5 @@
-import type { CustomerStatus, FieldService, InvoiceStatus } from "@/lib/match-books.ts";
+import type { FieldService } from "@/lib/field-side.ts";
+import type { CustomerStatus, InvoiceStatus } from "@/lib/match-books.ts";
 import type { BadgeTone } from "./ui.tsx";
 
 /** What each field-service system is called, and what it calls a customer. */

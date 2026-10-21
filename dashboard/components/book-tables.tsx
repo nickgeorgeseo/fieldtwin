@@ -1,4 +1,5 @@
-import type { CustomerRow, FieldService, InvoiceRow } from "@/lib/match-books.ts";
+import type { FieldService } from "@/lib/field-side.ts";
+import type { CustomerRow, InvoiceRow } from "@/lib/match-books.ts";
 import { customerStatuses, FIELD_SERVICES, invoiceStatuses, money } from "./book-statuses.ts";
 import { Badge } from "./ui.tsx";
 

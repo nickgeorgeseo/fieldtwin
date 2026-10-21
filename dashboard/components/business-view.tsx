@@ -2,7 +2,8 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { readBooks } from "@/lib/books.ts";
-import { type FieldService, matchCustomers, matchInvoices } from "@/lib/match-books.ts";
+import type { FieldService } from "@/lib/field-side.ts";
+import { matchCustomers, matchInvoices } from "@/lib/match-books.ts";
 import { customerStatuses, FIELD_SERVICES, invoiceStatuses } from "./book-statuses.ts";
 import { CustomerTable, InvoiceTable } from "./book-tables.tsx";
 import { Badge, type BadgeTone, Button } from "./ui.tsx";
