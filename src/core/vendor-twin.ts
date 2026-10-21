@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import type { World } from "../world/generate-world.ts";
 import type { SeededRandom } from "./random.ts";
+import { shown } from "./request-body.ts";
 import type { Twin } from "./twin.ts";
 import type { NewEvent, TwinEvent, VendorName } from "./types.ts";
 import type { VendorWebhooks } from "./webhooks.ts";
@@ -67,6 +68,17 @@ export function scenarioActionOf(vendor: VendorTwin, name: string): ScenarioActi
   const action = Object.hasOwn(actions, name) ? actions[name] : undefined;
   if (!action) throw new Error(`${vendor.name} has no scenario action "${name}". Available: ${Object.keys(actions).join(", ") || "none"}`);
   return action;
+}
+
+/**
+ * Checks an action's parameter that says how many ("payInvoices: 2"): a whole number of 1 or more, and at most `most`
+ * when the action makes that many records. Throws an Error naming the vendor and action, for check() to pass on.
+ */
+export function checkCount(vendor: VendorName, action: string, value: unknown, most?: number): void {
+  if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
+    const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
+    throw new Error(`${vendor} ${action} takes how many: a whole number ${range}, not ${shown(value)}`);
+  }
 }
 
 /** One thing a scenario can make happen: check its parameters when the scenario loads, run it when it's due. */

@@ -1,6 +1,5 @@
-import { shown } from "../../core/request-body.ts";
-import type { ScenarioAction } from "../../core/vendor-twin.ts";
-import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
+import { checkCount, type ScenarioAction } from "../../core/vendor-twin.ts";
+import { MOST_NEW_CUSTOMERS, newCustomers } from "../../world/generate-world.ts";
 import { NET_DAYS } from "../../world/history-stories.ts";
 import { linesTotal } from "./amounts.ts";
 import { customerName } from "./events.ts";
@@ -20,18 +19,14 @@ import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./ty
  */
 export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState>> = {
   newCustomers: {
-    check: (count) => checkCount("newCustomers", count, MOST_NEW_CUSTOMERS),
+    check: (count) => checkCount("housecallpro", "newCustomers", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
-      // Customers the books have and Housecall Pro doesn't (drift's accountingOnly) are taken too, so emails never clash.
-      const taken = new Set([...state.customers.values()].map(customerName));
-      for (const person of world.customers) taken.add(`${person.firstName} ${person.lastName}`);
       const now = hcpTime(nowIso);
-      return Array.from({ length: count as number }, (_, index) => {
-        const number = state.counts.customers + 1 + index;
-        const person = newCustomer(random, world, number, taken);
-        taken.add(`${person.firstName} ${person.lastName}`);
+      const firstNumber = state.counts.customers + 1;
+      const people = newCustomers(random, world, firstNumber, count as number, [...state.customers.values()].map(customerName));
+      return people.map((person, index) => {
         const customer: HcpCustomer = {
-          id: hcpId("cus", number),
+          id: hcpId("cus", firstNumber + index),
           first_name: person.firstName,
           last_name: person.lastName,
           email: person.email,
@@ -66,7 +61,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
   // A tech marks the work done, and the job is "complete unrated" (routes/work.ts). Only work whose time has come is
   // finished: a job with a visit still ahead waits for it, so no job is done before it was due to start.
   completeJobs: {
-    check: (count) => checkCount("completeJobs", count),
+    check: (count) => checkCount("housecallpro", "completeJobs", count),
     run: (count, { state, nowIso }) => {
       const now = hcpTime(nowIso);
       return [...state.jobs.values()]
@@ -87,7 +82,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
   // https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
   // Work with nothing to bill is left: a $0 invoice would be paid with no payment, and the docs don't say what then.
   invoiceJobs: {
-    check: (count) => checkCount("invoiceJobs", count),
+    check: (count) => checkCount("housecallpro", "invoiceJobs", count),
     run: (count, { state, nowIso }) => {
       const now = hcpTime(nowIso);
       const dueAt = hcpTime(new Date(Date.parse(nowIso) + NET_DAYS * DAY_MS).toISOString());
@@ -123,7 +118,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
   // One payment for what is still owed, so the invoice is "paid". It is "external", like the world's payments: a
   // scenario doesn't say how the customer paid (FIDELITY.md).
   payInvoices: {
-    check: (count) => checkCount("payInvoices", count),
+    check: (count) => checkCount("housecallpro", "payInvoices", count),
     run: (count, { state, nowIso }) => {
       const now = hcpTime(nowIso);
       return [...state.invoices.values()]
@@ -147,10 +142,3 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
 };
 
 const DAY_MS = 86_400_000;
-
-function checkCount(action: string, value: unknown, most?: number): void {
-  if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
-    const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
-    throw new Error(`housecallpro ${action} takes how many: a whole number ${range}, not ${shown(value)}`);
-  }
-}

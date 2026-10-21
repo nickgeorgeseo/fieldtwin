@@ -1,6 +1,5 @@
-import { shown } from "../../core/request-body.ts";
-import type { ScenarioAction } from "../../core/vendor-twin.ts";
-import { MOST_NEW_CUSTOMERS, newCustomer } from "../../world/generate-world.ts";
+import { checkCount, type ScenarioAction } from "../../core/vendor-twin.ts";
+import { MOST_NEW_CUSTOMERS, newCustomers } from "../../world/generate-world.ts";
 import { encodeId, nextIdNumber } from "./encoded-id.ts";
 import { clientName, type JobberClient, type JobberState } from "./types.ts";
 
@@ -13,15 +12,11 @@ import { clientName, type JobberClient, type JobberState } from "./types.ts";
  */
 export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> = {
   newClients: {
-    check: (count) => checkCount("newClients", count, MOST_NEW_CUSTOMERS),
+    check: (count) => checkCount("jobber", "newClients", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
-      // Customers the books have and Jobber doesn't (drift's accountingOnly) are taken too, so emails never clash.
-      const taken = new Set([...state.clients.values()].map(clientName));
-      for (const person of world.customers) taken.add(`${person.firstName} ${person.lastName}`);
       const firstNumber = nextIdNumber(state.clients.keys(), "Client");
-      return Array.from({ length: count as number }, (_, index) => {
-        const person = newCustomer(random, world, firstNumber + index, taken);
-        taken.add(`${person.firstName} ${person.lastName}`);
+      const people = newCustomers(random, world, firstNumber, count as number, [...state.clients.values()].map(clientName));
+      return people.map((person, index) => {
         const client: JobberClient = {
           id: encodeId("Client", firstNumber + index),
           firstName: person.firstName,
@@ -37,7 +32,7 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
   },
 
   payInvoices: {
-    check: (count) => checkCount("payInvoices", count),
+    check: (count) => checkCount("jobber", "payInvoices", count),
     run: (count, { state, nowIso }) =>
       [...state.invoices.values()]
         .filter((invoice) => !invoice.paidAt)
@@ -50,10 +45,3 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
         })),
   },
 };
-
-function checkCount(action: string, value: unknown, most?: number): void {
-  if (!Number.isInteger(value) || (value as number) < 1 || (most !== undefined && (value as number) > most)) {
-    const range = most === undefined ? "of 1 or more" : `from 1 to ${most.toLocaleString("en-US")}`;
-    throw new Error(`jobber ${action} takes how many: a whole number ${range}, not ${shown(value)}`);
-  }
-}

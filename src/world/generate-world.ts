@@ -134,12 +134,26 @@ function makeCustomers(random: SeededRandom, count: number, home: Home): WorldCu
 export const MOST_NEW_CUSTOMERS = 1000;
 
 /**
- * Someone new to the business, for scenario timelines ("15 new clients by 9 a.m."): local to the world's
- * city, with a name nobody in `takenNames` has ("First Last"), numbered `n` so their email is unique.
+ * `count` people new to the business, for scenario timelines ("15 new clients by 9 a.m."), numbered from
+ * `firstNumber` so their emails are unique. Nobody shares a name with the vendor's own customers (`takenNames`,
+ * "First Last"), with anyone else the world has, customers only the books know included, or with each other.
+ */
+export function newCustomers(random: SeededRandom, world: World, firstNumber: number, count: number, takenNames: Iterable<string>) {
+  const taken = new Set(takenNames);
+  for (const person of world.customers) taken.add(`${person.firstName} ${person.lastName}`);
+  return Array.from({ length: count }, (_, index) => {
+    const person = newCustomer(random, world, firstNumber + index, taken);
+    taken.add(`${person.firstName} ${person.lastName}`);
+    return person;
+  });
+}
+
+/**
+ * Someone new to the business: local to the world's city, with a name nobody in `takenNames` has, numbered `n`.
  * Once the word lists' names are all taken, newcomers get a middle initial ("Avery J. Brooks"), so a timeline
  * that runs for weeks of twin time never fails for want of a name.
  */
-export function newCustomer(random: SeededRandom, world: World, n: number, takenNames: Set<string>): WorldCustomer {
+function newCustomer(random: SeededRandom, world: World, n: number, takenNames: Set<string>): WorldCustomer {
   const home = CITIES.find((city) => city.city === world.company.city)!;
   for (let attempt = 0; attempt < 50; attempt++) {
     const firstName = random.pick(FIRST_NAMES);
