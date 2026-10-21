@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
+import { readUtcTime } from "../../../core/clock.ts";
 import type { Twin } from "../../../core/twin.ts";
-import { qboDateTimeMs } from "../dates.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboEntityName, QboState } from "../types.ts";
 import { asResponse, COMPANY, ENTITY_RECORDS, entityNamed } from "./entity.ts";
@@ -28,7 +28,7 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
     if (!entityList) return c.json(qboErrors.missingField("entities", now()), 400);
     if (!changedSince) return c.json(qboErrors.missingField("changedSince", now()), 400);
 
-    const sinceMs = qboDateTimeMs(changedSince);
+    const sinceMs = readUtcTime(changedSince);
     if (sinceMs === undefined) return c.json(qboErrors.invalidDate("changedSince", changedSince, now()), 400);
     if (twin.clock.nowMs() - sinceMs > LOOK_BACK_DAYS * 86_400_000) {
       return c.json(qboErrors.invalidDateRange("changedSince", `changedSince must be within the last ${LOOK_BACK_DAYS} days`, now()), 400);

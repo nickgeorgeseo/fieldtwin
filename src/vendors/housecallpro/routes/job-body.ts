@@ -1,5 +1,5 @@
+import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
-import { readTime } from "../dates.ts";
 import { hcpTime } from "../ids.ts";
 import type { HcpState } from "../types/index.ts";
 import { type LineFields, type Refusal, readLineItems, refuse, withoutNulls } from "./line-item-body.ts";
@@ -87,7 +87,7 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   const times: number[] = [];
   for (const name of ["scheduled_start", "scheduled_end"]) {
     const text = value[name];
-    const ms = typeof text === "string" ? readTime(text) : undefined;
+    const ms = typeof text === "string" ? readUtcTime(text) : undefined;
     if (ms === undefined)
       return refuse(`schedule.${name} is required, as an ISO-8601 date and time like 2026-07-20T14:00:00, not ${shown(text)}.`);
     // Before standard time, a zone's offset had seconds in it (Chicago's was -05:50:36), which no ISO-8601 offset can

@@ -1,4 +1,5 @@
-import { qboDate, qboDateTimeMs } from "./dates.ts";
+import { readUtcTime } from "../../core/clock.ts";
+import { qboDate } from "./dates.ts";
 import type { QboQuery, QueryCondition, QueryOperator, QueryValue } from "./query-language.ts";
 
 /**
@@ -16,7 +17,7 @@ const BOOLEANS = ["Active"];
 /** A value as it compares, for its property. undefined if the twin can't read it as that kind of value. */
 export function comparable(property: string, value: unknown): unknown {
   if (value === undefined || value === null) return undefined;
-  if (METADATA.includes(property)) return qboDateTimeMs(String(value));
+  if (METADATA.includes(property)) return readUtcTime(String(value));
   if (DATES.includes(property)) return qboDate(value);
   if (NUMBERS.includes(property)) {
     if (typeof value === "number") return value;

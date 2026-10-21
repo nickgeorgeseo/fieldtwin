@@ -13,6 +13,26 @@ export function parseTwinTime(text: string): number | undefined {
 }
 
 /**
+ * A date or date-time a client sent ("2026-07-13", "2026-07-13T15:30:00", "2011-08-10T10:20:30-0700",
+ * "2026-07-13T11:00:00.000Z"), in epoch milliseconds; undefined if it isn't one. A time without an offset is read
+ * as UTC, as the vendors write their own times (each vendor's FIDELITY.md rows say where that is a guess). Never hand
+ * such a value to Date.parse: it would use the host's time zone, and answers would depend on the machine.
+ */
+export function readUtcTime(value: string): number | undefined {
+  const match = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)([Zz]|[+-]\d{2}:?\d{2})?)?$/.exec(value.trim());
+  if (!match?.[1] || !isRealDate(match[1])) return undefined;
+  const [, date, time = "00:00", zone = "Z"] = match;
+  const ms = Date.parse(`${date}T${time}${zone.replace(/^([+-]\d{2})(\d{2})$/, "$1:$2").toUpperCase()}`);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+/** Whether YYYY-MM-DD is a day the calendar has: 2026-02-30 isn't, though Date would roll it over into March. */
+export function isRealDate(iso: string): boolean {
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(iso);
+}
+
+/**
  * Twin time.
  *
  * Nothing in this codebase calls Date.now(). Everything asks the clock instead.

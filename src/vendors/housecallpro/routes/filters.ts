@@ -1,4 +1,4 @@
-import { readTime } from "../dates.ts";
+import { readUtcTime } from "../../../core/clock.ts";
 import type { ListRequest } from "./lists.ts";
 
 /** Pieces the lists' filters share. Each list documents its own filters; see work-filters.ts and invoices.ts. */
@@ -12,7 +12,8 @@ export function listParam(req: ListRequest, name: string): string[] {
 
 /**
  * `<field>_min` and `<field>_max` filters on times: "greater than or equal to" and "less than or equal to the date
- * sent". A record without the time matches neither. Adds a test per filter sent, or says what's wrong with one.
+ * sent". A time without an offset is UTC, as the docs write times ("ISO-8601 formatted date string in UTC"). A record
+ * without the time matches neither. Adds a test per filter sent, or says what's wrong with one.
  */
 export function timeRange<T>(
   req: ListRequest,
@@ -23,7 +24,7 @@ export function timeRange<T>(
   for (const bound of ["min", "max"] as const) {
     const value = req.query(`${name}_${bound}`);
     if (!value) continue;
-    const limit = readTime(value);
+    const limit = readUtcTime(value);
     if (limit === undefined) return `${name}_${bound} must be a date or a date and time in UTC, like 2026-07-13T15:30:00, not "${value}".`;
     tests.push((record) => {
       const time = read(record);
