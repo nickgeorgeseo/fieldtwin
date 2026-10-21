@@ -1,3 +1,4 @@
+import { toCents } from "../../core/money.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import type { WorldLineItem } from "../../world/history.ts";
@@ -127,7 +128,7 @@ function lineItems(lines: WorldLineItem[], world: World, ids: SeedIds): HcpLineI
       id: ids.next("li"),
       name: line.name,
       description: line.description,
-      unit_price: Math.round(line.unitPrice * 100),
+      unit_price: toCents(line.unitPrice),
       unit_cost: 0, // the documented default: the world doesn't know what the business paid
       quantity: line.quantity,
       kind: part ? "materials" : "labor",
