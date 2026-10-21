@@ -8,7 +8,7 @@
  * FIDELITY.md marks these to check against a real account.
  */
 
-export interface HcpError {
+interface HcpError {
   error: { message: string };
 }
 

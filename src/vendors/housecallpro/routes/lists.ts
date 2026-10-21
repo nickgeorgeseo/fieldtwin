@@ -68,7 +68,7 @@ export interface Sort<Key extends string> {
 }
 
 /** The sort asked for, from the attributes this list sorts by, or what's wrong with it. */
-export function readSort<Key extends string>(req: ListRequest, sortable: readonly Key[], fallback: Key): Sort<Key> | { problem: string } {
+function readSort<Key extends string>(req: ListRequest, sortable: readonly Key[], fallback: Key): Sort<Key> | { problem: string } {
   const by = req.query("sort_by") || fallback;
   const direction = req.query("sort_direction") || "desc";
   if (!(sortable as readonly string[]).includes(by)) return { problem: `sort_by must be one of ${sortable.join(", ")}, not "${by}".` };

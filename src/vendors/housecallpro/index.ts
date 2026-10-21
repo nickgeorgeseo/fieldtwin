@@ -19,6 +19,6 @@ export const housecallproTwin: VendorTwin<HcpState> = {
   routes: housecallproRoutes,
   scenarioActions: housecallproScenarioActions,
   webhooks: housecallproWebhooks,
-  errorBody: (status, message) => hcpErrorForStatus(status, message),
+  errorBody: hcpErrorForStatus,
   errorHeaders: (status, twin) => hcpErrorHeaders(status, twin.clock.nowMs()),
 };
