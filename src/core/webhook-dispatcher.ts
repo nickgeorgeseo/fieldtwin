@@ -24,6 +24,7 @@ export class WebhookDispatcher {
   private nextNumber = 1;
   private running: Promise<void> = Promise.resolve();
   private generation = 0; // bumped by dropPending(), so a delivery already on its way when the world changed is forgotten
+  private quiet = false; // set by quietly(): what is recorded meanwhile is history, not news
 
   constructor(private readonly send: WebhookSender) {}
 
@@ -32,6 +33,7 @@ export class WebhookDispatcher {
    * bookkeeping, and a bug here must never turn a write that happened into an error.
    */
   notice(event: TwinEvent, vendor: VendorTwin, state: unknown, nowMs: number): void {
+    if (this.quiet) return;
     try {
       this.queueFor(event, vendor, state, nowMs);
     } catch (error) {
@@ -92,6 +94,19 @@ export class WebhookDispatcher {
   /** The latest deliveries, oldest first, without their payloads. */
   deliveries(): Delivery[] {
     return this.recent.map(({ dueMs: _dueMs, request: _request, policy: _policy, ...delivery }) => ({ ...delivery }));
+  }
+
+  /**
+   * Run `record` with nothing it records counting as news, as when the world or its history is rebuilt: no event
+   * recorded meanwhile queues a delivery, even if `record` throws.
+   */
+  quietly(record: () => void): void {
+    this.quiet = true;
+    try {
+      record();
+    } finally {
+      this.quiet = false;
+    }
   }
 
   /** Forget deliveries not yet made, and any on their way: the events behind them were reset or rewound away. */

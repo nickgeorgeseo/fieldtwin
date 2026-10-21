@@ -40,7 +40,6 @@ export class Twin {
 
   // Webhook subscriptions and deliveries: bookkeeping too. See webhooks.ts and webhook-dispatcher.ts.
   readonly webhooks: WebhookDispatcher;
-  private rebuilding = false; // while the world or its history is being rebuilt, nothing is news to anyone
 
   constructor(private options: TwinOptions) {
     for (const vendor of options.vendors) this.vendors.set(vendor.name, vendor);
@@ -55,7 +54,7 @@ export class Twin {
     const recorded = this.log.append({ ...event, at: this.clock.nowIso(), source });
     const vendor = this.vendor(event.vendor);
     vendor.apply(this.state(event.vendor), recorded);
-    if (!this.rebuilding) this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs());
+    this.webhooks.notice(recorded, vendor, this.state(event.vendor), this.clock.nowMs()); // not while history is replayed: quietly()
     return recorded;
   }
 
@@ -116,17 +115,16 @@ export class Twin {
   }
 
   /**
-   * Back to the seeded starting world, with the loaded scenario's faults. Same seed and options give a byte-identical
-   * log. All or nothing, like load(): if an entry due at the start throws, the twin is left as it was.
+   * Back to the seeded starting world, with the loaded scenario's faults: the same seed and options give a byte-identical
+   * log. All or nothing, like load().
    */
   reset(): void {
     this.startOver(() => this.rebuild(startingPoint(this.options)));
   }
 
   /**
-   * Replace the twin's history by `rebuild`, all or nothing. If it throws, everything it replaced is put back, so the
-   * twin is exactly as it was. Once it works, rate-limit budgets start full and pending deliveries are dropped, since
-   * they are bookkeeping about the requests of the history it replaced.
+   * Replace the twin's history by `rebuild`, all or nothing: if it throws, everything it replaced is put back. Once it
+   * works, rate-limit budgets start full and pending deliveries are dropped, as bookkeeping about the history it replaced.
    */
   private startOver(rebuild: () => void): void {
     const { options, clock, log, world, faultRules, faultRandom, states, checkpoints } = this;
@@ -147,13 +145,14 @@ export class Twin {
     this.world = world;
     this.faultRules = this.options.faults ?? [];
     this.checkpoints = new Checkpoints(); // a new one, so a rebuild that fails can put the old one back
-    this.asHistory(() => {
+    // The seeded world, then the scheduled entries already due: history, not news, so none of it sends a webhook.
+    this.webhooks.quietly(() => {
       for (const vendor of this.vendors.values()) {
         for (const event of vendor.seed(this.world)) this.record(event, "seed");
       }
+      this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
+      this.timeline.runDue(this.clock.nowMs());
     });
-    this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
-    this.catchUp();
   }
 
   /** Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. */
@@ -163,21 +162,6 @@ export class Twin {
     this.log = new EventLog();
     this.states = new Map([...this.vendors.values()].map((v) => [v.name, v.createState()]));
     for (const event of history) this.vendor(event.vendor).apply(this.state(event.vendor), this.log.append(event));
-  }
-
-  /** Apply the scheduled entries already due. They are history, not news, so they send no webhooks. */
-  private catchUp(): void {
-    this.asHistory(() => this.timeline.runDue(this.clock.nowMs()));
-  }
-
-  /** Record history rather than news: nothing recorded meanwhile sends a webhook, even if something throws. */
-  private asHistory(record: () => void): void {
-    this.rebuilding = true;
-    try {
-      record();
-    } finally {
-      this.rebuilding = false;
-    }
   }
 
   /** A vendor's OAuth server, created on first use with the vendor's documented policy. */
