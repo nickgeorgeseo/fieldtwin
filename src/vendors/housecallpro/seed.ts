@@ -2,7 +2,7 @@ import { stableUuid } from "../../core/ids.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import { CITIES } from "../../world/word-lists.ts";
-import { hcpTime } from "./ids.ts";
+import { hcpTime } from "./dates.ts";
 import { SeedIds } from "./seed-ids.ts";
 import { seedWork } from "./seed-work.ts";
 import type { HcpCompany, HcpCustomer, HcpEmployee } from "./types/index.ts";

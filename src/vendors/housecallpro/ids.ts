@@ -13,8 +13,3 @@ export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "note"
 export function hcpId(prefix: HcpIdPrefix, n: number | string): string {
   return `${prefix}_${stableUuid(`housecallpro/${prefix}/${n}`).replaceAll("-", "")}`;
 }
-
-/** Housecall Pro's timestamps: UTC ISO 8601 to the second, like the reference's samples ("2026-09-02T14:31:07Z"). */
-export function hcpTime(iso: string): string {
-  return iso.replace(/\.\d{3}Z$/, "Z");
-}

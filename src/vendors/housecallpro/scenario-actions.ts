@@ -2,8 +2,9 @@ import { checkCount, type ScenarioAction } from "../../core/vendor-twin.ts";
 import { MOST_NEW_CUSTOMERS, newCustomers } from "../../world/generate-world.ts";
 import { NET_DAYS } from "../../world/history-stories.ts";
 import { linesTotal } from "./amounts.ts";
+import { hcpTime, hcpTimeAt } from "./dates.ts";
 import { customerName } from "./events.ts";
-import { hcpId, hcpTime } from "./ids.ts";
+import { hcpId } from "./ids.ts";
 import { dueAmount } from "./routes/invoice-response.ts";
 import { workTimestamps } from "./routes/work.ts";
 import type { HcpCustomer, HcpInvoice, HcpJob, HcpPayment, HcpState } from "./types/index.ts";
@@ -85,7 +86,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     check: (count) => checkCount("housecallpro", "invoiceJobs", count),
     run: (count, { state, nowIso }) => {
       const now = hcpTime(nowIso);
-      const dueAt = hcpTime(new Date(Date.parse(nowIso) + NET_DAYS * DAY_MS).toISOString());
+      const dueAt = hcpTimeAt(Date.parse(nowIso) + NET_DAYS * DAY_MS);
       return [...state.jobs.values()]
         .flatMap((job) => {
           const finished = workTimestamps(job.appointments).completed_at;

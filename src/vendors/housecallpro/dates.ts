@@ -1,3 +1,13 @@
+/** Housecall Pro's timestamps: UTC ISO 8601 to the second, like the reference's samples ("2026-09-02T14:31:07Z"). */
+export function hcpTime(iso: string): string {
+  return iso.replace(/\.\d{3}Z$/, "Z");
+}
+
+/** The same, for a moment in epoch milliseconds. */
+export function hcpTimeAt(ms: number): string {
+  return hcpTime(new Date(ms).toISOString());
+}
+
 /**
  * "2026-12-14T23:30:00-06:00": a moment as clocks in an IANA time zone show it, with the offset the zone has at that
  * moment, daylight saving included. That is how `scheduled_start_local` is documented: "scheduled_start expressed in

@@ -1,6 +1,6 @@
 import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
-import { hcpTime } from "../ids.ts";
+import { hcpTimeAt } from "../dates.ts";
 import type { HcpState } from "../types/index.ts";
 import { type LineFields, type Refusal, readLineItems, refuse, withoutNulls } from "./line-item-body.ts";
 
@@ -102,9 +102,5 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   // A safe integer, so it is written as digits (never 1e+21) and a client can read it back as a whole number.
   if (!Number.isSafeInteger(arrival_window) || (arrival_window as number) < 0)
     return refuse(`schedule.arrival_window must be whole minutes of 0 or more, not ${shown(arrival_window)}.`);
-  return { start: iso(start), end: iso(end), arrivalWindow: arrival_window as number };
-}
-
-function iso(ms: number): string {
-  return hcpTime(new Date(ms).toISOString());
+  return { start: hcpTimeAt(start), end: hcpTimeAt(end), arrivalWindow: arrival_window as number };
 }

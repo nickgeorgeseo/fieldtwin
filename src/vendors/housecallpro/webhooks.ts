@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { VendorWebhooks, WebhookNotification } from "../../core/webhooks.ts";
+import { hcpTime, hcpTimeAt } from "./dates.ts";
 import { asHcpEvent } from "./events.ts";
-import { hcpTime } from "./ids.ts";
 import { customerResponse } from "./routes/customers.ts";
 import { invoiceResponse, invoiceStatus } from "./routes/invoice-response.ts";
 import { jobResponse, outstandingBalance } from "./routes/job-response.ts";
@@ -82,7 +82,7 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
 
   // Called as the event is recorded, so the record is as the event left it, even if the delivery goes out later.
   request(notification, subscription, state) {
-    const at = hcpTime(new Date(notification.occurredAtMs).toISOString());
+    const at = hcpTimeAt(notification.occurredAtMs);
     const shared = { event: notification.topic, company_id: state.company.id, event_occurred_at: at, event_created_at: at };
     const body = JSON.stringify({ ...shared, ...record(notification, state) });
     const timestamp = String(Math.floor(notification.occurredAtMs / 1000));
