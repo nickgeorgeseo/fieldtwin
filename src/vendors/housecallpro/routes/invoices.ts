@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
+import { linesTotal } from "../amounts.ts";
 import { hcpError } from "../errors.ts";
 import type { HcpInvoice, HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
@@ -40,7 +41,7 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
 const SORTABLE = ["amount", "created_at", "due_amount", "due_at", "invoice_number", "paid_at", "sent_at", "status", "updated_at"] as const;
 
 function sortValue(invoice: HcpInvoice, by: (typeof SORTABLE)[number]): string | number | null {
-  if (by === "amount") return invoiceResponse(invoice, false).amount;
+  if (by === "amount") return linesTotal(invoice.items);
   if (by === "due_amount") return dueAmount(invoice);
   if (by === "status") return invoiceStatus(invoice);
   if (by === "invoice_number") return invoiceNumberOrder(invoice.invoice_number);
