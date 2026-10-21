@@ -1,9 +1,10 @@
 import { parseTwinTime } from "../core/clock.ts";
 import { SeededRandom } from "../core/random.ts";
 import type { Twin } from "../core/twin.ts";
-import type { AuthMode, EventSource, FaultRule, TwinEvent, VendorName } from "../core/types.ts";
+import type { AuthMode, EventSource, TwinEvent, VendorName } from "../core/types.ts";
 import { scenarioActionOf } from "../core/vendor-twin.ts";
-import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscriptions, readScenarioFile, resolveAt } from "./scenario.ts";
+import { listScenarioFiles, parseFaultRules, parseScenario, readScenarioFile, resolveAt } from "./scenario.ts";
+import { checkWebhookTopics, knownVendor } from "./webhook-operations.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -11,6 +12,9 @@ import { listScenarioFiles, parseFaultRules, parseScenario, parseWebhookSubscrip
  * The HTTP control plane, the MCP server, and the tests all call these same functions,
  * so there is exactly one implementation of each operation.
  */
+
+// The webhook operations live in a file of their own, and are offered here with the rest.
+export { describeWebhooks, setWebhooks } from "./webhook-operations.ts";
 
 export function describeTwin(twin: Twin) {
   return {
@@ -76,31 +80,6 @@ export async function runAction(twin: Twin, vendorName: string, action: string, 
   return { events: recorded.map((event) => summarize(twin, event)) };
 }
 
-/**
- * Replace the webhook subscriptions: the URLs and topics an app would set up in each vendor's developer settings.
- * Like OAuth connections, they belong to the app, so they survive reset and rewind.
- */
-export function setWebhooks(twin: Twin, value: unknown) {
-  const subscriptions = parseWebhookSubscriptions(value);
-  for (const { vendor, topics } of subscriptions) checkTopics(twin, vendor, topics, "");
-  twin.webhooks.subscriptions = subscriptions;
-  return describeWebhooks(twin);
-}
-
-/** The subscriptions (without their secrets) and the latest deliveries, with how each one went. */
-export function describeWebhooks(twin: Twin) {
-  return {
-    subscriptions: twin.webhooks.subscriptions.map(({ clientSecret: _secret, ...subscription }) => subscription),
-    deliveries: twin.webhooks.deliveries(),
-  };
-}
-
-function knownVendor(twin: Twin, name: string): VendorName {
-  const vendor = twin.vendorNames().find((candidate) => candidate === name);
-  if (!vendor) throw new Error(`No vendor named "${name}". Vendors: ${twin.vendorNames().join(", ")}`);
-  return vendor;
-}
-
 export function createCheckpoint(twin: Twin, name: string) {
   return twin.checkpoint(name);
 }
@@ -127,23 +106,6 @@ export function rewindTo(twin: Twin, checkpointName: string) {
 export function setFaults(twin: Twin, rules: unknown) {
   twin.faultRules = checkWebhookTopics(twin, parseFaultRules(rules));
   return { activeFaults: twin.faultRules.map((rule) => rule.name) };
-}
-
-/** Fault rules whose webhook topics the vendor really sends; a misspelled topic would otherwise never fire. */
-function checkWebhookTopics(twin: Twin, rules: FaultRule[]): FaultRule[] {
-  for (const { name, vendor, webhook } of rules) {
-    if (webhook !== undefined && webhook !== "*") checkTopics(twin, vendor, [webhook], `Fault rule "${name}": `); // "*": any topic
-  }
-  return rules;
-}
-
-/** Throws, naming the topics the vendor does send, unless it sends every one of `topics`. */
-function checkTopics(twin: Twin, vendor: string, topics: readonly string[], context: string): void {
-  const sent = twin.vendor(knownVendor(twin, vendor)).webhooks?.topics ?? [];
-  const unknown = topics.filter((topic) => !sent.includes(topic));
-  if (unknown.length) {
-    throw new Error(`${context}${vendor} never sends ${unknown.join(", ")}. Topics the twin sends: ${sent.join(", ") || "none yet"}`);
-  }
 }
 
 /**
