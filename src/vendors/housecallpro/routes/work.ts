@@ -2,6 +2,7 @@ import { lineAmount } from "../amounts.ts";
 import { zonedTime } from "../dates.ts";
 import type { HcpAppointment, HcpCompany, HcpLineItem, HcpState } from "../types/index.ts";
 import { customerResponse } from "./customers.ts";
+import { employeeResponse } from "./employees.ts";
 import { NOTHING_EXPANDED } from "./lists.ts";
 
 /**
@@ -74,6 +75,14 @@ export function appointmentResponse(appointment: HcpAppointment, company: HcpCom
 export function workCustomer(customerId: string, state: HcpState) {
   const { addresses: _, ...customer } = customerResponse(state.customers.get(customerId)!, state.company, NOTHING_EXPANDED);
   return customer;
+}
+
+/** The employees assigned to the work, as Get Employees answers with them. */
+export function assignedEmployees(employeeIds: readonly string[], state: HcpState) {
+  return employeeIds.flatMap((id) => {
+    const employee = state.employees.get(id);
+    return employee ? [employeeResponse(employee, state.company)] : [];
+  });
 }
 
 /** The address the work is at, from the customer's addresses. */

@@ -4,9 +4,8 @@ import { linesTotal } from "../amounts.ts";
 import { hcpError } from "../errors.ts";
 import type { HcpEstimate, HcpEstimateOption, HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
-import { employeeResponse } from "./employees.ts";
 import { pageOf, readExpand, readList, readPaging, sorted } from "./lists.ts";
-import { lineItemResponse, schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
+import { assignedEmployees, lineItemResponse, schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
 import { readWorkFilter } from "./work-filters.ts";
 
 /**
@@ -65,10 +64,7 @@ function estimateResponse(estimate: HcpEstimate, state: HcpState, expand: Readon
     company_id: company.id,
     work_timestamps: workTimestamps(estimate.appointments),
     schedule: schedule(estimate.appointments, company, false),
-    assigned_employees: estimate.assigned_employee_ids.flatMap((id) => {
-      const employee = state.employees.get(id);
-      return employee ? [employeeResponse(employee, company)] : [];
-    }),
+    assigned_employees: assignedEmployees(estimate.assigned_employee_ids, state),
     estimate_fields: { job_type: null, business_unit: null },
     assigned_route_template_id: null,
     options: estimate.options.map((option) => optionResponse(option, expand)),

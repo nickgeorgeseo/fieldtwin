@@ -1,8 +1,7 @@
 import { linesTotal } from "../amounts.ts";
 import { hcpId } from "../ids.ts";
-import type { HcpCustomer, HcpEmployee, HcpJob, HcpState } from "../types/index.ts";
-import { employeeResponse } from "./employees.ts";
-import { schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
+import type { HcpCustomer, HcpJob, HcpState } from "../types/index.ts";
+import { assignedEmployees, schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
 
 /**
  * A job as the API answers with it, the reference's Job object, worked out from the facts the twin keeps.
@@ -24,7 +23,7 @@ export function jobResponse(job: HcpJob, state: HcpState, expand: ReadonlySet<st
     total_amount: total,
     outstanding_balance: outstandingBalance(job, state),
     subtotal: total,
-    assigned_employees: assignedEmployees(job, state).map((employee) => employeeResponse(employee, company)),
+    assigned_employees: assignedEmployees(job.assigned_employee_ids, state),
     tags: job.tags,
     original_estimate_id: job.original_estimate_id,
     original_estimate_uuids: job.original_estimate_id ? [job.original_estimate_id] : null, // "null unless job has been copied from an estimate"
@@ -60,8 +59,4 @@ export function outstandingBalance(job: HcpJob, state: HcpState): number {
   const invoices = (state.invoicesByJob.get(job.id) ?? []).map((id) => state.invoices.get(id)!);
   const paid = invoices.flatMap((invoice) => invoice.payments).reduce((sum, payment) => sum + payment.amount, 0);
   return Math.max(0, linesTotal(job.line_items) - paid);
-}
-
-function assignedEmployees(job: HcpJob, state: HcpState): HcpEmployee[] {
-  return job.assigned_employee_ids.flatMap((id) => state.employees.get(id) ?? []);
 }
