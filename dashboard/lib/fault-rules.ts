@@ -47,7 +47,8 @@ export const FAULT_PRESETS: { label: string; rule: FaultRule }[] = [
   },
   {
     label: "Housecall Pro throttles 1 in 5 requests (429, with RateLimit-Reset)",
-    rule: { name: "hcp-throttled", vendor: "housecallpro", rate: 0.2, effect: { status: 429 } },
+    // Not its OAuth endpoints, which share its prefix in the twin, so connecting still works (as in flaky-apis).
+    rule: { name: "hcp-throttled", vendor: "housecallpro", pathExcludes: "/oauth/", rate: 0.2, effect: { status: 429 } },
   },
   {
     // Customers only: a lost answer from the token endpoint would cost a client its rotated refresh token for good.
