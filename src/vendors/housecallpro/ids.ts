@@ -11,5 +11,15 @@ import { stableUuid } from "../../core/ids.ts";
 export type HcpIdPrefix = "cus" | "adr" | "pro" | "job" | "li" | "appt" | "note" | "est" | "opt" | "invoice" | "pmt";
 
 export function hcpId(prefix: HcpIdPrefix, n: number | string): string {
-  return `${prefix}_${stableUuid(`housecallpro/${prefix}/${n}`).replaceAll("-", "")}`;
+  const key = `housecallpro/${prefix}/${n}`;
+  let id = made.get(key);
+  if (id === undefined) {
+    id = `${prefix}_${stableUuid(key).replaceAll("-", "")}`;
+    made.set(key, id);
+  }
+  return id;
 }
+
+// Every reset seeds the same ids again, and each one is a hash, so each is worked out once. Numbering starts over on a
+// reset, so this holds no more ids than the largest world the process has had.
+const made = new Map<string, string>();
