@@ -10,7 +10,8 @@ const world = (seed: number, size?: { customers?: number; technicians?: number }
 const fingerprint = (seed: number) => {
   const { company, customers, technicians } = world(seed);
   const { name, trade, city, state } = company;
-  const people = { company: { name, trade, city, state }, customers, technicians };
+  const techs = technicians.map(({ key, firstName, lastName }) => ({ key, firstName, lastName }));
+  const people = { company: { name, trade, city, state }, customers, technicians: techs };
   return createHash("sha256").update(JSON.stringify(people)).digest("hex").slice(0, 16);
 };
 

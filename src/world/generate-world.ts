@@ -48,6 +48,7 @@ export interface WorldTechnician {
   key: string;
   firstName: string;
   lastName: string;
+  email: string; // every vendor gives the tech this address, so their records can be matched across systems
 }
 
 export interface WorldSize {
@@ -79,11 +80,10 @@ export function generateWorld(random: SeededRandom, options: WorldOptions): Worl
     utcOffsetHours: home.utcOffsetHours,
   };
   const customerList = makeCustomers(random, customers, home);
-  const technicianList = Array.from({ length: technicians }, (_, i) => ({
-    key: `tech-${pad(i + 1)}`,
-    firstName: random.pick(FIRST_NAMES),
-    lastName: random.pick(LAST_NAMES),
-  }));
+  const technicianList = Array.from({ length: technicians }, (_, i): WorldTechnician => {
+    const [firstName, lastName] = [random.pick(FIRST_NAMES), random.pick(LAST_NAMES)];
+    return { key: `tech-${pad(i + 1)}`, firstName, lastName, email: `${firstName}.${lastName}.${i + 1}@example.com`.toLowerCase() };
+  });
   const catalog = makeCatalog(random, trade.name);
   const drift = makeDrift(customerList, options.drift);
   const history = makeHistory({

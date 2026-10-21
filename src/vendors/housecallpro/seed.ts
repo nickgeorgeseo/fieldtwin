@@ -49,13 +49,13 @@ export function seedHousecallPro(world: World): NewEvent[] {
     record("CustomerCreated", { customer });
   }
 
-  // The technicians are field techs, with the email address Jobber has for them, so the two can be matched.
+  // The technicians are field techs, with the email address the world gives them, so Jobber's users match them.
   world.technicians.forEach((tech, index) => {
     const employee: HcpEmployee = {
       id: ids.employee(tech.key),
       first_name: tech.firstName,
       last_name: tech.lastName,
-      email: `${tech.firstName}.${tech.lastName}.${index + 1}@example.com`.toLowerCase(),
+      email: tech.email,
       mobile_number: null,
       color_hex: COLORS[index % COLORS.length]!,
       avatar_url: null,

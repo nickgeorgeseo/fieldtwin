@@ -34,16 +34,16 @@ export function seedJobber(world: World): NewEvent[] {
     record("ClientCreated", { client });
   });
 
-  world.technicians.forEach((tech, index) => {
+  for (const tech of world.technicians) {
     const user: JobberUser = {
       id: ids.user(tech.key),
       name: { first: tech.firstName, last: tech.lastName, full: `${tech.firstName} ${tech.lastName}` },
-      email: { raw: `${tech.firstName}.${tech.lastName}.${index + 1}@example.com`.toLowerCase() },
+      email: { raw: tech.email },
       isAccountOwner: false,
       createdAt: SEED_TIME,
     };
     record("UserCreated", { user });
-  });
+  }
 
   for (const worldQuote of world.history.quotes) {
     const quote: JobberQuote = {
