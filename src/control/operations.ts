@@ -35,7 +35,8 @@ export function resetTwin(twin: Twin) {
 
 /**
  * Move twin time forward. Scheduled scenario events happen on the way, each at its own time, and the webhook
- * deliveries they cause (and any retries now due) have been answered by the time this resolves.
+ * deliveries they cause (and any retries now due) have been answered by the time this resolves. An entry whose action
+ * throws stops the clock at its time, still due (ARCHITECTURE.md, "Scenario timelines").
  */
 const MAX_ADVANCE_MINUTES = 10 * 365 * 24 * 60; // ten years: far beyond any test, and far inside what a date can hold
 
@@ -44,7 +45,12 @@ export async function advanceClock(twin: Twin, minutes: number) {
     throw new Error(`minutes must be a number from 0 to ${MAX_ADVANCE_MINUTES.toLocaleString("en-US")} (ten years)`);
   }
   const before = twin.log.length;
-  twin.advance(minutes * 60_000);
+  try {
+    twin.advance(minutes * 60_000);
+  } catch (error) {
+    await twin.deliverWebhooks(); // what happened on the way, before the entry that failed, is news all the same
+    throw error;
+  }
   const scenarioEvents = twin.log.length - before; // counted now: API writes may arrive while webhooks go out
   await twin.deliverWebhooks();
   return { twinTime: twin.clock.nowIso(), scenarioEvents };
@@ -156,7 +162,8 @@ export function parseAuthMode(mode: unknown): AuthMode {
 
 /**
  * Rebuild the twin from a scenario file's seed, start time, and world size, then turn on its faults and schedule its
- * timeline. Everything is checked before anything changes, so a scenario that fails to load leaves the twin as it was.
+ * timeline. Everything is checked before anything changes, and the twin rebuilds all or nothing, so a scenario that
+ * fails to load leaves the twin as it was.
  */
 export function loadScenario(twin: Twin, yamlText: string) {
   const scenario = parseScenario(yamlText);
@@ -171,10 +178,10 @@ export function loadScenario(twin: Twin, yamlText: string) {
   for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
 
   const { drift, ...worldSize } = scenario.world ?? {};
-  twin.reconfigure({ seed: scenario.seed, scenario: scenario.name, startTime: scenario.startTime, worldSize, drift, faults });
+  twin.load({ seed: scenario.seed, scenario: scenario.name, startTime: scenario.startTime, worldSize, drift, faults }, (world) =>
+    entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, world.company.utcOffsetHours), ...entry })),
+  );
   twin.authMode = scenario.auth ?? twin.defaultAuthMode;
-  const utcOffsetHours = twin.world.company.utcOffsetHours;
-  twin.schedule(entries.map(({ at, ...entry }) => ({ atMs: resolveAt(at, startMs, utcOffsetHours), ...entry })));
   return describeTwin(twin); // its `scenario` is the name just loaded
 }
 

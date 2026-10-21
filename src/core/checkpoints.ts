@@ -37,8 +37,4 @@ export class Checkpoints<Saved> {
   all(): Checkpoint[] {
     return [...this.named.values()].map(({ checkpoint }) => checkpoint);
   }
-
-  clear(): void {
-    this.named.clear();
-  }
 }

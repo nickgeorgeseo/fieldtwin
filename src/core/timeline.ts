@@ -1,6 +1,6 @@
 import { streams } from "./streams.ts";
 import type { Twin } from "./twin.ts";
-import type { VendorName } from "./types.ts";
+import type { NewEvent, VendorName } from "./types.ts";
 import { scenarioActionOf } from "./vendor-twin.ts";
 
 /**
@@ -40,22 +40,42 @@ export class Timeline {
   advanceTo(targetMs: number): void {
     for (let due = this.nextAt(); due !== undefined && due <= targetMs; due = this.nextAt()) {
       this.twin.clock.advance(Math.max(0, due - this.twin.clock.nowMs()));
-      this.runDue(due);
+      this.runDue(due, "the clock stopped there, with it still due");
     }
     this.twin.clock.advance(targetMs - this.twin.clock.nowMs());
   }
 
-  /** Run the entries due at or before `ms` that haven't run yet. */
-  runDue(ms: number): void {
-    const { twin } = this;
+  /**
+   * Run the entries due at or before `ms` that haven't run yet. One whose action throws has recorded nothing and stays
+   * due, so the schedule never moves on past something that didn't happen. Its ScenarioEntryError names it, followed
+   * by `consequence`, what its failing means for the caller.
+   */
+  runDue(ms: number, consequence?: string): void {
     while (this.next < this.entries.length && this.entries[this.next]!.atMs <= ms) {
-      const position = this.next++;
-      const entry = this.entries[position]!;
-      const random = streams.timelineEntry(twin.seed, position);
-      const context = { state: twin.state(entry.vendor), world: twin.world, random, nowIso: twin.clock.nowIso() };
-      const action = scenarioActionOf(twin.vendor(entry.vendor), entry.action);
-      for (const event of action.run(entry.params, context)) twin.record(event, "scenario");
+      const events = this.run(this.entries[this.next]!, this.next, consequence);
+      this.next++;
+      for (const event of events) this.twin.record(event, "scenario");
     }
+  }
+
+  private run(entry: TimelineEntry, position: number, consequence?: string): NewEvent[] {
+    const { twin } = this;
+    const random = streams.timelineEntry(twin.seed, position);
+    const context = { state: twin.state(entry.vendor), world: twin.world, random, nowIso: twin.clock.nowIso() };
+    try {
+      return scenarioActionOf(twin.vendor(entry.vendor), entry.action).run(entry.params, context);
+    } catch (error) {
+      throw new ScenarioEntryError(entry, error, consequence);
+    }
+  }
+
+  /** The schedule as it stands, put back by calling what this returns: for a twin whose rebuild fails partway. */
+  save(): () => void {
+    const { entries, next } = this;
+    return () => {
+      this.entries = entries;
+      this.next = next;
+    };
   }
 
   /** Make every entry after `ms` due again (after a rewind), or every entry (after a reset). */
@@ -70,5 +90,17 @@ export class Timeline {
 
   private nextAt(): number | undefined {
     return this.entries[this.next]?.atMs;
+  }
+}
+
+/**
+ * A scheduled entry whose action threw when it ran, though its check passed when the scenario loaded: a bug in the
+ * vendor's action, named by its entry ("jobber newClients at 2026-07-13T12:00:00.000Z"), with what threw as its cause.
+ */
+export class ScenarioEntryError extends Error {
+  constructor(entry: TimelineEntry, cause: unknown, consequence?: string) {
+    const what = `${entry.vendor} ${entry.action} at ${new Date(entry.atMs).toISOString()}`;
+    const failed = `${what} failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+    super(consequence ? `${failed}; ${consequence}` : failed, { cause });
   }
 }
