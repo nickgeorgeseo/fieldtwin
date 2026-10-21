@@ -18,9 +18,8 @@ export function seedHousecallPro(world: World): NewEvent[] {
 
   // Housecall Pro is a field-service system, like Jobber: customers who exist only in the books aren't here, and
   // everyone is spelled the way the field-service system has them (see world/drift.ts).
-  for (const key of ids.customerKeys()) {
-    const person = world.customers.find((candidate) => candidate.key === key)!;
-    const customer = customerFrom(person, { customer: ids.customer(key), address: ids.address(key) }, SEED_TIME, true);
+  for (const person of ids.customers) {
+    const customer = customerFrom(person, { customer: ids.customer(person.key), address: ids.address(person.key) }, SEED_TIME, true);
     record("CustomerCreated", { customer });
   }
 

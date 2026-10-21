@@ -1,4 +1,4 @@
-import type { World } from "../../world/generate-world.ts";
+import type { World, WorldCustomer } from "../../world/generate-world.ts";
 import { type HcpIdPrefix, hcpId } from "./ids.ts";
 
 /**
@@ -6,17 +6,16 @@ import { type HcpIdPrefix, hcpId } from "./ids.ts";
  * the first record a client creates gets the next number. The world's keys ("cust-007", "job-0012") map to them.
  */
 export class SeedIds {
+  /** The customers Housecall Pro has: everyone but those only the books know (world/drift.ts), in the world's order. */
+  readonly customers: WorldCustomer[];
   private readonly customerNumbers: Map<string, number>;
+  private readonly technicianNumbers: Map<string, number>;
   private readonly counters = new Map<HcpIdPrefix, number>();
 
-  constructor(private readonly world: World) {
-    const inHousecallPro = world.customers.filter((person) => !world.drift.accountingOnly.includes(person.key));
-    this.customerNumbers = new Map(inHousecallPro.map((person, index) => [person.key, index + 1]));
-  }
-
-  /** The customers Housecall Pro has: everyone but those only the books know (world/drift.ts), in the world's order. */
-  customerKeys(): string[] {
-    return [...this.customerNumbers.keys()];
+  constructor(world: World) {
+    this.customers = world.customers.filter((person) => !world.drift.accountingOnly.includes(person.key));
+    this.customerNumbers = new Map(this.customers.map((person, index) => [person.key, index + 1]));
+    this.technicianNumbers = new Map(world.technicians.map((tech, index) => [tech.key, index + 1]));
   }
 
   customer(key: string): string {
@@ -29,7 +28,7 @@ export class SeedIds {
   }
 
   employee(technicianKey: string): string {
-    return hcpId("pro", this.world.technicians.findIndex((tech) => tech.key === technicianKey) + 1);
+    return hcpId("pro", this.technicianNumbers.get(technicianKey)!);
   }
 
   /** A numbered world record ("job-0012", "quote-0003") by its number, which is its order of creation. */
