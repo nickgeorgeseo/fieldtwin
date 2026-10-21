@@ -128,17 +128,17 @@ function makeCustomers(random: SeededRandom, count: number, home: Home): WorldCu
 }
 
 /**
- * Someone new to the business, for scenario timelines ("15 new clients by 9 a.m."): local to the world's
- * city, with a name nobody in `takenNames` has ("First Last"), numbered `n` so their email is unique.
- * Once the word lists' names are all taken, newcomers get a middle initial ("Avery J. Brooks"), so a timeline
- * that runs for weeks of twin time never fails for want of a name.
- */
-/**
  * The most new customers one scenario action brings in. The word lists name about 7,600 people in all, so a count
  * past this is a typo, refused when the scenario loads rather than once the twin is half rebuilt.
  */
 export const MOST_NEW_CUSTOMERS = 1000;
 
+/**
+ * Someone new to the business, for scenario timelines ("15 new clients by 9 a.m."): local to the world's
+ * city, with a name nobody in `takenNames` has ("First Last"), numbered `n` so their email is unique.
+ * Once the word lists' names are all taken, newcomers get a middle initial ("Avery J. Brooks"), so a timeline
+ * that runs for weeks of twin time never fails for want of a name.
+ */
 export function newCustomer(random: SeededRandom, world: World, n: number, takenNames: Set<string>): WorldCustomer {
   const home = CITIES.find((city) => city.city === world.company.city)!;
   for (let attempt = 0; attempt < 50; attempt++) {
