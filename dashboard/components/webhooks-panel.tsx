@@ -15,6 +15,13 @@ const EXAMPLE = `[
     "topics": ["INVOICE_UPDATE", "CLIENT_CREATE"],
     "clientId": "my-app",
     "clientSecret": "dev"
+  },
+  {
+    "vendor": "housecallpro",
+    "url": "http://localhost:3000/webhooks/hcp",
+    "topics": ["invoice.paid", "customer.created"],
+    "clientId": "my-app",
+    "clientSecret": "my-signing-secret"
   }
 ]`;
 
