@@ -10,6 +10,7 @@ import { readJobRequest } from "./job-body.ts";
 import { jobResponse } from "./job-response.ts";
 import { NOTHING_EXPANDED } from "./lists.ts";
 
+// Writes are apart from jobs.ts's reads to leave room for the job updates still to come (reschedule, lock, cancel).
 /** Create a Job: https://docs.housecallpro.com/docs/housecall-public-api/2dcf481ed7d69-create-a-job */
 export function jobWriteRoutes(app: Hono, twin: Twin): void {
   const state = () => twin.state<HcpState>("housecallpro");

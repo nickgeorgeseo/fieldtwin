@@ -52,7 +52,8 @@ export function housecallproRoutes(twin: Twin): Hono {
   return app;
 }
 
-// Every operation the twin serves, so a client can tell at once whether the one it called is coming.
+// Every operation the twin serves, so a client can tell at once whether the one it called is coming. A new operation
+// is added here and asserted in test/housecallpro.test.ts's 501 test, which checks what this list claims.
 const SERVED = [
   "GET /company",
   "GET, POST /customers",

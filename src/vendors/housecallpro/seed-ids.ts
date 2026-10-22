@@ -4,6 +4,8 @@ import { type HcpIdPrefix, hcpId } from "./ids.ts";
 /**
  * Housecall Pro ids for the world's records, numbered in the order seeding creates them, as state.ts counts them, so
  * the first record a client creates gets the next number. The world's keys ("cust-007", "job-0012") map to them.
+ * SeedIds must count exactly what state.ts's `counts` count, kind for kind: if the seed numbered a kind state.ts
+ * doesn't, or skipped one it does, the first id made through the API would repeat a seeded one.
  */
 export class SeedIds {
   /** The customers Housecall Pro has: everyone but those only the books know (world/drift.ts), in the world's order. */

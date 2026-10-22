@@ -63,12 +63,14 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
         const created = announce("job.created", data.job.id);
         return data.job.appointments.length ? [created, announce("job.scheduled", data.job.id)] : [created];
       }
-      // Completed by this very update: the last of its work was marked done just now.
+      // Completed by this very update: the last of its work was marked done just now. Any other update (a reschedule
+      // or new lines, once the twin models those writes) sends nothing: the twin doesn't offer job.updated yet.
       case "JobUpdated":
         return workTimestamps(data.job.appointments).completed_at === now ? [announce("job.completed", data.job.id)] : [];
       // "Invoice created", and "Invoice sent to customer" too if it was sent as it was made.
       case "InvoiceCreated": {
         const created = announce("invoice.created", data.invoice.id);
+        // Only invoice.created when it wasn't sent as it was made: an invoice a future Create Invoice write leaves unsent.
         return data.invoice.sent_at === now ? [created, announce("invoice.sent", data.invoice.id)] : [created];
       }
       // Paid by this very update: each payment made just now, the invoice if they cover it, and then its job if
@@ -78,7 +80,9 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
         const payments = invoice.payments
           .filter((payment) => payment.paid_at === now && payment.status === "succeeded")
           .map(() => announce("invoice.payment.succeeded", invoice.id));
+        // Payments alone: a partial payment, once the twin models a payment write that leaves something owed.
         if (invoice.paid_at !== now || invoiceStatus(invoice) !== "paid") return payments;
+        // No job.paid while another of the job's invoices is owed: a job billed twice, once the twin models that write.
         const jobPaid = outstandingBalance(state.jobs.get(invoice.job_id)!, state) === 0;
         return [...payments, announce("invoice.paid", invoice.id), ...(jobPaid ? [announce("job.paid", invoice.job_id)] : [])];
       }

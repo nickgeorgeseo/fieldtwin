@@ -9,7 +9,10 @@ import { hcpError } from "../errors.ts";
  */
 export const HCP = "/housecallpro";
 
-/** 404 for a record that doesn't exist, in the words Lock Job documents for one ("job not found"). */
+/**
+ * 404 for a record that doesn't exist, in the words Lock Job documents for one ("job not found"). Lower case is the
+ * docs' own; estimates.ts passes "Estimate" capitalised because its docs write "Estimate not found".
+ */
 export function notFound(c: Context, what: string) {
   return c.json(hcpError(`${what} not found`), 404);
 }
