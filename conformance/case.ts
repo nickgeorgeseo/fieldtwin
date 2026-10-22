@@ -50,13 +50,13 @@ interface RequestOptions {
 }
 
 /**
- * An answer no case may observe: the vendor was throttling or down, or stopped accepting the run's own token (they
- * last an hour). It says nothing about the API, so the case stops, and a recording keeps what it observed last time.
+ * An answer no case may observe: the vendor was throttling or down, or stopped accepting the run's own credential (an
+ * expired token, a deleted key). It says nothing about the API, so the case stops, and a recording keeps its last.
  */
 function refuseUnrecordable(
   vendor: string,
   answer: Answer,
-  ownToken: boolean,
+  ownCredential: boolean,
   stoppedAccepting = "the access token (HTTP 401). Tokens last an hour: get a fresh one",
 ): void {
   const throttled = answer.status === 429 || answer.body?.errors?.[0]?.extensions?.code === "THROTTLED";
@@ -64,7 +64,14 @@ function refuseUnrecordable(
     const what = throttled ? "that it is throttling" : `HTTP ${answer.status}`;
     throw new Error(`${vendor} answered ${what}, which says nothing about the API: try again later`);
   }
-  if (answer.status === 401 && ownToken) throw new Error(`${vendor} stopped accepting ${stoppedAccepting}`);
+  if (answer.status === 401 && ownCredential) throw new Error(`${vendor} stopped accepting ${stoppedAccepting}`);
+}
+
+// The answer, with the run's own credential replaced by `label` wherever the body repeats it: recordings are made from
+// answers and may hold no token or key, so a sandbox that echoes a header back loses it here, before any case sees it.
+async function answerOf(response: Response, credential: string, label: string): Promise<Answer> {
+  const text = await response.text();
+  return { status: response.status, body: parsed(credential ? text.replaceAll(credential, label) : text) };
 }
 
 /**
@@ -89,7 +96,7 @@ export async function quickbooks(
     },
     body: sent,
   });
-  const answer = { status: response.status, body: await response.json().catch(() => null) };
+  const answer = await answerOf(response, accessToken, "(the access token)");
   if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, options.token === undefined);
   return answer;
 }
@@ -118,7 +125,7 @@ export async function jobber(
     },
     body: options.text ?? JSON.stringify({ query, variables: options.variables ?? {} }),
   });
-  const answer = { status: response.status, body: await response.json().catch(() => null) };
+  const answer = await answerOf(response, target.jobber.accessToken, "(the access token)");
   if (!options.anyAnswer) refuseUnrecordable("Jobber", answer, options.token === undefined);
   return answer;
 }
@@ -149,9 +156,7 @@ export async function housecallpro(
     },
     body: sent,
   });
-  // The recording is made in a real account: an answer that repeats its key loses it here, before any case sees it.
-  const text = await response.text();
-  const answer = { status: response.status, body: parsed(apiKey ? text.replaceAll(apiKey, "(the API key)") : text) };
+  const answer = await answerOf(response, apiKey, "(the API key)");
   // A 401 is about the key only when the key went alone: one naming a location may be refusing the location, so a
   // case that names one asks again with the key alone afterwards.
   const keyAlone = options.authorization === undefined && options.companyId === undefined && !/[?&]location_ids/.test(path);
@@ -168,7 +173,10 @@ function parsed(text: string): Answer["body"] {
   }
 }
 
-/** The body of a 2xx answer; anything else stops the case with what went wrong. */
+/**
+ * The body of a 2xx answer; anything else stops the case with what went wrong. The body it quotes has lost the run's
+ * credential already (answerOf), and reaches only the console: a case that stops is never recorded (recordings.ts).
+ */
 export function expectOk(answer: Answer, doing: string): Answer["body"] {
   if (answer.status >= 200 && answer.status < 300) return answer.body;
   throw new Error(`Couldn't ${doing}: HTTP ${answer.status} ${JSON.stringify(answer.body).slice(0, 300)}`);

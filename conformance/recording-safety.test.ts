@@ -2,24 +2,16 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { caseId, housecallpro, VENDORS } from "./case.ts";
-import { CASES } from "./cases/index.ts";
+import { housecallpro, VENDORS } from "./case.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
-import { nextRecording } from "./recordings.ts";
-import type { Results } from "./run.ts";
 import { API_TERMS, runningTwin, sandboxTarget } from "./targets.ts";
-import { caseNamed, fakeTarget } from "./test-support.ts";
+import { caseNamed, fakeTarget, sandboxAnswering } from "./test-support.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
  * every case fail as if the twin were wrong.
  */
-
-/** A sandbox that answers every request with `status`, the way one does to an expired token. */
-function sandboxAnswering(status: number, body: unknown = {}) {
-  return fakeTarget(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
-}
 
 describe("recording against a sandbox", () => {
   it("stops before recording anything when a token is refused, and says what to do", async () => {
@@ -75,72 +67,6 @@ describe("recording against a sandbox", () => {
     const encodedIds = caseNamed("jobber/encoded-id-format");
     const id = Buffer.from("gid://Jobber/Client/1234567").toString("base64"); // 27 bytes: base64 without padding
     await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [{ id }] } } }))).rejects.toThrow("can't tell");
-  });
-});
-
-describe("answers that are never evidence", () => {
-  const readMissing = caseNamed("quickbooks/read-missing-entity");
-  const jobberSyntax = caseNamed("jobber/syntax-error");
-  // The cases that send a body as it is, rather than one their request helper writes.
-  const rawBodies = ["quickbooks/body-not-json", "jobber/body-not-json", "jobber/variables-as-a-string"].map(caseNamed);
-
-  it.each([429, 502, 503, 504])(
-    "stop a case when the sandbox answers HTTP %i, throttling or down, rather than record it",
-    async (status) => {
-      await expect(readMissing.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
-      await expect(jobberSyntax.observe(sandboxAnswering(status))).rejects.toThrow("try again later");
-      await expect(housecallpro(sandboxAnswering(status), "GET", "/company")).rejects.toThrow("try again later");
-      for (const rawBody of rawBodies) {
-        await expect(rawBody.observe(sandboxAnswering(status)), caseId(rawBody)).rejects.toThrow("try again later");
-      }
-    },
-  );
-
-  it("stop a case when Jobber says it is throttling, which it answers with HTTP 200", async () => {
-    const throttled = { errors: [{ message: "Throttled", extensions: { code: "THROTTLED" } }] };
-    await expect(jobberSyntax.observe(sandboxAnswering(200, throttled))).rejects.toThrow("throttling");
-    for (const rawBody of rawBodies.filter((testCase) => testCase.vendor === "jobber")) {
-      await expect(rawBody.observe(sandboxAnswering(200, throttled)), caseId(rawBody)).rejects.toThrow("throttling");
-    }
-  });
-
-  it("stop a case when the run's own token stops working part way, but not one that sends a bad token on purpose", async () => {
-    await expect(readMissing.observe(sandboxAnswering(401))).rejects.toThrow("get a fresh one");
-    for (const rawBody of rawBodies) {
-      await expect(rawBody.observe(sandboxAnswering(401)), caseId(rawBody)).rejects.toThrow("get a fresh one");
-    }
-    const badToken = caseNamed("quickbooks/unknown-access-token");
-    await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
-  });
-
-  it("stop a case when Housecall Pro stops taking the run's API key, but not when a case sends another on purpose", async () => {
-    await expect(housecallpro(sandboxAnswering(401), "GET", "/customers")).rejects.toThrow("stopped accepting the API key");
-    const withoutKey = housecallpro(sandboxAnswering(401), "GET", "/customers", undefined, { authorization: null });
-    await expect(withoutKey).resolves.toMatchObject({ status: 401 });
-  });
-});
-
-describe("a recording run's results", () => {
-  const quickbooksCases = CASES.filter((testCase) => testCase.vendor === "quickbooks").slice(0, 3);
-  const [first, second, third] = quickbooksCases.map((testCase) => testCase.name);
-  const earlier = { recordedAt: "2026-10-01T00:00:00Z", target: "sandbox", cases: { [first!]: { status: 1 }, [second!]: { status: 2 } } };
-
-  it("keep what a case observed last time when it couldn't run this time, so one bad run can't erase evidence", () => {
-    const results: Results = {
-      [`quickbooks/${first}`]: { status: 10 },
-      [`quickbooks/${second}`]: { error: "QuickBooks answered HTTP 503" },
-      [`quickbooks/${third}`]: { error: "QuickBooks answered HTTP 503" },
-    };
-    const next = nextRecording(earlier, quickbooksCases, results, "2026-10-12T00:00:00Z", "sandbox");
-    expect(next.recording.cases).toEqual({ [first!]: { status: 10 }, [second!]: { status: 2 } });
-    expect(next.kept).toEqual([second]);
-    expect(next.missing).toEqual([third]);
-  });
-
-  it("drop cases that no longer exist", () => {
-    const stale = { ...earlier, cases: { ...earlier.cases, "a-case-since-removed": { status: 3 } } };
-    const next = nextRecording(stale, quickbooksCases, {}, "2026-10-12T00:00:00Z", "sandbox");
-    expect(Object.keys(next.recording.cases)).not.toContain("a-case-since-removed");
   });
 });
 

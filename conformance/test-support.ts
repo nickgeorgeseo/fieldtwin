@@ -25,3 +25,8 @@ export function caseNamed(id: string): ConformanceCase {
   if (!found) throw new Error(`There is no conformance case named ${id}`);
   return found;
 }
+
+/** A sandbox that answers every request with `status` and `body`, the way one does to an expired token. */
+export function sandboxAnswering(status: number, body: unknown = {}): Target {
+  return fakeTarget(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
+}
