@@ -26,10 +26,6 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   const missing = ["customer_id", "address_id"].filter((name) => typeof body[name] !== "string" || !body[name]);
   if (missing.length)
     return refuse(`A job needs ${missing.join(" and ")}: "Create a job with the ID for an already existing address and customer."`);
-  const fields = body.job_fields;
-  if (isObject(fields) && (fields.job_type_id != null || fields.business_unit_id != null)) {
-    return refuse("job_fields: the twin doesn't model job types or business units yet.", 501);
-  }
 
   const customer = state.customers.get(body.customer_id as string);
   if (!customer) return refuse("customer not found", 404);
@@ -38,6 +34,11 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   if (!Array.isArray(employees) || !employees.every((id) => typeof id === "string"))
     return refuse("assigned_employee_ids must be a list of employee ids.");
   if (employees.some((id) => !state.employees.has(id))) return refuse("employee not found", 404);
+  // After the lookups, like the other 501s: a record that doesn't exist is the client's to fix before the twin's gaps matter.
+  const fields = body.job_fields;
+  if (isObject(fields) && (fields.job_type_id != null || fields.business_unit_id != null)) {
+    return refuse("job_fields: the twin doesn't model job types or business units yet.", 501);
+  }
 
   const invoiceNumber = readInvoiceNumber(body.invoice_number, state);
   if (typeof invoiceNumber === "object") return invoiceNumber;

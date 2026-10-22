@@ -319,6 +319,14 @@ describe("Housecall Pro twin: creating jobs", () => {
     }
   });
 
+  it("says a customer doesn't exist before saying job types aren't modeled, so the client fixes the request first", async () => {
+    const harness = setup();
+    const { addressId } = await cast(harness);
+    const response = await harness.hcpPost("/jobs", { customer_id: "cus_missing", address_id: addressId, job_fields: { job_type_id: "jt_1" } });
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.message).toBe("customer not found");
+  });
+
   it("keeps the job's notes as one note with an id, and its lead source; blank notes are no note", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);
