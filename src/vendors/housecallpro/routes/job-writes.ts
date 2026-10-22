@@ -41,9 +41,9 @@ export function jobWriteRoutes(app: Hono, twin: Twin): void {
         ? [
             {
               id: hcpId("appt", counts.appointments + 1),
-              start_time: request.schedule.start,
-              end_time: request.schedule.end,
-              arrival_window_minutes: request.schedule.arrivalWindow,
+              start_time: request.schedule.scheduled_start,
+              end_time: request.schedule.scheduled_end,
+              arrival_window_minutes: request.schedule.arrival_window,
               dispatched_employees_ids: request.assigned_employee_ids,
               completed_at: null,
             },

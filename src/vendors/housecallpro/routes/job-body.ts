@@ -13,7 +13,7 @@ export interface JobRequest {
   customer_id: string;
   address_id: string;
   invoice_number: string | undefined; // undefined: "one will be automatically generated"
-  schedule: { start: string; end: string; arrivalWindow: number } | undefined;
+  schedule: { scheduled_start: string; scheduled_end: string; arrival_window: number } | undefined; // the docs' names
   assigned_employee_ids: string[];
   line_items: LineFields[];
   tags: string[];
@@ -104,5 +104,5 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
   // A safe integer, so it is written as digits (never 1e+21) and a client can read it back as a whole number.
   if (!Number.isSafeInteger(arrival_window) || (arrival_window as number) < 0)
     return refuse(`schedule.arrival_window must be whole minutes of 0 or more, not ${shown(arrival_window)}.`);
-  return { start: hcpTimeAt(start), end: hcpTimeAt(end), arrivalWindow: arrival_window as number };
+  return { scheduled_start: hcpTimeAt(start), scheduled_end: hcpTimeAt(end), arrival_window: arrival_window as number };
 }
