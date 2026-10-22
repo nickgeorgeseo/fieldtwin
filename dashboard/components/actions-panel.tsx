@@ -13,7 +13,7 @@ export function ActionsPanel() {
   const { status } = useTwin();
   const { busy, notice, run } = useAction();
   const [counts, setCounts] = useState<Record<string, string>>(
-    Object.fromEntries(ACTIONS.map((entry) => [actionKey(entry), entry.initial])),
+    Object.fromEntries(ACTIONS.map((entry) => [actionKey(entry), entry.defaultCount])),
   );
   const [happened, setHappened] = useState<string[]>([]);
 
@@ -31,7 +31,7 @@ export function ActionsPanel() {
       <ul className="space-y-3">
         {ACTIONS.map(({ vendor, action, label, help }) => {
           const key = actionKey({ vendor, action });
-          const name = `${label} (${vendorLabel(vendor)})`;
+          const ariaName = `${label} (${vendorLabel(vendor)})`;
           return (
             <li key={key} className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
@@ -41,14 +41,14 @@ export function ActionsPanel() {
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">{help}</p>
               </div>
               <TextInput
-                aria-label={`How many: ${name}`}
+                aria-label={`How many: ${ariaName}`}
                 type="number"
                 min={1}
                 value={counts[key]}
                 onChange={(event) => setCounts({ ...counts, [key]: event.target.value })}
                 className="w-16"
               />
-              <Button aria-label={`Go: ${name}`} disabled={busy || !status} onClick={() => act(key)}>
+              <Button aria-label={`Go: ${ariaName}`} disabled={busy || !status} onClick={() => act(key)}>
                 Go
               </Button>
             </li>

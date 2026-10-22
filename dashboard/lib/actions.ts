@@ -9,39 +9,39 @@ export interface TwinAction {
   action: string;
   label: string;
   help: string;
-  initial: string; // the count the field starts with
+  defaultCount: string;
 }
 
 export const ACTIONS: TwinAction[] = [
-  { vendor: "jobber", action: "payInvoices", label: "Customers pay", help: "The longest-open invoices get paid", initial: "2" },
   {
     vendor: "jobber",
     action: "newClients",
     label: "New clients call in",
     help: "New clients, as from calls and online bookings",
-    initial: "3",
+    defaultCount: "3",
   },
-  { vendor: "housecallpro", action: "newCustomers", label: "New customers call in", help: "People new to the business", initial: "3" },
+  { vendor: "jobber", action: "payInvoices", label: "Customers pay", help: "The longest-open invoices get paid", defaultCount: "2" },
+  { vendor: "housecallpro", action: "newCustomers", label: "New customers call in", help: "People new to the business", defaultCount: "3" },
   {
     vendor: "housecallpro",
     action: "completeJobs",
     label: "Techs finish jobs",
     help: "The jobs whose visits began first, once every visit has begun",
-    initial: "2",
+    defaultCount: "2",
   },
   {
     vendor: "housecallpro",
     action: "invoiceJobs",
     label: "Finished work is invoiced",
     help: "Sent at once, finished longest ago first",
-    initial: "2",
+    defaultCount: "2",
   },
   {
     vendor: "housecallpro",
     action: "payInvoices",
     label: "Customers pay",
     help: "The invoices due longest ago get paid in full",
-    initial: "2",
+    defaultCount: "2",
   },
 ];
 
