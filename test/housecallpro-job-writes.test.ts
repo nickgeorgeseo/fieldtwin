@@ -222,7 +222,8 @@ describe("Housecall Pro twin: creating jobs", () => {
       [[{ name: "Huge", quantity: 1e308, unit_price: 100 }], "line_items[0]"],
       [[{ name: "Huge price", unit_price: 1e20 }], "line_items[0].unit_price"],
       [[{ name: "Huge cost", unit_cost: 2 ** 60 }], "line_items[0].unit_cost"],
-      [Array.from({ length: 2 }, () => ({ name: "Half of too much", unit_price: 2 ** 52 })), "line_items"],
+      // Each line is safe on its own (2^46 cents), and together they come to 2^53, the first sum that isn't.
+      [Array.from({ length: 128 }, () => ({ name: "A 128th of too much", unit_price: 2 ** 46 })), "line_items come to more"],
     ] as const) {
       const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: lines });
       expect(response.status, field).toBe(422);
@@ -303,17 +304,78 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await next.json()).error.message).toMatch(/invoice_number/);
   });
 
-  it("says it doesn't model anytime schedules, price forms, or job types yet (501)", async () => {
+  it("says it doesn't model anytime schedules, price forms, discount lines, or job types yet (501)", async () => {
     const harness = setup();
     const { customerId, addressId } = await cast(harness);
     for (const extra of [
       { schedule: { anytime: true, anytime_start_date: "2026-07-20" } },
       { line_items: [{ name: "Formed", pricing_form: { id: "pbpf_1" } }] },
+      { line_items: [{ name: "Loyalty", kind: "fixed discount" }] },
       { job_fields: { job_type_id: "jt_1" } },
     ]) {
       const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
       expect(response.status, JSON.stringify(extra)).toBe(501);
       expect((await response.json()).error.message).toMatch(/doesn't model/);
+    }
+  });
+
+  it("keeps the job's notes as one note with an id, and its lead source; blank notes are no note", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const job = await (
+      await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, notes: "Gate code 4411", lead_source: "Google" })
+    ).json();
+    expect(job.notes).toEqual([{ id: expect.stringMatching(/^note_[0-9a-f]{32}$/), content: "Gate code 4411" }]);
+    expect(job.lead_source).toBe("Google");
+    expect(await (await harness.hcpGet(`/jobs/${job.id}`)).json()).toEqual(job);
+
+    const blank = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, notes: "   " })).json();
+    expect(blank).toMatchObject({ notes: [], lead_source: null });
+  });
+
+  it("refuses an optional field of the wrong type (422), naming it", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const before = harness.twin.log.length;
+    for (const [extra, field] of [
+      [{ assigned_employee_ids: "pro_1" }, "assigned_employee_ids"],
+      [{ tags: "warranty" }, "tags"],
+      [{ schedule: "tomorrow" }, "schedule"],
+      [{ lead_source: 42 }, "lead_source"],
+      [{ notes: ["Gate code 4411"] }, "notes"],
+    ] as const) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
+      expect(response.status, field).toBe(422);
+      expect((await response.json()).error.message).toContain(field);
+    }
+    expect(harness.twin.log.length).toBe(before);
+  });
+
+  it("reads a schedule sent with a UTC offset, and answers it in UTC", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    const schedule = { scheduled_start: "2026-07-20T09:00:00-05:00", scheduled_end: "2026-07-20T11:00:00-05:00" };
+    const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule })).json();
+    expect(job.schedule).toMatchObject({ scheduled_start: "2026-07-20T14:00:00Z", scheduled_end: "2026-07-20T16:00:00Z" });
+  });
+
+  it("assigns an employee once, however many times the request names them", async () => {
+    const harness = setup();
+    const { customerId, addressId, employees } = await cast(harness);
+    const id = employees[0]!.id;
+    const job = await (
+      await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, assigned_employee_ids: [id, id, id] })
+    ).json();
+    expect(job.assigned_employees.map((employee: { id: string }) => employee.id)).toEqual([id]);
+  });
+
+  it("refuses an invoice number of 0 or below, since numbers count from 1", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await cast(harness);
+    for (const invoice_number of [0, -5]) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number });
+      expect(response.status, String(invoice_number)).toBe(422);
+      expect((await response.json()).error.message).toMatch(/invoice_number must be a whole number from 1/);
     }
   });
 });
