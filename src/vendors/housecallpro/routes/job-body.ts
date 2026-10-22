@@ -2,7 +2,7 @@ import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
 import { hcpTimeAt } from "../dates.ts";
 import type { HcpState } from "../types/index.ts";
-import { type Refusal, refuse, withoutNulls } from "./body.ts";
+import { type Refusal, readTags, refuse, withoutNulls } from "./body.ts";
 import { type LineFields, readLineItems } from "./line-item-body.ts";
 
 /**
@@ -47,9 +47,10 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   const lines = readLineItems(body.line_items);
   if ("problem" in lines) return lines;
   // null on an optional field means it wasn't sent, as clients generated from the OpenAPI spec send it.
-  const { tags = [], lead_source = null, notes = undefined } = withoutNulls(body);
-  if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string"))
-    return refuse(`tags must be a list of strings, like ["warranty"].`);
+  const sent = withoutNulls(body);
+  const { lead_source = null, notes = undefined } = sent;
+  const tags = readTags(sent.tags ?? [], "warranty");
+  if ("problem" in tags) return tags;
   if (lead_source !== null && typeof lead_source !== "string") return refuse("lead_source must be a string.");
   if (notes !== undefined && typeof notes !== "string") return refuse("notes must be a string.");
 
