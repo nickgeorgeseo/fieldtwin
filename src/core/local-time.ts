@@ -1,7 +1,8 @@
 /**
  * "2026-07-16T16:31:31-06:00": a moment as the business's local time with its UTC offset, the way vendors write
  * times for a company (Jobber's webhook samples). The offset is the world's fixed one, without daylight saving
- * (world/word-lists.ts). Housecall Pro writes its local times in the city's own zone instead (its dates.ts).
+ * (world/word-lists.ts). A vendor that writes local times in the city's own zone, daylight saving and all, keeps its
+ * own formatter beside its other dates instead.
  */
 export function localTime(ms: number, utcOffsetHours: number): string {
   const offsetMinutes = Math.round(utcOffsetHours * 60);
