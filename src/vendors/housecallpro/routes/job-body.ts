@@ -41,7 +41,7 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   }
 
   const invoiceNumber = readInvoiceNumber(body.invoice_number, state);
-  if (typeof invoiceNumber === "object") return invoiceNumber;
+  if ("problem" in invoiceNumber) return invoiceNumber;
   const schedule = readSchedule(body.schedule);
   if (schedule && "problem" in schedule) return schedule;
   const lines = readLineItems(body.line_items);
@@ -56,7 +56,7 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   return {
     customer_id: customer.id,
     address_id: body.address_id as string,
-    invoice_number: invoiceNumber,
+    invoice_number: invoiceNumber.value,
     schedule,
     assigned_employee_ids: [...new Set(employees as string[])],
     line_items: lines,
@@ -67,8 +67,8 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
 }
 
 /** "Invoice number must be unique across all of a company's jobs in Housecall Pro." A number, as JobCreate types it. */
-function readInvoiceNumber(sent: unknown, state: HcpState): string | undefined | Refusal {
-  if (sent === undefined || sent === null) return undefined;
+function readInvoiceNumber(sent: unknown, state: HcpState): { value: string | undefined } | Refusal {
+  if (sent === undefined || sent === null) return { value: undefined };
   // Digits in a string work too ("6001"), as answers write the number and Rails would read it (FIDELITY.md).
   const value = typeof sent === "string" && /^\d+$/.test(sent) ? Number(sent) : sent;
   // A safe integer, so it prints as digits ("5000", never "1e+21") and the number after it is one more.
@@ -77,7 +77,7 @@ function readInvoiceNumber(sent: unknown, state: HcpState): string | undefined |
   }
   const taken = [...state.jobs.values()].some((job) => job.invoice_number === String(value));
   if (taken) return refuse(`invoice_number ${value} is taken: it must be unique across all of a company's jobs.`);
-  return String(value);
+  return { value: String(value) };
 }
 
 /** A schedule is a start and an end ("ISO-8601 formatted date string", UTC unless it says otherwise), end after start. */
