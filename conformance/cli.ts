@@ -7,7 +7,7 @@ import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording, readRecordings, writeRecording } from "./recordings.ts";
 import { observeAll, report } from "./run.ts";
-import { runningTwin, SANDBOX_NAMES, sandboxTarget, twinTarget } from "./targets.ts";
+import { API_TERMS, runningTwin, SANDBOX_NAMES, sandboxTarget, twinTarget } from "./targets.ts";
 
 /**
  *   npm run conformance                   score a fresh twin of its own against the recordings: per case, per
@@ -50,10 +50,13 @@ async function record(dryRun: boolean): Promise<void> {
   const cases = CASES.filter((testCase) => vendors.includes(testCase.vendor));
   console.log(`Recording ${cases.length} cases against ${listed(vendors.map((vendor) => `the ${SANDBOX_NAMES[vendor]}`))}.`);
   for (const vendor of vendors) {
+    console.log(`Recording from the ${SANDBOX_NAMES[vendor]} is subject to ${API_TERMS[vendor].name}: ${API_TERMS[vendor].url}`);
     const writes = cases.filter((testCase) => testCase.vendor === vendor && testCase.writes).map(caseId);
     if (!writes.length) continue;
+    // Housecall Pro's API can delete neither customers nor jobs, so what the cases make stays until someone deletes it in the app.
+    const left = vendor === "housecallpro" ? "leave them there, where the API can't delete them" : "leave them there";
     console.log(
-      `These create records named "fieldtwin conformance ..." in the ${SANDBOX_NAMES[vendor]}, and leave them there: ${writes.join(", ")}.`,
+      `These create records named "fieldtwin conformance ..." in the ${SANDBOX_NAMES[vendor]}, and ${left}: ${writes.join(", ")}.`,
     );
   }
 

@@ -105,6 +105,19 @@ export const SANDBOX_NAMES: Record<Vendor, string> = {
   housecallpro: "Housecall Pro MAX- or XL-plan account (API key)",
 };
 
+/**
+ * Each vendor's API terms, which recording from an account is subject to. Some limit what the API may be used for:
+ * the recorder names them before it runs, so whoever records can check.
+ */
+export const API_TERMS: Record<Vendor, { name: string; url: string }> = {
+  quickbooks: {
+    name: "Intuit's Developer Terms of Service",
+    url: "https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services",
+  },
+  jobber: { name: "Jobber's Developer Agreement", url: "https://developer.getjobber.com/docs/legal/terms" },
+  housecallpro: { name: "Housecall Pro's API Terms of Service", url: "https://docs.housecallpro.com/docs/terms/api-terms" },
+};
+
 export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors: Vendor[] } {
   const vendors: Vendor[] = [];
   if (Boolean(env.QBO_ACCESS_TOKEN) !== Boolean(env.QBO_REALM_ID)) {

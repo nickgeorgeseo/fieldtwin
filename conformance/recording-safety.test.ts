@@ -1,13 +1,14 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { caseId, housecallpro, type Target } from "./case.ts";
+import { caseId, housecallpro, type Target, VENDORS } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording } from "./recordings.ts";
 import type { Results } from "./run.ts";
-import { runningTwin, sandboxTarget } from "./targets.ts";
+import { API_TERMS, runningTwin, sandboxTarget } from "./targets.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
@@ -201,6 +202,13 @@ describe("which QuickBooks company a recording may write to", () => {
       expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", QBO_REALM_ID: "1", QBO_API_BASE })).toThrow("production QuickBooks");
     },
   );
+});
+
+describe("what the recorder says before it runs", () => {
+  it("names each vendor's API terms, at the links the README gives", () => {
+    const readme = readFileSync(new URL("./README.md", import.meta.url), "utf8");
+    for (const vendor of VENDORS) expect(readme).toContain(`](${API_TERMS[vendor].url})`);
+  });
 });
 
 describe("which vendors a recording covers", () => {
