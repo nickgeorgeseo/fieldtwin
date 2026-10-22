@@ -98,6 +98,28 @@ describe("Housecall Pro twin: locations", () => {
   });
 });
 
+describe("Housecall Pro twin: the event log", () => {
+  it("describes each kind of seeded or written record in one line, in the twin's own words", async () => {
+    const { twin, hcpGet, hcpPost } = setup();
+    const customer = (await (await hcpGet("/customers?page_size=1")).json()).customers[0];
+    await hcpPost(`/customers/${customer.id}/addresses`, {
+      street: "12 Elm St",
+      city: "Riverton",
+      state: "NC",
+      zip: "28201",
+      country: "US",
+    });
+    const describe = (type: string) =>
+      twin.vendor("housecallpro").describeEvent(twin.log.all().find((event) => event.vendor === "housecallpro" && event.type === type)!);
+
+    expect(describe("CompanyCreated")).toBe(`CompanyCreated "${twin.world.company.name}"`);
+    expect(describe("EmployeeCreated")).toMatch(/^EmployeeCreated pro_[0-9a-f]{32} "[A-Z][a-z]+ [A-Z][a-z]+" \(field tech\)$/);
+    expect(describe("EstimateCreated")).toMatch(/^EstimateCreated #\d+ 1 option( \(approved\))?$/);
+    const { address } = twin.log.all().at(-1)!.data as { address: { id: string } };
+    expect(describe("AddressCreated")).toBe(`AddressCreated ${address.id} for ${customer.id} "12 Elm St, Riverton"`);
+  });
+});
+
 describe("Housecall Pro twin: what it doesn't serve", () => {
   it("answers 501 in Housecall Pro's error format for an endpoint it doesn't model yet, naming what it serves", async () => {
     const { hcpGet } = setup();
@@ -134,6 +156,14 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
     expect(await failed.json()).toEqual({ error: { message: 'Injected by fault rule "outage"' } });
 
     expect((await qboGet("/customer/1")).status).toBe(200);
+  });
+
+  it("injects a 401 in the one shape Housecall Pro documents for one, { message }, not the error object the rest use", async () => {
+    const { twin, hcpGet } = setup();
+    twin.faultRules = [{ name: "unauthorized", vendor: "housecallpro", rate: 1, effect: { status: 401 } }];
+    const response = await hcpGet("/company");
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ message: 'Injected by fault rule "unauthorized"' });
   });
 
   it("puts RateLimit-Reset on an injected 429, as Housecall Pro documents: the epoch second a minute later, in twin time", async () => {
