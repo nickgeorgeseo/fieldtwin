@@ -42,6 +42,17 @@ describe("MCP server", () => {
     ]);
   });
 
+  it("answers twin_status, twin_advance_clock, and twin_reset exactly as the HTTP control plane does", async () => {
+    const { app, call } = await connectAgent();
+    const { app: overHttp } = setup();
+    const post = (path: string, body?: string) =>
+      overHttp.request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    expect(await call("twin_status")).toEqual(await (await app.request("/_twin")).json());
+    expect(await call("twin_advance_clock", { minutes: 90 })).toEqual(await (await post("/_twin/clock/advance", '{"minutes": 90}')).json());
+    expect(await call("twin_status")).toMatchObject({ twinTime: "2026-07-13T12:30:00.000Z" });
+    expect(await call("twin_reset")).toEqual(await (await post("/_twin/reset")).json());
+  });
+
   it("lets an agent checkpoint, see what its API calls changed, and rewind them", async () => {
     const { call, qboPost } = await connectAgent();
     await call("twin_checkpoint", { name: "before" });
@@ -81,6 +92,14 @@ describe("MCP server: scenarios, faults, auth, and the log", () => {
     });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain("not both");
+    expect(twin.scenario).toBeUndefined();
+  });
+
+  it("asks for a scenario by name or as YAML when given neither", async () => {
+    const { client, twin } = await connectAgent();
+    const result = await client.callTool({ name: "twin_load_scenario", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("either");
     expect(twin.scenario).toBeUndefined();
   });
 
