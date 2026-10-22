@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { type ConformanceCase, caseId, housecallpro, quickbooks, type Target } from "./case.ts";
+import { type ConformanceCase, caseId, housecallpro, quickbooks } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { readRecordings } from "./recordings.ts";
 import { compare, observeAll, report } from "./run.ts";
 import { twinTarget } from "./targets.ts";
+import { caseNamed, fakeTarget } from "./test-support.ts";
 
 /**
  * The twin, held to recordings of the real APIs. Every case runs against an in-process twin; a case that has been
@@ -46,7 +47,7 @@ describe("a twin as a target", () => {
     const { app: written } = createApp({ seed: 42 });
     const twin = await twinTarget("http://twin.test", async (url, init) => written.request(url, init));
     await quickbooks(twin, "POST", "customer", { DisplayName: "Written Just Before" });
-    const cdc = CASES.find((testCase) => caseId(testCase) === "quickbooks/cdc-nothing-changed")!;
+    const cdc = caseNamed("quickbooks/cdc-nothing-changed");
     expect(await cdc.observe(twin)).toEqual({ status: 200, groupKeys: [] });
   });
 
@@ -66,30 +67,23 @@ describe("a twin as a target", () => {
 
 describe("the ORDERBY case", () => {
   /** A company whose queries sort text the way a plain string comparison does, capitals first. */
-  function booksSortingByCharacterCode(): Target {
+  function booksSortingByCharacterCode() {
     const names: string[] = [];
-    return {
-      kind: "sandbox",
-      fetch: async (url, init) => {
-        if (init?.method === "POST") {
-          const { DisplayName } = JSON.parse(String(init.body));
-          names.push(DisplayName);
-          return Response.json({ Customer: { Id: String(names.length), DisplayName } });
-        }
-        const statement = new URL(String(url)).searchParams.get("query") ?? "";
-        const prefix = /like '([^%']*)%'/i.exec(statement)?.[1] ?? "";
-        const sorted = names.filter((name) => name.startsWith(prefix)).sort();
-        return Response.json({ QueryResponse: { Customer: sorted.map((DisplayName) => ({ DisplayName })) } });
-      },
-      quickbooks: { apiBase: "https://books.test/v3", realmId: "1", accessToken: "t" },
-      jobber: { apiUrl: "https://jobber.test/api/graphql", accessToken: "t" },
-      housecallpro: { apiBase: "https://housecallpro.test", apiKey: "k" },
-      now: async () => "2026-10-12T00:00:00Z",
-    };
+    return fakeTarget(async (url, init) => {
+      if (init?.method === "POST") {
+        const { DisplayName } = JSON.parse(String(init.body));
+        names.push(DisplayName);
+        return Response.json({ Customer: { Id: String(names.length), DisplayName } });
+      }
+      const statement = new URL(String(url)).searchParams.get("query") ?? "";
+      const prefix = /like '([^%']*)%'/i.exec(statement)?.[1] ?? "";
+      const sorted = names.filter((name) => name.startsWith(prefix)).sort();
+      return Response.json({ QueryResponse: { Customer: sorted.map((DisplayName) => ({ DisplayName })) } });
+    });
   }
 
   it("tells a sort that puts capitals first from one that ignores case, whatever customers the company has", async () => {
-    const orderby = CASES.find((testCase) => caseId(testCase) === "quickbooks/orderby-text-case")!;
+    const orderby = caseNamed("quickbooks/orderby-text-case");
     expect(await orderby.observe(booksSortingByCharacterCode())).not.toEqual(observed[caseId(orderby)]);
   });
 });
@@ -101,7 +95,7 @@ describe("the conformance score", () => {
   });
 
   it("reports each recorded case's score and differences, a score per endpoint, and the cases not recorded yet", () => {
-    const [missing, stale] = [CASES.find((c) => c.name === "read-missing-entity")!, CASES.find((c) => c.name === "stale-synctoken")!];
+    const [missing, stale] = [caseNamed("quickbooks/read-missing-entity"), caseNamed("quickbooks/stale-synctoken")];
     const twin = { [caseId(missing)]: { status: 400, code: "610" }, [caseId(stale)]: { status: 400, code: "5010" } };
     const recording = {
       recordedAt: "2026-10-12T00:00:00Z",
@@ -116,7 +110,7 @@ describe("the conformance score", () => {
     expect(text).toContain("Fidelity: 1/2 observations match (50%)");
   });
 
-  const readMissing = CASES.find((testCase) => testCase.name === "read-missing-entity")!;
+  const readMissing = caseNamed("quickbooks/read-missing-entity");
   const recordingOf = (observations: Record<string, string | number>) => ({
     recordedAt: "2026-10-12T00:00:00Z",
     target: "test",

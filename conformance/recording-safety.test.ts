@@ -2,13 +2,14 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { caseId, housecallpro, type Target, VENDORS } from "./case.ts";
+import { caseId, housecallpro, VENDORS } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { parseCommand } from "./command.ts";
 import { checkTokens } from "./preflight.ts";
 import { nextRecording } from "./recordings.ts";
 import type { Results } from "./run.ts";
 import { API_TERMS, runningTwin, sandboxTarget } from "./targets.ts";
+import { caseNamed, fakeTarget } from "./test-support.ts";
 
 /**
  * Recordings are evidence, so they may not be quietly wrong: one made with a dead token or the wrong URL would make
@@ -16,15 +17,8 @@ import { API_TERMS, runningTwin, sandboxTarget } from "./targets.ts";
  */
 
 /** A sandbox that answers every request with `status`, the way one does to an expired token. */
-function sandboxAnswering(status: number, body: unknown = {}): Target {
-  return {
-    kind: "sandbox",
-    fetch: async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
-    quickbooks: { apiBase: "https://sandbox-quickbooks.api.intuit.com/v3", realmId: "123", accessToken: "expired" },
-    jobber: { apiUrl: "https://api.getjobber.com/api/graphql", accessToken: "expired" },
-    housecallpro: { apiBase: "https://api.housecallpro.com", apiKey: "deleted" },
-    now: async () => "2026-10-12T00:00:00Z",
-  };
+function sandboxAnswering(status: number, body: unknown = {}) {
+  return fakeTarget(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
 }
 
 describe("recording against a sandbox", () => {
@@ -53,48 +47,42 @@ describe("recording against a sandbox", () => {
   });
 
   it("goes ahead when every token and key works", async () => {
-    const working: Target = {
-      ...sandboxAnswering(200),
-      fetch: async (url) => {
-        if (String(url).includes("graphql")) return Response.json({ data: { account: { id: "a" } } });
-        return Response.json(String(url).includes("housecallpro") ? { id: "c", name: "A company" } : { CompanyInfo: {} });
-      },
-    };
+    const working = fakeTarget(async (url) => {
+      if (String(url).includes("graphql")) return Response.json({ data: { account: { id: "a" } } });
+      return Response.json(String(url).includes("housecallpro") ? { id: "c", name: "A company" } : { CompanyInfo: {} });
+    });
     await expect(checkTokens(working, ["quickbooks", "jobber", "housecallpro"])).resolves.toBeUndefined();
   });
 
   it("sends a Housecall Pro account its API key in the documented form, with the path straight after the host", async () => {
     const sent: { url: string; authorization: string | null }[] = [];
-    const account: Target = {
-      ...sandboxAnswering(200),
-      fetch: async (url, init) => {
-        sent.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
-        return Response.json({});
-      },
-    };
+    const account = fakeTarget(async (url, init) => {
+      sent.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
+      return Response.json({});
+    });
     await housecallpro(account, "GET", "/customers?page_size=1");
-    expect(sent).toEqual([{ url: "https://api.housecallpro.com/customers?page_size=1", authorization: "Token deleted" }]);
+    expect(sent).toEqual([
+      { url: "https://api.housecallpro.com/customers?page_size=1", authorization: `Token ${account.housecallpro.apiKey}` },
+    ]);
   });
 
   it("doesn't record the padding of ids from a testing account with no clients, which would never match", async () => {
-    const encodedIds = CASES.find((testCase) => caseId(testCase) === "jobber/encoded-id-format")!;
+    const encodedIds = caseNamed("jobber/encoded-id-format");
     await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [] } } }))).rejects.toThrow("no clients");
   });
 
   it("doesn't record the padding of ids when none of them needs any, which the twin's never do", async () => {
-    const encodedIds = CASES.find((testCase) => caseId(testCase) === "jobber/encoded-id-format")!;
+    const encodedIds = caseNamed("jobber/encoded-id-format");
     const id = Buffer.from("gid://Jobber/Client/1234567").toString("base64"); // 27 bytes: base64 without padding
     await expect(encodedIds.observe(sandboxAnswering(200, { data: { clients: { nodes: [{ id }] } } }))).rejects.toThrow("can't tell");
   });
 });
 
 describe("answers that are never evidence", () => {
-  const readMissing = CASES.find((testCase) => caseId(testCase) === "quickbooks/read-missing-entity")!;
-  const jobberSyntax = CASES.find((testCase) => caseId(testCase) === "jobber/syntax-error")!;
+  const readMissing = caseNamed("quickbooks/read-missing-entity");
+  const jobberSyntax = caseNamed("jobber/syntax-error");
   // The cases that send a body as it is, rather than one their request helper writes.
-  const rawBodies = ["quickbooks/body-not-json", "jobber/body-not-json", "jobber/variables-as-a-string"].map(
-    (id) => CASES.find((testCase) => caseId(testCase) === id)!,
-  );
+  const rawBodies = ["quickbooks/body-not-json", "jobber/body-not-json", "jobber/variables-as-a-string"].map(caseNamed);
 
   it.each([429, 502, 503, 504])(
     "stop a case when the sandbox answers HTTP %i, throttling or down, rather than record it",
@@ -121,7 +109,7 @@ describe("answers that are never evidence", () => {
     for (const rawBody of rawBodies) {
       await expect(rawBody.observe(sandboxAnswering(401)), caseId(rawBody)).rejects.toThrow("get a fresh one");
     }
-    const badToken = CASES.find((testCase) => caseId(testCase) === "quickbooks/unknown-access-token")!;
+    const badToken = caseNamed("quickbooks/unknown-access-token");
     await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
   });
 
@@ -158,12 +146,9 @@ describe("a recording run's results", () => {
 
 describe("recording against a sandbox it can't reach", () => {
   it("names the URL, rather than saying only that a fetch failed", async () => {
-    const unreachable: Target = {
-      ...sandboxAnswering(200),
-      fetch: async () => {
-        throw new TypeError("fetch failed");
-      },
-    };
+    const unreachable = fakeTarget(async () => {
+      throw new TypeError("fetch failed");
+    });
     await expect(checkTokens(unreachable, ["quickbooks"])).rejects.toThrow(
       "Couldn't reach QuickBooks at https://sandbox-quickbooks.api.intuit.com/v3 (fetch failed)",
     );
