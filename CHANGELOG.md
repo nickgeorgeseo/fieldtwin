@@ -21,6 +21,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ### Changed
 
+- The conformance recorder names each vendor's API terms before it runs, says that Housecall Pro's API can't delete the records its cases make, and, given a command it doesn't know, says which environment variables each vendor's recording needs.
 - `flaky-apis` makes Housecall Pro fail too: one request in five throttled (429, with `RateLimit-Reset`), some 502s, one write in ten whose answer is lost after the customer, address, or job is made (504), and some webhooks late. Its customers pay the same two invoices Jobber's do, at the same moment. QuickBooks and Jobber meet exactly the faults they did, as their rules and dice are unchanged.
 - An action run through the control plane (`POST /_twin/actions`, the `twin_run_action` MCP tool, or a dashboard button) draws its random choices from the length of the event log, and Housecall Pro's records make the seeded log longer: 410 events for the default seed instead of 282. So on the same seed, the same action makes different people than 0.4.1 did, and `jobber/newClients` names other clients. Scenario timelines draw theirs by their place in the timeline, so a scenario runs as before.
 - `newClients`, like Housecall Pro's `newCustomers`, brings in at most 1,000 people at a time. The twin can name about 7,600 in all, and a larger count used to pass the check when a scenario loaded, then fail once the twin was half rebuilt, and fail every reset after it.
@@ -35,6 +36,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 - An advance that reaches a timeline entry whose action throws stops the clock at the entry's time with the entry still due, so advancing again tries it again. Before, the advance answered an error but the entry was gone from the schedule, and the next advance went on as if it had happened.
 - A timeline entry whose action throws is named in the error, as in `jobber newClients at 2026-07-13T12:00:00.000Z failed: ...`, and the control plane answers it as the bug in the twin it is: a 500, with the action's own stack in the log, rather than a 400 blaming the request.
 - When an advance stops at such an entry, the webhooks for what happened on the way before it go out before the advance answers, as they do when it succeeds. Before, they waited for the next request.
+- Conformance recorder: a QuickBooks or Jobber answer that repeats the run's access token loses it before any case sees it, as a Housecall Pro answer repeating the API key already did, so a sandbox that echoes a header can't put the token in a recording or in what the recorder prints.
 - Conformance recorder: the cases that send a body as it is (QuickBooks' and Jobber's `body-not-json`, and Jobber's `variables-as-a-string`) stop on an answer that says nothing about the API, as every other case does. A 429, a 502 to 504, Jobber's `THROTTLED`, or a 401 once the run's own token expired could be saved as their evidence.
 
 ## 0.4.1 - 2026-10-15
