@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { setup } from "./helpers.ts";
 
@@ -133,5 +134,59 @@ describe("Housecall Pro OAuth twin", () => {
     const response = await authorize(harness, { redirect_uri: "" });
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("invalid_request");
+  });
+
+  it("refuses a redirect URI that isn't absolute, or a PKCE method other than S256, as invalid_request", async () => {
+    const harness = setup();
+    const relative = await authorize(harness, { redirect_uri: "/callback" });
+    expect(relative.status).toBe(400);
+    expect(await relative.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/absolute URL/) });
+    const plain = await authorize(harness, { code_challenge: "abc", code_challenge_method: "plain" });
+    expect(plain.status).toBe(400);
+    expect((await plain.json()).error).toBe("invalid_request");
+  });
+
+  it("refuses a token request whose body isn't JSON or a form, saying the docs send JSON", async () => {
+    const harness = setup();
+    const post = (contentType: string, body: string) =>
+      harness.app.request("/housecallpro/oauth/token", { method: "POST", headers: { "Content-Type": contentType }, body });
+    const text = await post("text/plain", "grant_type=authorization_code");
+    expect(text.status).toBe(400);
+    expect(await text.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/docs send JSON/) });
+    const broken = await post("application/json", "{not json");
+    expect(broken.status).toBe(400);
+    expect(await broken.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/isn't valid JSON/) });
+  });
+
+  it("lets an authorization code expire after 10 minutes of twin time, with the documented invalid_grant", async () => {
+    const harness = setup();
+    const code = codeFrom(await authorize(harness));
+    harness.twin.clock.advance(601_000);
+    const response = await token(harness, { grant_type: "authorization_code", code });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_grant", error_description: INVALID_GRANT });
+  });
+
+  it("takes a PKCE S256 challenge, and refuses the code with a verifier that doesn't match it", async () => {
+    const harness = setup();
+    const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk-twin-verifier";
+    const challenge = createHash("sha256").update(verifier).digest("base64url");
+    const pkce = { code_challenge: challenge, code_challenge_method: "S256" };
+
+    const wrong = await token(harness, {
+      grant_type: "authorization_code",
+      code: codeFrom(await authorize(harness, pkce)),
+      code_verifier: "nope",
+    });
+    expect(wrong.status).toBe(400);
+    expect(await wrong.json()).toEqual({ error: "invalid_grant", error_description: INVALID_GRANT });
+
+    const right = await token(harness, {
+      grant_type: "authorization_code",
+      code: codeFrom(await authorize(harness, pkce)),
+      code_verifier: verifier,
+    });
+    expect(right.status).toBe(200);
+    expect((await right.json()).token_type).toBe("Bearer");
   });
 });
