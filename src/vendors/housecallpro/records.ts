@@ -1,5 +1,5 @@
 import type { WorldCustomer } from "../../world/generate-world.ts";
-import { dueAmount } from "./routes/invoice-response.ts";
+import { dueAmount } from "./statuses.ts";
 import type { HcpCustomer, HcpInvoice, HcpJob } from "./types/index.ts";
 
 /**

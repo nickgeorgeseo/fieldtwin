@@ -1,7 +1,7 @@
+import { workStatus } from "../statuses.ts";
 import type { HcpAppointment } from "../types/index.ts";
 import { oneOf, type Test, timeRange } from "./filters.ts";
 import { type ListRequest, listParam } from "./lists.ts";
-import { workStatus } from "./work.ts";
 
 /** A job or an estimate: work for a customer, done by the employees assigned, on appointments. */
 interface Work {

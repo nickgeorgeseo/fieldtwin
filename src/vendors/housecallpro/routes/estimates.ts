@@ -2,11 +2,12 @@ import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { linesTotal } from "../amounts.ts";
 import { hcpError } from "../errors.ts";
+import { workStatus, workTimestamps } from "../statuses.ts";
 import type { HcpEstimate, HcpEstimateOption, HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
 import { pageOf, readExpand, readList, readPaging, sorted } from "./lists.ts";
-import { assignedEmployees, lineItemResponse, schedule, workAddress, workCustomer, workStatus, workTimestamps } from "./work.ts";
 import { readWorkFilter } from "./work-filters.ts";
+import { assignedEmployees, lineItemResponse, scheduleResponse, workAddress, workCustomer } from "./work-response.ts";
 
 /**
  * Estimates. Get Estimates:  https://docs.housecallpro.com/docs/housecall-public-api/e430ba3d520a0-get-estimates
@@ -63,7 +64,7 @@ function estimateResponse(estimate: HcpEstimate, state: HcpState, expand: Readon
     company_name: company.name,
     company_id: company.id,
     work_timestamps: workTimestamps(estimate.appointments),
-    schedule: schedule(estimate.appointments, company, false),
+    schedule: scheduleResponse(estimate.appointments, company, false),
     assigned_employees: assignedEmployees(estimate.assigned_employee_ids, state),
     estimate_fields: { job_type: null, business_unit: null },
     assigned_route_template_id: null,

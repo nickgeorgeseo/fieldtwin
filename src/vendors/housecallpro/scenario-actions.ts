@@ -6,8 +6,7 @@ import { hcpTime, hcpTimeAt } from "./dates.ts";
 import { customerName } from "./events.ts";
 import { hcpId } from "./ids.ts";
 import { customerFrom, invoiceFor, paidInFull } from "./records.ts";
-import { dueAmount } from "./routes/invoice-response.ts";
-import { workTimestamps } from "./routes/work.ts";
+import { dueAmount, workTimestamps } from "./statuses.ts";
 import type { HcpJob, HcpState } from "./types/index.ts";
 
 /**
@@ -35,7 +34,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 
-  // A tech marks the work done, and the job is "complete unrated" (routes/work.ts). Only work whose time has come is
+  // A tech marks the work done, and the job is "complete unrated" (statuses.ts). Only work whose time has come is
   // finished: a job with a visit still ahead waits for it, so no job is done before it was due to start.
   completeJobs: {
     check: (count) => checkCount("housecallpro", "completeJobs", count),

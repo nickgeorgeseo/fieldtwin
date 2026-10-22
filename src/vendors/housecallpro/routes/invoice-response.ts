@@ -1,4 +1,5 @@
 import { lineAmount, linesTotal } from "../amounts.ts";
+import { dueAmount, invoiceStatus } from "../statuses.ts";
 import type { HcpInvoice } from "../types/index.ts";
 
 /**
@@ -38,18 +39,4 @@ export function invoiceResponse(invoice: HcpInvoice, withJobId: boolean) {
     // Get Invoices and Get Invoice by UUID add the job's id; a job's own list of invoices doesn't.
     ...(withJobId && { job_id: invoice.job_id }),
   };
-}
-
-/** What the invoice's payments haven't covered, in cents. */
-export function dueAmount(invoice: HcpInvoice): number {
-  const paid = invoice.payments.reduce((total, payment) => total + payment.amount, 0);
-  return Math.max(0, linesTotal(invoice.items) - paid);
-}
-
-/**
- * "paid" once payments cover it, "open" before. The other statuses the filter names (pending_payment, voided,
- * uncollectible, canceled) need writes the twin doesn't model yet.
- */
-export function invoiceStatus(invoice: HcpInvoice): "open" | "paid" {
-  return dueAmount(invoice) === 0 ? "paid" : "open";
 }

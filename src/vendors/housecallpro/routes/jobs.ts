@@ -1,12 +1,13 @@
 import type { Hono } from "hono";
 import type { Twin } from "../../../core/twin.ts";
 import { hcpError } from "../errors.ts";
+import { workStatus } from "../statuses.ts";
 import type { HcpJob, HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
 import { jobResponse } from "./job-response.ts";
 import { invoiceNumberOrder, pageOf, readExpand, readList, sorted } from "./lists.ts";
-import { appointmentResponse, lineItemResponse, workStatus } from "./work.ts";
 import { readWorkFilter } from "./work-filters.ts";
+import { appointmentResponse, lineItemResponse } from "./work-response.ts";
 
 /**
  * Jobs. Get Jobs:          https://docs.housecallpro.com/docs/housecall-public-api/6c97704da8bf3-get-jobs
