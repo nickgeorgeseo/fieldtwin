@@ -5,7 +5,7 @@ import { hcpError } from "../errors.ts";
 import { dueAmount, invoiceStatus } from "../statuses.ts";
 import type { HcpInvoice, HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
-import { amountRange, oneOf, type Test, timeRange } from "./filters.ts";
+import { amountRange, type Match, oneOf, timeRange } from "./filters.ts";
 import { invoiceResponse } from "./invoice-response.ts";
 import { invoiceNumberOrder, type ListRequest, listParam, pageOf, readList, sorted } from "./lists.ts";
 
@@ -53,19 +53,19 @@ function sortValue(invoice: HcpInvoice, by: (typeof SORTABLE)[number]): string |
  * The filters Get Invoices documents: status, customer_uuid, created_at, due_at, and paid_at ranges, amount_due
  * ranges (in cents, like every amount), and payment_method. location_ids is checked for every request (locations.ts).
  */
-function readInvoiceFilter(req: ListRequest): Test<HcpInvoice> | { problem: string } {
-  const tests: Test<HcpInvoice>[] = [];
+function readInvoiceFilter(req: ListRequest): Match<HcpInvoice> | { problem: string } {
+  const matches: Match<HcpInvoice>[] = [];
   const problem =
-    oneOf<HcpInvoice>(req, "status", STATUSES, (invoice) => [invoiceStatus(invoice)], tests) ??
-    oneOf<HcpInvoice>(req, "payment_method", PAYMENT_METHODS, (invoice) => invoice.payments.map((p) => p.payment_method), tests) ??
-    timeRange<HcpInvoice>(req, "created_at", (invoice) => invoice.created_at, tests) ??
-    timeRange<HcpInvoice>(req, "due_at", (invoice) => invoice.due_at, tests) ??
-    timeRange<HcpInvoice>(req, "paid_at", (invoice) => invoice.paid_at, tests) ??
-    amountRange<HcpInvoice>(req, "amount_due", dueAmount, tests);
+    oneOf<HcpInvoice>(req, "status", STATUSES, (invoice) => [invoiceStatus(invoice)], matches) ??
+    oneOf<HcpInvoice>(req, "payment_method", PAYMENT_METHODS, (invoice) => invoice.payments.map((p) => p.payment_method), matches) ??
+    timeRange<HcpInvoice>(req, "created_at", (invoice) => invoice.created_at, matches) ??
+    timeRange<HcpInvoice>(req, "due_at", (invoice) => invoice.due_at, matches) ??
+    timeRange<HcpInvoice>(req, "paid_at", (invoice) => invoice.paid_at, matches) ??
+    amountRange<HcpInvoice>(req, "amount_due", dueAmount, matches);
   if (problem) return { problem };
   const customers = listParam(req, "customer_uuid");
-  if (customers.length) tests.push((invoice) => customers.includes(invoice.customer_id));
-  return (invoice) => tests.every((test) => test(invoice));
+  if (customers.length) matches.push((invoice) => customers.includes(invoice.customer_id));
+  return (invoice) => matches.every((match) => match(invoice));
 }
 
 const STATUSES = ["open", "pending_payment", "paid", "voided", "uncollectible", "canceled"];

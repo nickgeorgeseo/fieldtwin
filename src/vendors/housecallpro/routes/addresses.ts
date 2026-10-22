@@ -37,8 +37,10 @@ export function addressRoutes(app: Hono, twin: Twin): void {
     if (!customer) return notFound(c, "customer");
     const fields = readAddress(read.body, "address");
     if ("problem" in fields) return c.json(hcpError(fields.problem), fields.status);
-    const missing = REQUIRED.filter((name) => !fields[name]?.trim());
-    if (missing.length) return c.json(hcpError(`An address needs ${REQUIRED.join(", ")}. Missing: ${missing.join(", ")}.`), 422);
+    const missing = REQUIRED_ADDRESS_FIELDS.filter((name) => !fields[name]?.trim());
+    if (missing.length) {
+      return c.json(hcpError(`An address needs ${REQUIRED_ADDRESS_FIELDS.join(", ")}. Missing: ${missing.join(", ")}.`), 422);
+    }
 
     // latitude and longitude are accepted and dropped: the Address the API answers with has neither.
     const address: HcpAddress = { id: hcpId("adr", state().counts.addresses + 1), type: "service", ...fields };
@@ -54,4 +56,4 @@ export function addressRoutes(app: Hono, twin: Twin): void {
   });
 }
 
-const REQUIRED = ["street", "city", "state", "zip", "country"] as const;
+const REQUIRED_ADDRESS_FIELDS = ["street", "city", "state", "zip", "country"] as const;

@@ -91,7 +91,7 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
   request(notification, subscription, state) {
     const at = hcpTimeAt(notification.occurredAtMs);
     const shared = { event: notification.topic, company_id: state.company.id, event_occurred_at: at, event_created_at: at };
-    const body = JSON.stringify({ ...shared, ...record(notification, state) });
+    const body = JSON.stringify({ ...shared, ...payloadRecord(notification, state) });
     const timestamp = String(Math.floor(notification.occurredAtMs / 1000));
     const signature = createHmac("sha256", subscription.clientSecret).update(`${timestamp}.${body}`).digest("hex");
     return { headers: { "Content-Type": "application/json", "Api-Timestamp": timestamp, "Api-Signature": signature }, body };
@@ -99,7 +99,7 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
 };
 
 /** The record an event key is about, under its own name, as the docs' protocols show it. */
-function record(notification: WebhookNotification, state: HcpState) {
+function payloadRecord(notification: WebhookNotification, state: HcpState) {
   if (notification.topic.startsWith("customer.")) {
     return { customer: customerResponse(state.customers.get(notification.itemId)!, state.company, NOTHING_EXPANDED) };
   }

@@ -76,7 +76,7 @@ function readSort<Key extends string>(req: ListRequest, sortable: readonly Key[]
   return { by: by as Key, descending: direction === "desc" };
 }
 
-type Sortable = string | number | null | undefined;
+type SortValue = string | number | null | undefined;
 
 /**
  * An invoice_number to sort by. JobCreate types it as a number, and the twin only makes numbers, so lists sort them as
@@ -91,7 +91,7 @@ export function invoiceNumberOrder(invoiceNumber: string): number | string {
  * case, and an empty value sorts after every other, as a Postgres database sorts NULL (the docs say neither). Ties keep
  * the order records were created in, reversed for `desc`, so every page of a list holds the same records each time.
  */
-export function sorted<T, Key extends string>(records: Iterable<T>, sort: Sort<Key>, value: (record: T, by: Key) => Sortable): T[] {
+export function sorted<T, Key extends string>(records: Iterable<T>, sort: Sort<Key>, value: (record: T, by: Key) => SortValue): T[] {
   const ascending = [...records]
     .map((record, index) => ({ record, index, value: value(record, sort.by) }))
     .sort((a, b) => compare(a.value, b.value) || a.index - b.index)
@@ -99,7 +99,7 @@ export function sorted<T, Key extends string>(records: Iterable<T>, sort: Sort<K
   return sort.descending ? ascending.reverse() : ascending;
 }
 
-function compare(a: Sortable, b: Sortable): number {
+function compare(a: SortValue, b: SortValue): number {
   if (a === b) return 0;
   if (a === null || a === undefined || a === "") return 1;
   if (b === null || b === undefined || b === "") return -1;

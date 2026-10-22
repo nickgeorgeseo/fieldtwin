@@ -40,7 +40,7 @@ export function readCustomerFields(body: Record<string, unknown>): Read<Customer
 }
 
 /** Every text field empty: where a new customer starts, before the fields a client sent. */
-export function noCustomerText(): Record<(typeof CUSTOMER_TEXT_FIELDS)[number], null> {
+export function blankCustomerText(): Record<(typeof CUSTOMER_TEXT_FIELDS)[number], null> {
   return Object.fromEntries(CUSTOMER_TEXT_FIELDS.map((name) => [name, null])) as Record<(typeof CUSTOMER_TEXT_FIELDS)[number], null>;
 }
 

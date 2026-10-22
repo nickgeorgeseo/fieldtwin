@@ -6,7 +6,7 @@ import { hcpError } from "../errors.ts";
 import { hcpId } from "../ids.ts";
 import { ADDRESS_TEXT_FIELDS, type HcpCompany, type HcpCustomer, type HcpState } from "../types/index.ts";
 import { HCP, notFound } from "./base.ts";
-import { identityProblem, noCustomerText, readAddressList, readCustomerFields } from "./customer-body.ts";
+import { blankCustomerText, identityProblem, readAddressList, readCustomerFields } from "./customer-body.ts";
 import { NOTHING_EXPANDED, pageOf, readExpand, readList, sorted } from "./lists.ts";
 
 /**
@@ -48,7 +48,7 @@ export function customerRoutes(app: Hono, twin: Twin): void {
     const { counts, company } = state();
     const customer: HcpCustomer = {
       id: hcpId("cus", counts.customers + 1),
-      ...noCustomerText(),
+      ...blankCustomerText(),
       notifications_enabled: false, // not documented; off, so the twin never assumes a customer agreed to messages
       tags: [],
       ...fields,

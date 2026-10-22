@@ -1,6 +1,6 @@
 import { workStatus } from "../statuses.ts";
 import type { HcpAppointment } from "../types/index.ts";
-import { oneOf, type Test, timeRange } from "./filters.ts";
+import { type Match, oneOf, timeRange } from "./filters.ts";
 import { type ListRequest, listParam } from "./lists.ts";
 
 /** A job or an estimate: work for a customer, done by the employees assigned, on appointments. */
@@ -16,21 +16,21 @@ interface Work {
  * matches no schedule filter.
  * https://docs.housecallpro.com/docs/housecall-public-api/6c97704da8bf3-get-jobs
  */
-export function readWorkFilter<T extends Work>(req: ListRequest): Test<T> | { problem: string } {
-  const tests: Test<T>[] = [];
+export function readWorkFilter<T extends Work>(req: ListRequest): Match<T> | { problem: string } {
+  const matches: Match<T>[] = [];
   const problem =
-    timeRange<T>(req, "scheduled_start", (work) => work.appointments[0]?.start_time, tests) ??
-    timeRange<T>(req, "scheduled_end", (work) => work.appointments.at(-1)?.end_time, tests) ??
-    oneOf<T>(req, "work_status", Object.keys(STATUS_FILTERS), statusFiltersOf, tests);
+    timeRange<T>(req, "scheduled_start", (work) => work.appointments[0]?.start_time, matches) ??
+    timeRange<T>(req, "scheduled_end", (work) => work.appointments.at(-1)?.end_time, matches) ??
+    oneOf<T>(req, "work_status", Object.keys(STATUS_FILTERS), statusFiltersOf, matches);
   if (problem) return { problem };
 
   const customerId = req.query("customer_id");
-  if (customerId) tests.push((work) => work.customer_id === customerId);
+  if (customerId) matches.push((work) => work.customer_id === customerId);
   const employeeIds = listParam(req, "employee_ids");
   if (employeeIds.length) {
-    tests.push((work) => work.assigned_employee_ids.some((id) => employeeIds.includes(id)));
+    matches.push((work) => work.assigned_employee_ids.some((id) => employeeIds.includes(id)));
   }
-  return (work) => tests.every((test) => test(work));
+  return (work) => matches.every((match) => match(work));
 }
 
 /**
