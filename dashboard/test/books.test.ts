@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readBooks } from "../lib/books.ts";
+import { type HcpCustomer, readBooks } from "../lib/books.ts";
 import { matchCustomers, matchInvoices } from "../lib/match-books.ts";
 import type { TwinEvent } from "../lib/twin-types.ts";
 
@@ -119,6 +119,23 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
 
   it("lists the differences before the customers that agree", () => {
     assert.equal(matchCustomers(books, "jobber").at(-1)?.status, "same");
+  });
+
+  it("matches a client by their primary email, not the first one listed, and names a nameless client by their company", () => {
+    const emails = [
+      { address: "billing@example.com", primary: false },
+      { address: "acme@example.com", primary: true },
+    ];
+    const acme = readBooks([
+      event("jobber", "ClientCreated", {
+        client: { id: "client-9", firstName: null, lastName: null, companyName: "Acme Plumbing", emails },
+      }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("9", "Acme Plumbing", "acme@example.com") }),
+    ]);
+    assert.deepEqual(
+      matchCustomers(acme, "jobber").map((row) => [row.email, row.service?.name, row.status]),
+      [["acme@example.com", "Acme Plumbing", "same"]],
+    );
   });
 
   it("keeps a customer the books have twice under one email as a row of its own, since a sync that books one twice is the bug to catch", () => {
@@ -243,6 +260,34 @@ describe("comparing Housecall Pro with the books instead of Jobber", () => {
         ["kendall@example.com", "Kendall Dunmore", "same"],
       ],
     );
+  });
+
+  it("pairs a customer with no email with no one, in either system", () => {
+    const books = readBooks([
+      event("housecallpro", "CustomerCreated", { customer: hcpCustomer(7, "Rowan", "Stroud", null) }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("7", "Rowan Stroud") }),
+    ]);
+    assert.deepEqual(
+      matchCustomers(books, "housecallpro").map((row) => [row.email, row.service?.name, row.quickbooks?.name, row.status]),
+      [
+        ["", "Rowan Stroud", undefined, "only-in-field-service"],
+        ["", undefined, "Rowan Stroud", "only-in-quickbooks"],
+      ],
+    );
+  });
+
+  it("names a customer with no name by their company, else their email, else a phone number, as Housecall Pro does", () => {
+    const nameless = (n: number, fields: Partial<HcpCustomer>) => ({ ...hcpCustomer(n, "", "", null), ...fields });
+    const books = readBooks([
+      event("housecallpro", "CustomerCreated", { customer: nameless(1, { company: "Acme Plumbing", email: "acme@example.com" }) }),
+      event("housecallpro", "CustomerCreated", { customer: nameless(2, { email: "pat@example.com", mobile_number: "555-0100" }) }),
+      event("housecallpro", "CustomerCreated", { customer: nameless(3, { home_number: "555-0101" }) }),
+    ]);
+    assert.deepEqual(Object.fromEntries(matchCustomers(books, "housecallpro").map((row) => [row.service?.id, row.service?.name])), {
+      cus_1: "Acme Plumbing",
+      cus_2: "pat@example.com",
+      cus_3: "555-0101",
+    });
   });
 
   it("turns Housecall Pro's cents into dollars before comparing totals", () => {
