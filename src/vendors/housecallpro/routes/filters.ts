@@ -1,7 +1,11 @@
 import { readUtcTime } from "../../../core/clock.ts";
 import { type ListRequest, listParam } from "./lists.ts";
 
-/** Pieces the lists' filters share. Each list documents its own filters; see work-filters.ts and invoices.ts. */
+/**
+ * Pieces the lists' filters share. Each list documents its own filters; see work-filters.ts and invoices.ts.
+ * Get Jobs:     https://docs.housecallpro.com/docs/housecall-public-api/6c97704da8bf3-get-jobs
+ * Get Invoices: https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
+ */
 
 export type Match<T> = (record: T) => boolean;
 

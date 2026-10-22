@@ -6,6 +6,7 @@ import { type Refusal, readTags, refuse } from "./refusal.ts";
  * Reading the customer and address fields a client sends (the reference's CustomerCreate, CustomerUpdate, and
  * AddressCreate). Text fields are strings or null, as the reference types them. Fields the twin doesn't model are
  * dropped, like a field Housecall Pro doesn't know. Every problem names the field, so the request can be fixed.
+ * Create Customer: https://docs.housecallpro.com/docs/housecall-public-api/4e0bf8c4d65d7-create-customer
  */
 
 export type CustomerFields = Partial<Pick<HcpCustomer, (typeof CUSTOMER_TEXT_FIELDS)[number] | "notifications_enabled" | "tags">>;

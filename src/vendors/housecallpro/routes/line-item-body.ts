@@ -9,6 +9,7 @@ import { type Refusal, refuse, withoutNulls } from "./refusal.ts";
  * two decimal places", 1 unless sent. A line is `labor` and taxable unless the request says otherwise, the defaults
  * JobLineItemCreate documents. Every amount must come to whole cents a number can count exactly (up to 2^53), so a
  * total is never rounded, or answered as null.
+ * https://docs.housecallpro.com/docs/housecall-public-api/2dcf481ed7d69-create-a-job
  */
 export type LineFields = Omit<HcpLineItem, "id">;
 
