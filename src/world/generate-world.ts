@@ -128,8 +128,8 @@ function makeCustomers(random: SeededRandom, count: number, home: Home): WorldCu
 }
 
 /**
- * The most new customers one scenario action brings in. The word lists name about 7,600 people in all, so a count
- * past this is a typo, refused when the scenario loads rather than once the twin is half rebuilt.
+ * The most new customers one scenario action brings in. A count past this is a typo: no scenario needs a thousand
+ * people to call in at once, and making them would take seconds and bloat the log with records nobody reads.
  */
 export const MOST_NEW_CUSTOMERS = 1000;
 

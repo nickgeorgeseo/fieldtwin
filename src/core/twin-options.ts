@@ -19,7 +19,10 @@ export interface TwinOptions {
   sendWebhook?: WebhookSender; // how deliveries reach your app: fetch, unless a test answers them itself
 }
 
-/** The clock and world a twin with these options starts from. Building them is all that can fail. */
+/**
+ * The clock and world a twin with these options starts from. Built before the twin's history is replaced, so options
+ * that can't make a world change nothing; an entry due at the start that throws is caught later, by startOver().
+ */
 export function startingPoint({ seed, startTime, worldSize, drift }: TwinOptions): { clock: TwinClock; world: World } {
   return { clock: new TwinClock(startTime), world: generateWorld(streams.world(seed), { startTime, size: worldSize, drift }) };
 }
