@@ -1,5 +1,5 @@
 import type { Twin } from "../core/twin.ts";
-import type { FaultRule, VendorName } from "../core/types.ts";
+import type { FaultRule } from "../core/types.ts";
 import { parseWebhookSubscriptions } from "./scenario.ts";
 
 /**
@@ -35,16 +35,9 @@ export function checkWebhookTopics(twin: Twin, rules: FaultRule[]): FaultRule[] 
   return rules;
 }
 
-/** A vendor the twin serves, by its name, or an error naming the ones it does. */
-export function knownVendor(twin: Twin, name: string): VendorName {
-  const vendor = twin.vendorNames().find((candidate) => candidate === name);
-  if (!vendor) throw new Error(`No vendor named "${name}". Vendors: ${twin.vendorNames().join(", ")}`);
-  return vendor;
-}
-
 /** Throws, naming the topics the vendor does send, unless it sends every one of `topics`. */
 function checkTopics(twin: Twin, vendor: string, topics: readonly string[], context: string): void {
-  const sent = twin.vendor(knownVendor(twin, vendor)).webhooks?.topics ?? [];
+  const sent = twin.vendor(vendor).webhooks?.topics ?? [];
   const unknown = topics.filter((topic) => !sent.includes(topic));
   if (unknown.length) {
     throw new Error(`${context}${vendor} never sends ${unknown.join(", ")}. Topics the twin sends: ${sent.join(", ") || "none yet"}`);

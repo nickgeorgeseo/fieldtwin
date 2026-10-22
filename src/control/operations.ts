@@ -4,7 +4,7 @@ import type { Twin } from "../core/twin.ts";
 import type { AuthMode, EventSource, TwinEvent, VendorName } from "../core/types.ts";
 import { scenarioActionOf } from "../core/vendor-twin.ts";
 import { listScenarioFiles, parseFaultRules, parseScenario, readScenarioFile, resolveAt } from "./scenario.ts";
-import { checkWebhookTopics, knownVendor } from "./webhook-operations.ts";
+import { checkWebhookTopics } from "./webhook-operations.ts";
 
 /**
  * Everything you can do to a running twin from the outside.
@@ -65,7 +65,7 @@ export async function advanceClock(twin: Twin, minutes: number) {
  * (`jobber`, `payInvoices`, 2), clients call in. Recorded with source "control"; webhooks go out before this resolves.
  */
 export async function runAction(twin: Twin, vendorName: string, action: string, params: unknown) {
-  const vendor = twin.vendor(knownVendor(twin, vendorName));
+  const vendor = twin.vendor(vendorName);
   const scenarioAction = scenarioActionOf(vendor, action);
   scenarioAction.check(params);
   // Seeded by the history so far, so the same requests make the same clients.

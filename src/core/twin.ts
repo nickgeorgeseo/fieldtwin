@@ -63,9 +63,10 @@ export class Twin {
     return this.webhooks.deliverDue(this.clock.nowMs());
   }
 
-  vendor(name: VendorName): VendorTwin {
-    const vendor = this.vendors.get(name);
-    if (!vendor) throw new Error(`No vendor twin named "${name}" is loaded`);
+  /** A vendor the twin serves, by its name (from a request, so any string), or an error naming the ones it does. */
+  vendor(name: string): VendorTwin {
+    const vendor = this.vendors.get(name as VendorName);
+    if (!vendor) throw new Error(`No vendor named "${name}". Vendors: ${this.vendorNames().join(", ")}`);
     return vendor;
   }
 
