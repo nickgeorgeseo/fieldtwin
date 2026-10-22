@@ -1,5 +1,6 @@
 import type { Books, QboCustomer, QboInvoice } from "./books.ts";
-import { type FieldService, fieldSide } from "./field-side.ts";
+import { fieldServiceRecords } from "./field-service.ts";
+import type { FieldService } from "./vendors.ts";
 
 /**
  * Where a field-service system and QuickBooks agree about the business, and where they have drifted apart. The twin
@@ -31,7 +32,7 @@ const CUSTOMER_ORDER: CustomerStatus[] = [
  * own, since a sync that makes duplicates is what this page has to catch. A customer without an email pairs with none.
  */
 export function matchCustomers(books: Books, service: FieldService): CustomerRow[] {
-  const field = fieldSide(books, service).customers;
+  const field = fieldServiceRecords(books, service).customers;
   const pairs = pairUp(field, (customer) => customer.email, books.quickbooks.customers, customerEmail);
   const rows: CustomerRow[] = field.map((customer) => {
     const row: CustomerRow = { email: customer.email, field: { id: customer.id, name: customer.name }, status: "only-in-field-service" };
@@ -86,7 +87,7 @@ const INVOICE_ORDER: InvoiceStatus[] = [
 ];
 
 export function matchInvoices(books: Books, service: FieldService): InvoiceRow[] {
-  const side = fieldSide(books, service);
+  const side = fieldServiceRecords(books, service);
   const customers = new Map(side.customers.map((customer) => [customer.id, customer.name]));
   const pairs = pairUp(
     side.invoices,

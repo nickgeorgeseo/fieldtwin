@@ -1,19 +1,18 @@
 import type { Books, HcpCustomer, JobberClient } from "./books.ts";
 import { hcpLinesCents } from "./hcp-amounts.ts";
+import type { FieldService } from "./vendors.ts";
 
 /**
- * The two field-service systems the books are compared with, each read into the same terms: a customer's name and
- * email, and an invoice's number, customer, total in cents, and whether it is paid (match-books.ts compares them).
+ * A field-service system's customers and invoices, read into the terms they are compared with the books in: a
+ * customer's name and email, and an invoice's number, customer, total in cents, and whether it is paid
+ * (match-books.ts compares them).
  */
-export type FieldService = "jobber" | "housecallpro";
-
-/** A field-service system's customers and invoices, in the terms they are compared with the books in. */
-export interface FieldSide {
+export interface FieldServiceRecords {
   customers: { id: string; name: string; email: string }[];
   invoices: { number: string; customerId: string; cents: number; paid: boolean }[];
 }
 
-export function fieldSide(books: Books, service: FieldService): FieldSide {
+export function fieldServiceRecords(books: Books, service: FieldService): FieldServiceRecords {
   if (service === "jobber") {
     return {
       customers: books.jobber.clients.map((client) => ({ id: client.id, name: clientName(client), email: clientEmail(client) })),

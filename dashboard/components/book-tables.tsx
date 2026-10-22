@@ -1,6 +1,6 @@
-import type { FieldService } from "@/lib/field-side.ts";
 import type { CustomerRow, InvoiceRow } from "@/lib/match-books.ts";
-import { customerStatuses, FIELD_SERVICES, invoiceStatuses, money } from "./book-statuses.ts";
+import { FIELD_SERVICES, type FieldService, vendorLabel } from "@/lib/vendors.ts";
+import { customerStatuses, invoiceStatuses, money } from "./book-statuses.ts";
 import { Badge } from "./ui.tsx";
 
 const CELL = "px-3 py-2";
@@ -21,7 +21,8 @@ function Head({ headings }: { headings: string[] }) {
 }
 
 export function CustomerTable({ service, rows }: { service: FieldService; rows: CustomerRow[] }) {
-  const { name, customer } = FIELD_SERVICES[service];
+  const name = vendorLabel(service);
+  const { customer } = FIELD_SERVICES[service];
   const statuses = customerStatuses(name);
   return (
     <table className="w-full text-left text-sm">
@@ -54,7 +55,8 @@ export function CustomerTable({ service, rows }: { service: FieldService; rows: 
 }
 
 export function InvoiceTable({ service, rows }: { service: FieldService; rows: InvoiceRow[] }) {
-  const { name, customer } = FIELD_SERVICES[service];
+  const name = vendorLabel(service);
+  const { customer } = FIELD_SERVICES[service];
   const statuses = invoiceStatuses(name);
   return (
     <table className="w-full text-left text-sm">

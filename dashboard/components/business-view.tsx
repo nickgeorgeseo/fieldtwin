@@ -2,9 +2,9 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { readBooks } from "@/lib/books.ts";
-import type { FieldService } from "@/lib/field-side.ts";
 import { matchCustomers, matchInvoices } from "@/lib/match-books.ts";
-import { customerStatuses, FIELD_SERVICES, invoiceStatuses } from "./book-statuses.ts";
+import { FIELD_SERVICES, type FieldService, vendorLabel } from "@/lib/vendors.ts";
+import { customerStatuses, invoiceStatuses } from "./book-statuses.ts";
 import { CustomerTable, InvoiceTable } from "./book-tables.tsx";
 import { Badge, type BadgeTone, Button } from "./ui.tsx";
 import { useEventLog } from "./use-event-log.ts";
@@ -22,7 +22,7 @@ export function BusinessView() {
     () => ({ customers: matchCustomers(books, service), invoices: matchInvoices(books, service) }),
     [books, service],
   );
-  const { name } = FIELD_SERVICES[service];
+  const name = vendorLabel(service);
 
   const show = (next: Tab, status: string | null) => {
     setTab(next);
@@ -49,7 +49,7 @@ export function BusinessView() {
               setOnly(null);
             }}
           >
-            {FIELD_SERVICES[key].name}
+            {vendorLabel(key)}
           </Button>
         ))}
       </fieldset>

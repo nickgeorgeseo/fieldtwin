@@ -5,3 +5,8 @@ export const VENDOR_LABELS = { quickbooks: "QuickBooks", jobber: "Jobber", house
 export function vendorLabel(vendor: string): string {
   return (VENDOR_LABELS as Record<string, string>)[vendor] ?? vendor;
 }
+
+/** The field-service systems the books are compared with (the Business page), and what each calls a customer. */
+export const FIELD_SERVICES = { jobber: { customer: "client" }, housecallpro: { customer: "customer" } } as const;
+
+export type FieldService = keyof typeof FIELD_SERVICES;
