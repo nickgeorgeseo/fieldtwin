@@ -90,6 +90,13 @@ describe("QuickBooks twin: creating and reading invoices", () => {
     expect(Invoice).toMatchObject({ TxnDate: "2026-07-01", DueDate: "2026-07-31" });
   });
 
+  it("rejects a TxnDate that isn't a day the calendar has (2070), rather than rolling it into March", async () => {
+    const { qboPost } = setup();
+    const response = await qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [salesLine("1", 1, 50)], TxnDate: "2026-02-30" });
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toMatchObject({ code: "2070", Message: "Invalid Date", element: "TxnDate" });
+  });
+
   it("rejects a line whose Amount is not Qty times UnitPrice (6070)", async () => {
     const { qboPost } = setup();
     const line = { ...salesLine("1", 2, 50), Amount: 99 };

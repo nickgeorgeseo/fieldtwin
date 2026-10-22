@@ -83,6 +83,12 @@ describe("QuickBooks twin: change data capture", () => {
     }
   });
 
+  it("refuses a changedSince that isn't a day the calendar has, rather than rolling it into the next month", async () => {
+    const { status, body } = await cdc(setup(), "Customer", "2026-02-30");
+    expect(status).toBe(400);
+    expect(body.Fault.Error[0]).toMatchObject({ code: "2070", Message: "Invalid Date", element: "changedSince" });
+  });
+
   it("refuses to look back more than 30 days", async () => {
     const { status, body } = await cdc(setup(), "Customer", "2026-06-01T00:00:00Z");
     expect(status).toBe(400);
