@@ -166,6 +166,15 @@ describe("values nested too deeply to write out", () => {
     expect((await response.json()).Fault.Error[0]).toMatchObject({ code: "2010", element: "DisplayName" });
   });
 
+  it("say that an object, too, was nested too deeply, rather than writing it out", async () => {
+    const deepObject = `${'{"a":'.repeat(4000)}"x"${"}".repeat(4000)}`;
+    const response = await qboRaw(setup(), "/customer", `{"DisplayName": ${deepObject}}`);
+    expect(response.status).toBe(400);
+    const [error] = (await response.json()).Fault.Error;
+    expect(error).toMatchObject({ code: "2010", element: "DisplayName" });
+    expect(error.Detail).toContain("an object nested too deeply");
+  });
+
   it.each([
     ["/customers", (value: string) => `{"first_name": ${value}}`, "first_name"],
     ["/customers", (value: string) => `{"first_name": "Ada", "tags": ${value}}`, "tags"],
