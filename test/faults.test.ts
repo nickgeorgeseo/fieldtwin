@@ -40,6 +40,23 @@ describe("fault rules", () => {
     expect(authorize.headers.get("X-Twin-Fault")).toBeNull();
   });
 
+  it("match only when the method, the included path, and the excluded path all agree", async () => {
+    const { app, hcpGet, hcpPost } = setup();
+    const rule = {
+      name: "hcp-writes-down",
+      vendor: "housecallpro",
+      method: "POST",
+      pathIncludes: "/customers",
+      pathExcludes: "/oauth/",
+      rate: 1,
+      effect: { status: 503 },
+    };
+    expect((await putFaults(app, [rule])).status).toBe(200);
+
+    expect((await hcpPost("/customers", { first_name: "Ada", last_name: "Alder" })).status).toBe(503);
+    expect((await hcpGet("/customers")).status).toBe(200);
+  });
+
   it("reject a rate outside 0 to 1 and an unknown vendor", async () => {
     const { app } = setup();
     const badRate = await putFaults(app, [{ name: "x", vendor: "quickbooks", rate: 5, effect: { status: 500 } }]);
