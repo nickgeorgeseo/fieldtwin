@@ -1,7 +1,7 @@
 import { isObject, shown } from "../../../core/request-body.ts";
 import { lineAmount } from "../amounts.ts";
 import type { HcpLineItem } from "../types/index.ts";
-import { type Refusal, refuse, withoutNulls } from "./body.ts";
+import { type Refusal, refuse, withoutNulls } from "./refusal.ts";
 
 /**
  * Reading the line items a client sends (the reference's LineItemCreate and JobLineItemCreate). `name` is required.

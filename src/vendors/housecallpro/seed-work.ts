@@ -3,7 +3,7 @@ import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import type { WorldLineItem } from "../../world/history.ts";
 import { hcpTime } from "./dates.ts";
-import { invoiceFor, paidInFull } from "./records.ts";
+import { invoiceFor, paidInFull } from "./record-builders.ts";
 import type { SeedIds } from "./seed-ids.ts";
 import type { HcpEstimate, HcpJob, HcpLineItem } from "./types/index.ts";
 
@@ -74,7 +74,7 @@ export function seedWork(world: World, ids: SeedIds): NewEvent[] {
     events.push({ vendor: "housecallpro", type: "JobCreated", data: { job } });
   }
 
-  // An invoice bills the job's lines, and a paid one has a payment for all of it (records.ts).
+  // An invoice bills the job's lines, and a paid one has a payment for all of it (record-builders.ts).
   for (const worldInvoice of world.history.invoices) {
     const job = jobs.get(worldInvoice.jobKey)!;
     const unpaid = invoiceFor(job, ids.numbered("invoice", worldInvoice.key), {

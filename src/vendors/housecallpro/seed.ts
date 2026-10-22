@@ -3,7 +3,7 @@ import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
 import { CITIES } from "../../world/word-lists.ts";
 import { hcpTime } from "./dates.ts";
-import { customerFrom } from "./records.ts";
+import { customerFrom } from "./record-builders.ts";
 import { SeedIds } from "./seed-ids.ts";
 import { seedWork } from "./seed-work.ts";
 import type { HcpCompany, HcpEmployee } from "./types/index.ts";

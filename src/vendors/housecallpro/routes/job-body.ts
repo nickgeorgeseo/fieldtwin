@@ -2,8 +2,8 @@ import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
 import { hcpTimeAt } from "../dates.ts";
 import type { HcpState } from "../types/index.ts";
-import { type Refusal, readTags, refuse, withoutNulls } from "./body.ts";
 import { type LineFields, readLineItems } from "./line-item-body.ts";
+import { type Refusal, readTags, refuse, withoutNulls } from "./refusal.ts";
 
 /**
  * Reading a Create a Job request (the reference's JobCreate): "Create a job with the ID for an already existing

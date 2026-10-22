@@ -4,7 +4,7 @@ import { NET_DAYS } from "../../world/history-stories.ts";
 import { linesTotal } from "./amounts.ts";
 import { hcpTime, hcpTimeAt } from "./dates.ts";
 import { hcpId } from "./ids.ts";
-import { customerFrom, invoiceFor, paidInFull } from "./records.ts";
+import { customerFrom, invoiceFor, paidInFull } from "./record-builders.ts";
 import { dueAmount, workTimestamps } from "./statuses.ts";
 import { customerName, type HcpJob, type HcpState } from "./types/index.ts";
 
@@ -52,7 +52,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 
-  // A Pro invoices finished work and sends it at once, as the world's invoices were sent (records.ts), due on the
+  // A Pro invoices finished work and sends it at once, as the world's invoices were sent (record-builders.ts), due on the
   // world's terms (FIDELITY.md). The fields are Get Invoices':
   // https://docs.housecallpro.com/docs/housecall-public-api/65ce9f430d605-get-invoices
   // Work with nothing to bill is left: a $0 invoice would be paid with no payment, and the docs don't say what then.
@@ -77,7 +77,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     },
   },
 
-  // One payment for what is still owed, so the invoice is "paid", as the world's paid invoices are (records.ts).
+  // One payment for what is still owed, so the invoice is "paid", as the world's paid invoices are (record-builders.ts).
   payInvoices: {
     check: (count) => checkCount("housecallpro", "payInvoices", count),
     run: (count, { state, nowIso }) => {
