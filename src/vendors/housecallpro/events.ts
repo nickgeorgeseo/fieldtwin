@@ -1,7 +1,16 @@
 import { formatMoney } from "../../core/money.ts";
 import type { TwinEvent } from "../../core/types.ts";
 import { linesTotal } from "./amounts.ts";
-import type { HcpAddress, HcpCompany, HcpCustomer, HcpEmployee, HcpEstimate, HcpInvoice, HcpJob } from "./types/index.ts";
+import {
+  customerName,
+  type HcpAddress,
+  type HcpCompany,
+  type HcpCustomer,
+  type HcpEmployee,
+  type HcpEstimate,
+  type HcpInvoice,
+  type HcpJob,
+} from "./types/index.ts";
 
 /** Every event the Housecall Pro twin records. Events carry complete records, so apply() stays simple. */
 export type HcpEventData =
@@ -51,10 +60,4 @@ export function describeHcpEvent(event: TwinEvent): string {
       return `${data.type} #${invoice_number} amount=${formatMoney(linesTotal(items) / 100)}${paid_at ? " (paid)" : ""}`;
     }
   }
-}
-
-/** How a person reads a customer: their name, or failing that their company, email, or a phone number. */
-export function customerName(customer: HcpCustomer): string {
-  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
-  return name || customer.company || customer.email || customer.mobile_number || customer.home_number || customer.work_number || "";
 }

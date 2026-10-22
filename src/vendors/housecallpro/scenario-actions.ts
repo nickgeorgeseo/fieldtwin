@@ -3,11 +3,10 @@ import { MOST_NEW_CUSTOMERS, newCustomers } from "../../world/generate-world.ts"
 import { NET_DAYS } from "../../world/history-stories.ts";
 import { linesTotal } from "./amounts.ts";
 import { hcpTime, hcpTimeAt } from "./dates.ts";
-import { customerName } from "./events.ts";
 import { hcpId } from "./ids.ts";
 import { customerFrom, invoiceFor, paidInFull } from "./records.ts";
 import { dueAmount, workTimestamps } from "./statuses.ts";
-import type { HcpJob, HcpState } from "./types/index.ts";
+import { customerName, type HcpJob, type HcpState } from "./types/index.ts";
 
 /**
  * What a scenario timeline can make happen in Housecall Pro, as if a Pro did it in the app. Each returns complete

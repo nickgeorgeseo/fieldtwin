@@ -56,6 +56,12 @@ export interface HcpAddress {
   country: string | null;
 }
 
+/** How a person reads a customer: their name, or failing that their company, email, or a phone number. */
+export function customerName(customer: HcpCustomer): string {
+  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
+  return name || customer.company || customer.email || customer.mobile_number || customer.home_number || customer.work_number || "";
+}
+
 /** The text fields a client sends for a customer, all of them nullable. */
 export const CUSTOMER_TEXT_FIELDS = [
   "first_name",
