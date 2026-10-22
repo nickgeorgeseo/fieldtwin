@@ -8,7 +8,7 @@
 
 [Watch the two-minute demo](https://nickgeorgeai.com/fieldtwin#demo): the dashboard drives a twin, an agent's changes are listed and rewound, and a sync brings drifted books back into line.
 
-Point your code at `http://localhost:4010` instead of `api.getjobber.com` or `quickbooks.api.intuit.com` (or at `http://localhost:4010/housecallpro` instead of `api.housecallpro.com`). It gets the same paths, headers, and JSON back, from a fake trades business with customers, technicians, and months of jobs, quotes, invoices, and payments, kept in both systems at once. Then make it hard: throttle QuickBooks, lose the answer to a write, deliver a webhook twice, jump the clock past every token's expiry. Afterwards, see exactly what your code changed, and undo it.
+Point your code at `http://localhost:4010` instead of `api.getjobber.com` or `quickbooks.api.intuit.com` (or at `http://localhost:4010/housecallpro` instead of `api.housecallpro.com`). It gets the same paths, headers, and JSON back, from a fake trades business with customers, technicians, and months of jobs, quotes, invoices, and payments, kept in every system at once. Then make it hard: throttle QuickBooks, lose the answer to a write, deliver a webhook twice, jump the clock past every token's expiry. Afterwards, see exactly what your code changed, and undo it.
 
 ```bash
 curl -X POST localhost:4010/_twin/checkpoints/before-agent           # name this moment
@@ -275,7 +275,7 @@ curl "localhost:4010/_twin/checkpoints/before-agent/changes?source=api"
 curl -X POST localhost:4010/_twin/checkpoints/before-agent/rewind
 ```
 
-Load `flaky-apis` to see how it copes when the APIs fight back, or `mismatched-books` to see whether it notices that the two systems disagree. To let a coding agent drive the twin itself, use the [MCP server](#using-it-from-a-coding-agent-mcp).
+Load `flaky-apis` to see how it copes when the APIs fight back, or `mismatched-books` to see whether it notices that the field-service systems and QuickBooks disagree. To let a coding agent drive the twin itself, use the [MCP server](#using-it-from-a-coding-agent-mcp).
 
 ## Authentication
 
@@ -333,7 +333,7 @@ curl -X POST localhost:4010/_twin/actions/housecallpro/payInvoices -H "Content-T
 
 Each URL gets its deliveries one at a time, in order; an app that is slow to answer doesn't hold up deliveries to another. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
-Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
+Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, `job.created`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
 
 ```yaml
 faults:
