@@ -13,7 +13,8 @@ import { checkWebhookTopics } from "./webhook-operations.ts";
  * so there is exactly one implementation of each operation.
  */
 
-// The webhook operations live in a file of their own, and are offered here with the rest.
+// The webhook operations live in a file of their own; re-exported so the HTTP and MCP adapters still import one
+// module, as ARCHITECTURE.md promises ("One operations module").
 export { describeWebhooks, setWebhooks } from "./webhook-operations.ts";
 
 export function describeTwin(twin: Twin) {
@@ -134,7 +135,7 @@ export function loadScenario(twin: Twin, yamlText: string) {
   const entries = scenario.timeline.flatMap(({ at, ...byVendor }) => {
     resolveAt(at, startMs, 0); // a time it can't read fails now; local times are resolved once the world is known
     return Object.entries(byVendor).flatMap(([vendor, actions]) =>
-      Object.entries(actions ?? {}).map(([action, params]) => ({ at, vendor: vendor as VendorName, action, params })),
+      Object.entries(actions).map(([action, params]) => ({ at, vendor: vendor as VendorName, action, params })),
     );
   });
   for (const { vendor, action, params } of entries) scenarioActionOf(twin.vendor(vendor), action).check(params);
