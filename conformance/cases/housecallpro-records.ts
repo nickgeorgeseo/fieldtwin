@@ -2,10 +2,12 @@ import { type ConformanceCase, expectOk, housecallpro } from "../case.ts";
 import { errorOf, firstId, noneLike, shapeOf } from "./housecallpro-shared.ts";
 
 /**
- * Housecall Pro cases that only read, from records the account already has: a customer with an address, a job, an
- * estimate, an invoice for a job with something still due, jobs numbered with different numbers of digits, and a job
- * with two visits. Housecall Pro's API makes no invoices, and the twin doesn't model the writes that make estimates or
- * second visits, so make these in Housecall Pro first. A case missing its records says what it needs, and isn't recorded.
+ * Housecall Pro cases about records the account already has: a customer with an address, a job, an estimate, an
+ * invoice for a job with something still due, jobs numbered with different numbers of digits, and a job with two
+ * visits. All but one only read; job-for-unknown-customer POSTs a job for a customer that doesn't exist, which is made
+ * only if Housecall Pro takes it. Housecall Pro's API makes no invoices, and the twin doesn't model the writes that
+ * make estimates or second visits, so make these in Housecall Pro first. A case missing its records says what it
+ * needs, and isn't recorded.
  */
 
 interface Job {
@@ -66,8 +68,9 @@ export const housecallproRecordCases: ConformanceCase[] = [
     vendor: "housecallpro",
     endpoint: "POST /jobs",
     fidelity: "Creating a job: ids that don't exist",
+    writes: true, // only if Housecall Pro makes a job for a customer and an address that don't exist
     async observe(target) {
-      // A customer and an address no record has, in the forms the account's own take, so nothing can be made.
+      // A customer and an address no record has, in the forms the account's own take, so nothing should be made.
       const customers = expectOk(await housecallpro(target, "GET", "/customers?page_size=10"), "list customers").customers ?? [];
       const customer = customers.find((candidate: { addresses?: { id: string }[] }) => candidate.addresses?.[0]?.id);
       if (!customer) {
