@@ -43,12 +43,13 @@ function clientEmail(client: JobberClient): string {
   return (client.emails.find((email) => email.primary) ?? client.emails[0])?.address.toLowerCase() ?? "";
 }
 
-function clientName(client: JobberClient): string {
+/** How Jobber shows a client: their name, or failing that their company. */
+export function clientName(client: Pick<JobberClient, "firstName" | "lastName" | "companyName">): string {
   return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.companyName || "";
 }
 
 /** How Housecall Pro shows a customer: their name, or failing that their company, email, or a phone number. */
-function hcpCustomerName(customer: HcpCustomer): string {
+export function hcpCustomerName(customer: Omit<HcpCustomer, "id">): string {
   const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
   return name || customer.company || customer.email || customer.mobile_number || customer.home_number || customer.work_number || "";
 }

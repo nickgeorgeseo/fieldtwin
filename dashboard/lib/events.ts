@@ -1,3 +1,4 @@
+import { clientName, hcpCustomerName } from "./field-service.ts";
 import { hcpLinesCents } from "./hcp-amounts.ts";
 import type { TwinEvent } from "./twin-types.ts";
 
@@ -53,27 +54,31 @@ function recordOf(data: unknown): Fields | null {
 }
 
 function name(record: Fields): string {
-  const person =
-    [text(record.firstName), text(record.lastName)].filter(Boolean).join(" ") ||
-    [text(record.first_name), text(record.last_name)].filter(Boolean).join(" "); // Housecall Pro's names are snake_case
-  const customer = text(field(record.CustomerRef, "name"));
+  const client = clientName({ firstName: text(record.firstName), lastName: text(record.lastName), companyName: text(record.companyName) });
+  // Housecall Pro's names are snake_case, and a customer needs only one of these: they go by the first they have.
+  const customer = hcpCustomerName({
+    first_name: text(record.first_name),
+    last_name: text(record.last_name),
+    company: text(record.company),
+    email: text(record.email),
+    mobile_number: text(record.mobile_number),
+    home_number: text(record.home_number),
+    work_number: text(record.work_number),
+  });
   const named = text(record.name) || text(field(record.name, "full")); // a Jobber account's name, a team member's full name
   const place = [text(record.street), text(record.city)].filter(Boolean).join(", "); // a Housecall Pro address
-  // A Housecall Pro customer needs only one of these, and goes by the first it has.
-  const contact = text(record.email) || text(record.mobile_number) || text(record.home_number) || text(record.work_number);
+  const booked = text(field(record.CustomerRef, "name"));
   return (
     text(record.DisplayName) ||
     text(record.Name) ||
-    person ||
-    text(record.companyName) ||
-    text(record.company) ||
+    client ||
+    customer ||
     named ||
     text(record.subject) ||
     text(record.title) ||
     text(record.description) ||
     place ||
-    customer ||
-    contact
+    booked
   );
 }
 
