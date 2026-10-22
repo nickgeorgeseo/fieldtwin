@@ -29,3 +29,38 @@ describe("writing fault rules from presets", () => {
     assert.equal(new Set(names).size, names.length);
   });
 });
+
+describe("the ready-made Housecall Pro fault rules", () => {
+  const preset = (name: string) => FAULT_PRESETS.find(({ rule }) => rule.name === name)?.rule;
+
+  it("throttles Housecall Pro's API but not its OAuth endpoints, which share its prefix in the twin", () => {
+    assert.deepEqual(preset("hcp-throttled"), {
+      name: "hcp-throttled",
+      vendor: "housecallpro",
+      pathExcludes: "/oauth/",
+      rate: 0.2,
+      effect: { status: 429 },
+    });
+  });
+
+  it("loses answers only to creating a customer, since one lost from the token endpoint would cost a refresh token for good", () => {
+    const rule = preset("hcp-lost-customers");
+    assert.equal(rule?.method, "POST");
+    assert.equal(rule?.pathIncludes, "/customers");
+    assert.deepEqual(rule?.effect, { status: 504, lostResponse: true });
+  });
+
+  it("gives every lost answer a status for the twin to answer with", () => {
+    for (const { rule } of FAULT_PRESETS) {
+      if (rule.effect.lostResponse) assert.equal(typeof rule.effect.status, "number", rule.name);
+    }
+  });
+
+  it("picks webhook deliveries by topic alone, never by method or path", () => {
+    const webhookRules = FAULT_PRESETS.map(({ rule }) => rule).filter((rule) => rule.webhook);
+    assert.ok(webhookRules.length > 0);
+    for (const rule of webhookRules) {
+      assert.deepEqual([rule.method, rule.pathIncludes, rule.pathExcludes], [undefined, undefined, undefined], rule.name);
+    }
+  });
+});
