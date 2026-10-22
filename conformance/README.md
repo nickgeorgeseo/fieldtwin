@@ -31,7 +31,7 @@ Fidelity: 41/44 observations match (93%)
 
 ## Recording
 
-You need a QuickBooks Online **sandbox company**, a Jobber **developer testing account**, a Housecall Pro account on the **MAX or XL plan**, or any of them. Never a customer's account: the cases that write create a few records named "fieldtwin conformance ...", and the recorder refuses to run against production QuickBooks.
+You need a QuickBooks Online **sandbox company**, a Jobber **developer testing account**, a Housecall Pro account on the **MAX or XL plan**, or any of them. Never a customer's account: the cases that write create records named "fieldtwin conformance ..." (in Housecall Pro, about ten customers and seven jobs per full run, some only if Housecall Pro accepts what the twin refuses), and the recorder refuses to run against production QuickBooks.
 
 **Check the vendor's API terms first.** Recording sends real requests from your account, so it is subject to the terms you accepted for that access: Intuit's [Developer Terms of Service](https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services), Jobber's [Developer Agreement](https://developer.getjobber.com/docs/legal/terms), or Housecall Pro's [API Terms of Service](https://docs.housecallpro.com/docs/terms/api-terms). Some of them limit what their APIs may be used for, so read them, and record only if they allow it.
 
