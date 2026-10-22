@@ -37,4 +37,13 @@ describe("Housecall Pro twin: employees", () => {
     const names = body.employees.map((employee: { first_name: string }) => employee.first_name);
     expect(names).toEqual([...names].sort());
   });
+
+  it("refuses an attribute it doesn't sort employees by, listing the ones it does", async () => {
+    const { hcpGet } = setup();
+    const response = await hcpGet("/employees?sort_by=role");
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: { message: 'sort_by must be one of created_at, first_name, last_name, email, not "role".' },
+    });
+  });
 });

@@ -79,6 +79,33 @@ describe("Housecall Pro twin: listing jobs", () => {
     expect(both.length).toBe(harness.twin.world.history.jobs.length);
   });
 
+  it("answers an empty page for a customer with no jobs, and narrows a customer's jobs by work status", async () => {
+    const harness = setup();
+    const { hcpGet } = harness;
+    const nobody = await (await hcpGet("/jobs?customer_id=cus_nobody")).json();
+    expect(nobody).toMatchObject({ total_items: 0, jobs: [] });
+
+    const sample = await jobFor(harness, finishedJob(harness));
+    const body = await (await hcpGet(`/jobs?page_size=1000&customer_id=${sample.customer.id}&work_status[]=completed`)).json();
+    const done = body.jobs as Job[];
+    expect(done.map((job) => job.id)).toContain(sample.id);
+    expect(done.every((job) => job.customer.id === sample.customer.id && job.work_status === "complete unrated")).toBe(true);
+    const all = (await (await hcpGet(`/jobs?page_size=1000&customer_id=${sample.customer.id}`)).json()).jobs as Job[];
+    expect(done.length).toBeLessThanOrEqual(all.length);
+  });
+
+  it("sorts jobs by work_status as words, and refuses an attribute it doesn't sort by", async () => {
+    const { hcpGet } = setup();
+    const jobs = (await (await hcpGet("/jobs?page_size=1000&sort_by=work_status&sort_direction=asc")).json()).jobs as Job[];
+    const statuses = jobs.map((job) => job.work_status);
+    expect(statuses).toEqual([...statuses].sort());
+    expect(new Set(statuses).size).toBeGreaterThan(1);
+
+    const response = await hcpGet("/jobs?sort_by=total_amount");
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toMatch(/sort_by must be one of .*work_status, not "total_amount"/);
+  });
+
   it("refuses a work_status it doesn't know and a date it can't read, saying what it takes", async () => {
     const { hcpGet } = setup();
     const status = await hcpGet("/jobs?work_status[]=finished");
@@ -223,6 +250,18 @@ describe("Housecall Pro twin: one job", () => {
     expect(body.data.reduce((total: number, line: { amount: number }) => total + line.amount, 0)).toBe(job.total_amount);
   });
 
+  it("adds attachments to a job only when expand asks, and refuses an expand value Get a Job doesn't document", async () => {
+    const harness = setup();
+    const listed = await jobFor(harness, finishedJob(harness));
+    const plain = await (await harness.hcpGet(`/jobs/${listed.id}`)).json();
+    expect(plain).not.toHaveProperty("attachments");
+    expect(await (await harness.hcpGet(`/jobs/${listed.id}?expand[]=attachments`)).json()).toEqual({ ...plain, attachments: [] });
+
+    const response = await harness.hcpGet(`/jobs/${listed.id}?expand[]=invoices`);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('expand takes attachments and appointments, not "invoices".');
+  });
+
   it("answers 404 for a job that doesn't exist, in the documented words", async () => {
     const { hcpGet } = setup();
     const response = await hcpGet("/jobs/job_missing");
@@ -230,5 +269,6 @@ describe("Housecall Pro twin: one job", () => {
     expect(await response.json()).toEqual({ error: { message: "job not found" } });
     expect((await hcpGet("/jobs/job_missing/line_items")).status).toBe(404);
     expect((await hcpGet("/jobs/job_missing/appointments")).status).toBe(404);
+    expect((await hcpGet("/jobs/job_missing/invoices")).status).toBe(404);
   });
 });

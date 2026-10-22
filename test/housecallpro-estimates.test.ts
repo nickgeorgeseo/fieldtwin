@@ -120,12 +120,37 @@ describe("Housecall Pro twin: estimates", () => {
     expect(first).toMatchObject({ page: 1, page_size: 1, total_items: all.length, line_items: [all[0]] });
   });
 
+  it("refuses a page below 1 on an option's line items, as every list does", async () => {
+    const harness = setup();
+    const estimate = (await allEstimates(harness)).find((candidate) => candidate.options.length)!;
+    const response = await harness.hcpGet(`/estimates/${estimate.id}/options/${estimate.options[0]!.id}/line_items?page=0`);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toMatch(/^page must be a whole number of 1 or more/);
+  });
+
+  it("adds attachments to each option only when expand asks, and refuses an expand value the docs don't list", async () => {
+    const harness = setup();
+    const [plain] = await allEstimates(harness);
+    expect(plain!.options[0]).not.toHaveProperty("attachments");
+    const expanded = await (await harness.hcpGet(`/estimates/${plain!.id}?expand[]=attachments`)).json();
+    expect(expanded).toEqual({ ...plain, options: plain!.options.map((option) => ({ ...option, attachments: [] })) });
+
+    const response = await harness.hcpGet(`/estimates/${plain!.id}?expand[]=appointments`);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('expand takes attachments, not "appointments".');
+  });
+
   it("answers 404 for an estimate or option that doesn't exist, in the documented words", async () => {
     const harness = setup();
     const missing = await harness.hcpGet("/estimates/est_missing");
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({ error: { message: "Estimate not found" } });
+    const noEstimate = await harness.hcpGet("/estimates/est_missing/options/opt_x/line_items");
+    expect(noEstimate.status).toBe(404);
+    expect(await noEstimate.json()).toEqual({ error: { message: "Estimate not found" } });
     const [estimate] = await allEstimates(harness);
-    expect((await harness.hcpGet(`/estimates/${estimate!.id}/options/opt_missing/line_items`)).status).toBe(404);
+    const noOption = await harness.hcpGet(`/estimates/${estimate!.id}/options/opt_missing/line_items`);
+    expect(noOption.status).toBe(404);
+    expect(await noOption.json()).toEqual({ error: { message: "Estimate option not found" } });
   });
 });
