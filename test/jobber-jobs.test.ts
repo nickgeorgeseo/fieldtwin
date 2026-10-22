@@ -139,6 +139,6 @@ describe("Jobber twin: users", () => {
       name: { first: tech.firstName, last: tech.lastName, full: `${tech.firstName} ${tech.lastName}` },
       isAccountOwner: false,
     });
-    expect(users.nodes[0].email.raw).toMatch(/@example\.com$/);
+    expect(users.nodes[0].email.raw).toBe(tech.email);
   });
 });
