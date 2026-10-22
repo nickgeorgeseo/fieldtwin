@@ -92,6 +92,40 @@ describe("Housecall Pro twin: invoices", () => {
     expect(paidSince.every((invoice) => invoice.paid_at! >= "2026-07-01")).toBe(true);
   });
 
+  it("filters invoices by payment method: the world's payments are external, and a method it doesn't document is refused", async () => {
+    const harness = setup();
+    const paid = harness.twin.world.history.invoices.filter((invoice) => invoice.paidAt);
+    const external = await allInvoices(harness, "&payment_method[]=external");
+    expect(external).toHaveLength(paid.length);
+    expect(external.every((invoice) => invoice.payments.some((payment) => payment.payment_method === "external"))).toBe(true);
+    expect(await allInvoices(harness, "&payment_method[]=credit_card")).toEqual([]);
+
+    const response = await harness.hcpGet("/invoices?payment_method[]=cash");
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe(
+      'payment_method takes consumer_financing, credit_card, ach, external, mobile_check_deposit, not "cash".',
+    );
+  });
+
+  it("filters invoices by when they were created, and by the amount still due", async () => {
+    const harness = setup();
+    const all = await allInvoices(harness);
+    const dates = all.map((invoice) => invoice.invoice_date).sort();
+    const [min, max] = [dates[Math.floor(dates.length / 3)]!, dates[Math.floor((2 * dates.length) / 3)]!];
+    const between = await allInvoices(harness, `&created_at_min=${min}&created_at_max=${max}`);
+    expect(between.length).toBeGreaterThan(0);
+    expect(between.length).toBeLessThan(all.length);
+    expect(between.every((invoice) => invoice.invoice_date >= min && invoice.invoice_date <= max)).toBe(true);
+
+    const settled = await allInvoices(harness, "&amount_due_max=0");
+    expect(settled).toHaveLength(harness.twin.world.history.invoices.filter((invoice) => invoice.paidAt).length);
+    expect(settled.every((invoice) => invoice.status === "paid" && invoice.due_amount === 0)).toBe(true);
+
+    const response = await harness.hcpGet("/invoices?amount_due_min=lots");
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('amount_due_min must be an amount in cents, like 15000, not "lots".');
+  });
+
   it("ignores an empty customer_uuid[], as Rails sends an empty list, the way the other filters ignore empties", async () => {
     const harness = setup();
     expect(await allInvoices(harness, "&customer_uuid[]=")).toHaveLength(harness.twin.world.history.invoices.length);
