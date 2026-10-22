@@ -1,4 +1,5 @@
-import { type Books, type HcpCustomer, hcpLinesCents, type JobberClient } from "./books.ts";
+import type { Books, HcpCustomer, JobberClient } from "./books.ts";
+import { hcpLinesCents } from "./hcp-amounts.ts";
 
 /**
  * The two field-service systems the books are compared with, each read into the same terms: a customer's name and
