@@ -14,8 +14,9 @@ import { listParam } from "./lists.ts";
  */
 export function locationCheck(twin: Twin): MiddlewareHandler {
   return async (c, next) => {
+    // An empty header names no location, as an empty location_ids[] does, so it is read as not sent.
     const header = c.req.header("X-Company-Id");
-    const asked = header !== undefined ? [header] : listParam(c.req, "location_ids");
+    const asked = header ? [header] : listParam(c.req, "location_ids");
     const { id } = twin.state<HcpState>("housecallpro").company;
     const unreachable = asked.find((location) => location !== id);
     if (unreachable === undefined) return next();

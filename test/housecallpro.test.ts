@@ -88,6 +88,15 @@ describe("Housecall Pro twin: locations", () => {
     expect(withParam.status).toBe(403);
   });
 
+  it("reads an empty X-Company-Id as not sent, so location_ids still count and nothing is refused for a blank name", async () => {
+    const harness = setup();
+    const headers = { Authorization: "Token k", "X-Company-Id": "" };
+    expect((await harness.app.request("/housecallpro/customers", { headers })).status).toBe(200);
+    const response = await harness.app.request("/housecallpro/customers?location_ids[]=somewhere-else", { headers });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.message).toContain("somewhere-else");
+  });
+
   it("ignores location_ids when X-Company-Id is sent too, as the guide says", async () => {
     const harness = setup();
     const id = await company(harness);
