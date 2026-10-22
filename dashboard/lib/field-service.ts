@@ -33,7 +33,7 @@ export function fieldServiceRecords(books: Books, service: FieldService): FieldS
     invoices: books.housecallpro.invoices.map((invoice) => ({
       number: invoice.invoice_number,
       customerId: invoice.customer_id,
-      cents: hcpLinesCents(invoice.items), // in cents already
+      cents: hcpLinesCents(invoice.items), // Housecall Pro counts in cents; Jobber's lines above are dollars
       paid: invoice.paid_at !== null,
     })),
   };

@@ -52,7 +52,7 @@ export interface HcpCustomer {
 
 export interface HcpInvoice {
   id: string;
-  invoice_number: string; // its job's, and the number the books carry, as Jobber's is
+  invoice_number: string; // the job's number too (FIDELITY.md); the books carry it as DocNumber, as they carry Jobber's
   customer_id: string;
   items: { unit_price: number; quantity: number }[]; // unit prices in cents
   paid_at: string | null;

@@ -76,7 +76,7 @@ export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; childr
   );
 }
 
-/** Each vendor keeps one color everywhere: in badges, the event feed, and the business view. */
+/** Each vendor keeps one color everywhere: in badges and the event feed. */
 const VENDOR_TONES: Record<string, BadgeTone> = { quickbooks: "green", jobber: "sky", housecallpro: "pink" };
 
 export function VendorBadge({ vendor }: { vendor: string }) {
