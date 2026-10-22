@@ -4,7 +4,7 @@ import { errorOf } from "./housecallpro-shared.ts";
 
 /**
  * Housecall Pro cases, one per FIDELITY.md row the twin can't confirm from the docs alone. Housecall Pro has no
- * sandbox: run them against an account on the MAX plan, with one of its API keys. These only read, and need nothing
+ * sandbox: run them against an account on the MAX or XL plan, with one of its API keys. These only read, and need nothing
  * in the account.
  */
 export const housecallproCases: ConformanceCase[] = [
