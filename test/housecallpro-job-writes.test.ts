@@ -1,24 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { jobCast, SCHEDULE } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
-
-type Harness = ReturnType<typeof setup>;
-
-/** A customer with their address, and two employees, to create jobs for. */
-async function cast(harness: Harness) {
-  const customer = (await (await harness.hcpGet("/customers?page_size=1")).json()).customers[0] as {
-    id: string;
-    addresses: { id: string }[];
-  };
-  const employees = (await (await harness.hcpGet("/employees")).json()).employees as { id: string; first_name: string }[];
-  return { customerId: customer.id, addressId: customer.addresses[0]!.id, employees };
-}
-
-const SCHEDULE = { scheduled_start: "2026-07-20T14:00:00", scheduled_end: "2026-07-20T16:00:00", arrival_window: 60 };
 
 describe("Housecall Pro twin: creating jobs", () => {
   it("creates a job for a customer at one of their addresses, numbered after the last job, answering 201", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId });
     expect(response.status).toBe(201);
     const job = await response.json();
@@ -38,7 +25,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("schedules the job and dispatches its employees when the request says when and who", async () => {
     const harness = setup();
-    const { customerId, addressId, employees } = await cast(harness);
+    const { customerId, addressId, employees } = await jobCast(harness);
     const job = await (
       await harness.hcpPost("/jobs", {
         customer_id: customerId,
@@ -58,7 +45,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("writes the local schedule with the offset the company's time zone has that day, standard time in winter", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const company = await (await harness.hcpGet("/company")).json();
     expect(company.time_zone).toBe("America/Chicago"); // seed 42's business is in Texas
 
@@ -84,7 +71,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("keeps the employees assigned to a job without a schedule", async () => {
     const harness = setup();
-    const { customerId, addressId, employees } = await cast(harness);
+    const { customerId, addressId, employees } = await jobCast(harness);
     const job = await (
       await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, assigned_employee_ids: [employees[1]!.id] })
     ).json();
@@ -94,7 +81,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("prices the job's line items in cents, as labor and taxable unless told otherwise", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const line_items = [
       { name: "Service call", unit_price: 8900 },
       { name: "Filter", unit_price: 1850, quantity: 2.5, kind: "materials", taxable: false, description: "MERV 8" },
@@ -112,7 +99,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("rounds a line's half cent up, as the QuickBooks and Jobber twins do, so the same line comes to the same amount", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     // 2.01 × $34.50 is $69.345 exactly; as floating point it is a hair under, which plain rounding takes down to $69.34.
     const lines = [
       { name: "Wire (per ft)", unit_price: 3450, quantity: 2.01 },
@@ -127,7 +114,7 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("takes the invoice number a request gives, and refuses one another job has, as it must be unique", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 5000 })).json();
     expect(job.invoice_number).toBe("5000");
     const next = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId })).json();
@@ -138,48 +125,9 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await taken.json()).error.message).toMatch(/invoice_number 1 is taken/i);
   });
 
-  it("refuses a job without customer_id or address_id (422), naming what's missing", async () => {
-    const harness = setup();
-    const { customerId } = await cast(harness);
-    const response = await harness.hcpPost("/jobs", { customer_id: customerId });
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.message).toMatch(/address_id/);
-  });
-
-  it("answers 404 for a customer, an address, or an employee that doesn't exist, and changes nothing", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const before = harness.twin.log.length;
-    const other = (await (await harness.hcpGet("/customers?page=2&page_size=1")).json()).customers[0];
-    for (const [body, what] of [
-      [{ customer_id: "cus_missing", address_id: addressId }, "customer"],
-      [{ customer_id: customerId, address_id: other.addresses[0].id }, "address"],
-      [{ customer_id: customerId, address_id: addressId, assigned_employee_ids: ["pro_missing"] }, "employee"],
-    ] as const) {
-      const response = await harness.hcpPost("/jobs", body);
-      expect(response.status, what).toBe(404);
-      expect((await response.json()).error.message).toBe(`${what} not found`);
-    }
-    expect(harness.twin.log.length).toBe(before);
-  });
-
-  it("refuses a schedule that ends before it starts, or a time it can't read", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    for (const schedule of [
-      { scheduled_start: SCHEDULE.scheduled_end, scheduled_end: SCHEDULE.scheduled_start },
-      { scheduled_start: "tomorrow", scheduled_end: SCHEDULE.scheduled_end },
-      { scheduled_start: SCHEDULE.scheduled_start },
-    ]) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
-      expect(response.status, JSON.stringify(schedule)).toBe(422);
-      expect((await response.json()).error.message).toMatch(/scheduled_(start|end)/);
-    }
-  });
-
   it("reads null on an optional field as not sent, as clients generated from the OpenAPI spec send it", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const response = await harness.hcpPost("/jobs", {
       customer_id: customerId,
       address_id: addressId,
@@ -199,42 +147,9 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: null })).status).toBe(201);
   });
 
-  it("refuses line items without a name, or priced in fractions of a cent", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    for (const [line, field] of [
-      [{ unit_price: 100 }, "line_items[0].name"],
-      [{ name: "Half cent", unit_price: 100.5 }, "line_items[0].unit_price"],
-      [{ name: "Too precise", quantity: 1.125 }, "line_items[0].quantity"],
-      [{ name: "Tip", kind: "gratuity" }, "line_items[0].kind"],
-    ] as const) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: [line] });
-      expect(response.status, field).toBe(422);
-      expect((await response.json()).error.message).toContain(field);
-    }
-  });
-
-  it("refuses a line too large to count in whole cents, rather than answer a total of null", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const before = harness.twin.log.length;
-    for (const [lines, field] of [
-      [[{ name: "Huge", quantity: 1e308, unit_price: 100 }], "line_items[0]"],
-      [[{ name: "Huge price", unit_price: 1e20 }], "line_items[0].unit_price"],
-      [[{ name: "Huge cost", unit_cost: 2 ** 60 }], "line_items[0].unit_cost"],
-      // Each line is safe on its own (2^46 cents), and together they come to 2^53, the first sum that isn't.
-      [Array.from({ length: 128 }, () => ({ name: "A 128th of too much", unit_price: 2 ** 46 })), "line_items come to more"],
-    ] as const) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, line_items: lines });
-      expect(response.status, field).toBe(422);
-      expect((await response.json()).error.message).toContain(field);
-    }
-    expect(harness.twin.log.length).toBe(before);
-  });
-
   it("takes an invoice number sent as digits in a string, as every answer writes it, and refuses one that isn't a number", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: "6001" })).json();
     expect(job.invoice_number).toBe("6001");
     const lettered = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: "INV-6002" });
@@ -242,19 +157,9 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await lettered.json()).error.message).toMatch(/invoice_number/);
   });
 
-  it("refuses an invoice number too large to be a whole number, so the next one can still follow it", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 1e21 });
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.message).toMatch(/invoice_number/);
-    const next = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId })).json();
-    expect(next.invoice_number).toBe(String(harness.twin.world.history.jobs.length + 1));
-  });
-
   it("takes a large quantity with two decimal places, and refuses a third", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const post = (quantity: number) =>
       harness.hcpPost("/jobs", {
         customer_id: customerId,
@@ -265,75 +170,9 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await post(1234567.891)).status).toBe(422);
   });
 
-  it("refuses a schedule that ends within the second it starts, since times are kept to the second", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const schedule = { scheduled_start: "2026-07-20T14:00:00.100Z", scheduled_end: "2026-07-20T14:00:00.900Z" };
-    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.message).toMatch(/scheduled_end must be after/);
-  });
-
-  it("refuses an arrival window too large to count in whole minutes, as it refuses such amounts", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const schedule = { ...SCHEDULE, arrival_window: 1e21 };
-    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
-    expect(response.status).toBe(422);
-    expect((await response.json()).error.message).toMatch(/arrival_window/);
-  });
-
-  it("refuses a schedule before 1900, when the company's zone had no offset in whole minutes to write its local times with", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    for (const day of ["0999-06-01", "1883-01-01"]) {
-      const schedule = { scheduled_start: `${day}T15:00:00Z`, scheduled_end: `${day}T16:00:00Z` };
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
-      expect(response.status, day).toBe(422);
-      expect((await response.json()).error.message).toMatch(/scheduled_start.*1900/);
-    }
-  });
-
-  it("refuses to number a job after the largest invoice number it can count to, rather than repeat it", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const top = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: Number.MAX_SAFE_INTEGER });
-    expect(top.status).toBe(201);
-    const next = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId });
-    expect(next.status).toBe(422);
-    expect((await next.json()).error.message).toMatch(/invoice_number/);
-  });
-
-  it("says it doesn't model anytime schedules, price forms, discount lines, or job types yet (501)", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    for (const extra of [
-      { schedule: { anytime: true, anytime_start_date: "2026-07-20" } },
-      { line_items: [{ name: "Formed", pricing_form: { id: "pbpf_1" } }] },
-      { line_items: [{ name: "Loyalty", kind: "fixed discount" }] },
-      { job_fields: { job_type_id: "jt_1" } },
-    ]) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
-      expect(response.status, JSON.stringify(extra)).toBe(501);
-      expect((await response.json()).error.message).toMatch(/doesn't model/);
-    }
-  });
-
-  it("says a customer doesn't exist before saying job types aren't modeled, so the client fixes the request first", async () => {
-    const harness = setup();
-    const { addressId } = await cast(harness);
-    const response = await harness.hcpPost("/jobs", {
-      customer_id: "cus_missing",
-      address_id: addressId,
-      job_fields: { job_type_id: "jt_1" },
-    });
-    expect(response.status).toBe(404);
-    expect((await response.json()).error.message).toBe("customer not found");
-  });
-
   it("keeps the job's notes as one note with an id, and its lead source; blank notes are no note", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const job = await (
       await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, notes: "Gate code 4411", lead_source: "Google" })
     ).json();
@@ -345,27 +184,9 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect(blank).toMatchObject({ notes: [], lead_source: null });
   });
 
-  it("refuses an optional field of the wrong type (422), naming it", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    const before = harness.twin.log.length;
-    for (const [extra, field] of [
-      [{ assigned_employee_ids: "pro_1" }, "assigned_employee_ids"],
-      [{ tags: "warranty" }, "tags"],
-      [{ schedule: "tomorrow" }, "schedule"],
-      [{ lead_source: 42 }, "lead_source"],
-      [{ notes: ["Gate code 4411"] }, "notes"],
-    ] as const) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
-      expect(response.status, field).toBe(422);
-      expect((await response.json()).error.message).toContain(field);
-    }
-    expect(harness.twin.log.length).toBe(before);
-  });
-
   it("reads a schedule sent with a UTC offset, and answers it in UTC", async () => {
     const harness = setup();
-    const { customerId, addressId } = await cast(harness);
+    const { customerId, addressId } = await jobCast(harness);
     const schedule = { scheduled_start: "2026-07-20T09:00:00-05:00", scheduled_end: "2026-07-20T11:00:00-05:00" };
     const job = await (await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule })).json();
     expect(job.schedule).toMatchObject({ scheduled_start: "2026-07-20T14:00:00Z", scheduled_end: "2026-07-20T16:00:00Z" });
@@ -373,21 +194,11 @@ describe("Housecall Pro twin: creating jobs", () => {
 
   it("assigns an employee once, however many times the request names them", async () => {
     const harness = setup();
-    const { customerId, addressId, employees } = await cast(harness);
+    const { customerId, addressId, employees } = await jobCast(harness);
     const id = employees[0]!.id;
     const job = await (
       await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, assigned_employee_ids: [id, id, id] })
     ).json();
     expect(job.assigned_employees.map((employee: { id: string }) => employee.id)).toEqual([id]);
-  });
-
-  it("refuses an invoice number of 0 or below, since numbers count from 1", async () => {
-    const harness = setup();
-    const { customerId, addressId } = await cast(harness);
-    for (const invoice_number of [0, -5]) {
-      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number });
-      expect(response.status, String(invoice_number)).toBe(422);
-      expect((await response.json()).error.message).toMatch(/invoice_number must be a whole number from 1/);
-    }
   });
 });
