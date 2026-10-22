@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorldQuote } from "../src/world/history.ts";
+import { cents, iso, listAll } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
 
 type Harness = ReturnType<typeof setup>;
@@ -21,12 +22,7 @@ interface Estimate {
   }[];
 }
 
-const cents = (quote: WorldQuote) => quote.lineItems.reduce((total, line) => total + Math.round(line.quantity * line.unitPrice * 100), 0);
-const iso = (time: string) => time.replace(".000Z", "Z");
-
-async function allEstimates(harness: Harness, query = ""): Promise<Estimate[]> {
-  return (await (await harness.hcpGet(`/estimates?page_size=1000${query}`)).json()).estimates;
-}
+const allEstimates = (harness: Harness, query = "") => listAll<Estimate>(harness.hcpGet, "estimates", query);
 
 async function estimateFor(harness: Harness, quote: WorldQuote): Promise<Estimate> {
   return (await allEstimates(harness)).find((estimate) => estimate.estimate_number === String(quote.number))!;
@@ -58,10 +54,7 @@ describe("Housecall Pro twin: estimates", () => {
     ]);
 
     const job = harness.twin.world.history.jobs.find((candidate) => candidate.key === quote.jobKey)!;
-    const jobs = (await (await harness.hcpGet("/jobs?page_size=1000")).json()).jobs as {
-      description: string;
-      original_estimate_id: string;
-    }[];
+    const jobs = await listAll<{ description: string; original_estimate_id: string }>(harness.hcpGet, "jobs");
     const copied = jobs.filter((candidate) => candidate.original_estimate_id === estimate.id);
     expect(copied.map((candidate) => candidate.description)).toEqual([job.title]);
   });

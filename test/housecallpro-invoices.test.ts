@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorldInvoice } from "../src/world/history.ts";
+import { cents, iso, listAll } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
 
 type Harness = ReturnType<typeof setup>;
@@ -20,13 +21,7 @@ interface Invoice {
   payments: { amount: number; status: string; payment_method: string }[];
 }
 
-const cents = (invoice: WorldInvoice) =>
-  invoice.lineItems.reduce((total, line) => total + Math.round(line.quantity * line.unitPrice * 100), 0);
-const iso = (time: string) => time.replace(".000Z", "Z");
-
-async function allInvoices(harness: Harness, query = ""): Promise<Invoice[]> {
-  return (await (await harness.hcpGet(`/invoices?page_size=1000${query}`)).json()).invoices;
-}
+const allInvoices = (harness: Harness, query = "") => listAll<Invoice>(harness.hcpGet, "invoices", query);
 
 /** The twin's invoice for a world invoice: it has the world's invoice number, as the books and Jobber do. */
 async function invoiceFor(harness: Harness, worldInvoice: WorldInvoice): Promise<Invoice> {
@@ -185,11 +180,8 @@ describe("Housecall Pro twin: a job's invoices", () => {
 
     const { jobs, invoices: worldInvoices } = harness.twin.world.history;
     const waiting = jobs.find((job) => job.visits.every((visit) => visit.completedAt) && !worldInvoices.some((i) => i.jobKey === job.key))!;
-    const all = (await (await harness.hcpGet("/jobs?page_size=1000")).json()).jobs as {
-      id: string;
-      schedule: { scheduled_start: string };
-    }[];
-    const job = all.find((candidate) => candidate.schedule.scheduled_start === waiting.visits[0]!.startAt.replace(".000Z", "Z"))!;
+    const all = await listAll<{ id: string; schedule: { scheduled_start: string } }>(harness.hcpGet, "jobs");
+    const job = all.find((candidate) => candidate.schedule.scheduled_start === iso(waiting.visits[0]!.startAt))!;
     expect((await (await harness.hcpGet(`/jobs/${job.id}/invoices`)).json()).invoices).toEqual([]);
   });
 

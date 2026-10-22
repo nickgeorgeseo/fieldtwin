@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorldJob } from "../src/world/history.ts";
+import { cents, iso, listAll } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
 
 type Harness = ReturnType<typeof setup>;
@@ -26,13 +27,11 @@ interface Job {
   original_estimate_uuids: string[] | null;
 }
 
-const cents = (job: WorldJob) => job.lineItems.reduce((total, line) => total + Math.round(line.quantity * line.unitPrice * 100), 0);
-
 /** The twin's job for a world job: the same work, for the same customer, starting at the same time. */
 async function jobFor(harness: Harness, worldJob: WorldJob, query = ""): Promise<Job> {
-  const all = (await (await harness.hcpGet(`/jobs?page_size=1000${query}`)).json()).jobs as Job[];
+  const all = await listAll<Job>(harness.hcpGet, "jobs", query);
   const email = harness.twin.world.customers.find((customer) => customer.key === worldJob.customerKey)!.email;
-  const start = worldJob.visits[0]!.startAt.replace(".000Z", "Z");
+  const start = iso(worldJob.visits[0]!.startAt);
   return all.find((job) => job.description === worldJob.title && job.customer.email === email && job.schedule.scheduled_start === start)!;
 }
 
@@ -182,8 +181,8 @@ describe("Housecall Pro twin: one job", () => {
     expect(job.work_status).toBe("complete unrated");
     expect(job.work_timestamps).toEqual({
       on_my_way_at: null,
-      started_at: worldJob.visits[0]!.startAt.replace(".000Z", "Z"),
-      completed_at: worldJob.visits.at(-1)!.completedAt!.replace(".000Z", "Z"),
+      started_at: iso(worldJob.visits[0]!.startAt),
+      completed_at: iso(worldJob.visits.at(-1)!.completedAt!),
     });
   });
 
@@ -201,8 +200,8 @@ describe("Housecall Pro twin: one job", () => {
     const harness = setup();
     const worldJob = harness.twin.world.history.jobs.find((job) => job.visits.length === 2)!;
     const job = await jobFor(harness, worldJob, "&expand[]=appointments");
-    expect(job.schedule.scheduled_start).toBe(worldJob.visits[0]!.startAt.replace(".000Z", "Z"));
-    expect(job.schedule.scheduled_end).toBe(worldJob.visits[1]!.endAt.replace(".000Z", "Z"));
+    expect(job.schedule.scheduled_start).toBe(iso(worldJob.visits[0]!.startAt));
+    expect(job.schedule.scheduled_end).toBe(iso(worldJob.visits[1]!.endAt));
     const appointments = job.schedule.appointments!;
     expect(appointments).toHaveLength(2);
     expect(appointments[0]).toMatchObject({ anytime: false, arrival_window_minutes: 0 });

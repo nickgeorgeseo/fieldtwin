@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadScenario } from "../src/control/operations.ts";
+import { listAll } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
 
 type Harness = ReturnType<typeof setup>;
 
-const allCustomers = async (hcpGet: Harness["hcpGet"]) =>
-  (await (await hcpGet("/customers?page_size=1000")).json()).customers as { id: string; first_name: string; email: string }[];
+const allCustomers = (hcpGet: Harness["hcpGet"]) => listAll<{ id: string; first_name: string; email: string }>(hcpGet, "customers");
 
 describe("Housecall Pro twin: listing customers", () => {
   it("lists the business's customers ten to a page by default, with the page counts", async () => {
