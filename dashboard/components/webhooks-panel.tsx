@@ -79,7 +79,7 @@ export function WebhooksPanel() {
               value={text}
               onChange={(event) => setText(event.target.value)}
               spellCheck={false}
-              rows={10}
+              rows={16}
               className="mt-2 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950"
             />
             <p className="text-xs text-zinc-500">Replaces every subscription. Secrets sign deliveries and are never shown back.</p>
