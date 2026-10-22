@@ -34,10 +34,8 @@ export class Twin {
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   private readonly bookkeeping = new Bookkeeping((vendor) => streams.oauth(this.options.seed, [...this.vendors.keys()].indexOf(vendor)));
-
   // A loaded scenario's schedule, run as advance() moves the clock. See timeline.ts.
   private readonly timeline = new Timeline(this);
-
   // Webhook subscriptions and deliveries: bookkeeping too. See webhooks.ts and webhook-dispatcher.ts.
   readonly webhooks: WebhookDispatcher;
 
@@ -90,14 +88,14 @@ export class Twin {
   }
 
   /**
-   * Switch to a scenario: a different seed, start time, world size, or faults, and its timeline, made from the new
-   * world (whose business hours a timeline's local times are in), with the entries already due applied. All or
-   * nothing: if the new options can't make a world, or an entry due at the start throws, the twin is left as it was.
+   * Switch to a scenario: a different seed, start time, world size, or faults, and its timeline, with the entries already due
+   * applied. `scheduleFor` makes the timeline from the new world: a callback, since local times ("08:00") mean a moment only once
+   * that world's UTC offset is known. All or nothing: if they can't make a world, or an entry due at the start throws, nothing changes.
    */
-  load(changes: Partial<Omit<TwinOptions, "vendors">>, timeline: (world: World) => TimelineEntry[]): void {
+  load(changes: Partial<Omit<TwinOptions, "vendors">>, scheduleFor: (world: World) => TimelineEntry[]): void {
     const options = { ...this.options, ...changes };
     const start = startingPoint(options);
-    const entries = timeline(start.world);
+    const entries = scheduleFor(start.world);
     this.startOver(() => {
       this.options = options;
       this.timeline.schedule(entries);
@@ -115,23 +113,20 @@ export class Twin {
     return this.timeline.upcoming(limit);
   }
 
-  /**
-   * Back to the seeded starting world, with the loaded scenario's faults: the same seed and options give a byte-identical
-   * log. All or nothing, like load().
-   */
+  /** Back to the seeded start, with the loaded scenario's faults: same seed, same log byte for byte. All or nothing, like load(). */
   reset(): void {
     this.startOver(() => this.rebuild(startingPoint(this.options)));
   }
 
   /**
-   * Replace the twin's history by `rebuild`, all or nothing: if it throws, everything it replaced is put back. Once it
+   * Replace the twin's history by `replaceHistory`, all or nothing: if it throws, everything it replaced is put back. Once it
    * works, rate-limit budgets start full and pending deliveries are dropped, as bookkeeping about the history it replaced.
    */
-  private startOver(rebuild: () => void): void {
+  private startOver(replaceHistory: () => void): void {
     const { options, clock, log, world, faultRules, faultRandom, states, checkpoints } = this;
     const restoreTimeline = this.timeline.save();
     try {
-      rebuild();
+      replaceHistory();
     } catch (error) {
       Object.assign(this, { options, clock, log, world, faultRules, faultRandom, states, checkpoints });
       restoreTimeline();
@@ -156,7 +151,10 @@ export class Twin {
     });
   }
 
-  /** Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. */
+  /**
+   * Start over from `history`, replayed rather than recorded, at `clock`: what a reset and a rewind share. Every field
+   * assigned here or in rebuild() must be in startOver()'s list, or a rebuild that fails leaves it half changed.
+   */
   private restart(clock: TwinClock, faultRandom: FaultRandom, history: readonly TwinEvent[]): void {
     this.clock = clock;
     this.faultRandom = faultRandom;
