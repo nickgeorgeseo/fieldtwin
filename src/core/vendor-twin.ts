@@ -44,13 +44,17 @@ export interface VendorTwin<State = unknown> {
 
   /**
    * Headers the vendor sends with an error of this status, like Housecall Pro's `RateLimit-Reset` on a 429, so an
-   * injected fault carries them too. Optional: a vendor without it sends only the body.
+   * injected fault carries them too. Called only by the fault middleware: a vendor's own routes add their headers
+   * themselves. Return {} for a status that carries none. Content-Type and X-Twin-Fault are set by the middleware,
+   * and win. Optional: a vendor without it sends only the body.
    */
   errorHeaders?(status: number, twin: Twin): Record<string, string>;
 
   /**
    * What a scenario timeline can make happen in this vendor, by name ("newClients", "payInvoices").
    * Optional: a vendor without actions simply can't be scripted. See "Scenario timelines" in ARCHITECTURE.md.
+   * An action that takes a count shares its pieces: checkCount (below) reads the count, and world's newCustomers
+   * names the people, so every vendor's new customers are checked and named the same way.
    */
   scenarioActions?: Record<string, ScenarioAction<State>>;
 
@@ -85,7 +89,10 @@ export function checkCount(vendor: VendorName, action: string, value: unknown, m
 export interface ScenarioAction<State = unknown> {
   /** Throw an Error saying what's wrong with `params`, so a bad scenario fails when it loads, not hours later. */
   check(params: unknown): void;
-  /** The complete events to record, with source "scenario". Read state; never change it. */
+  /**
+   * The complete events to record, with source "scenario". Read state; never change it. Throwing here is a bug:
+   * check() passed. The entry then records nothing and stays due, and the caller gets a ScenarioEntryError naming it.
+   */
   run(params: unknown, context: ScenarioActionContext<State>): NewEvent[];
 }
 
