@@ -138,7 +138,12 @@ export const MOST_NEW_CUSTOMERS = 1000;
  * `firstNumber` so their emails are unique. Nobody shares a name with the vendor's own customers (`takenNames`,
  * "First Last"), with anyone else the world has, customers only the books know included, or with each other.
  */
-export function newCustomers(random: SeededRandom, world: World, firstNumber: number, count: number, takenNames: Iterable<string>) {
+export function newCustomers(
+  random: SeededRandom,
+  world: World,
+  { firstNumber, count }: { firstNumber: number; count: number },
+  takenNames: Iterable<string>,
+) {
   const taken = new Set(takenNames);
   for (const person of world.customers) taken.add(`${person.firstName} ${person.lastName}`);
   return Array.from({ length: count }, (_, index) => {

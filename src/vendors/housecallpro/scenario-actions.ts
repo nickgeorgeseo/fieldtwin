@@ -23,7 +23,7 @@ export const housecallproScenarioActions: Record<string, ScenarioAction<HcpState
     run: (count, { state, world, random, nowIso }) => {
       const now = hcpTime(nowIso);
       const firstNumber = state.counts.customers + 1;
-      const people = newCustomers(random, world, firstNumber, count as number, [...state.customers.values()].map(customerName));
+      const people = newCustomers(random, world, { firstNumber, count: count as number }, [...state.customers.values()].map(customerName));
       return people.map((person, index) => {
         const ids = { customer: hcpId("cus", firstNumber + index), address: hcpId("adr", state.counts.addresses + 1 + index) };
         // Notifications off, as for a customer created through the API: the twin never assumes one agreed to messages.

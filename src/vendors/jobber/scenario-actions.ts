@@ -15,7 +15,7 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
     check: (count) => checkCount("jobber", "newClients", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
       const firstNumber = nextIdNumber(state.clients.keys(), "Client");
-      const people = newCustomers(random, world, firstNumber, count as number, [...state.clients.values()].map(clientName));
+      const people = newCustomers(random, world, { firstNumber, count: count as number }, [...state.clients.values()].map(clientName));
       return people.map((person, index) => {
         const client: JobberClient = {
           id: encodeId("Client", firstNumber + index),
