@@ -42,6 +42,20 @@ describe("MCP server", () => {
     ]);
   });
 
+  it("describes each vendor's actions and webhook topics from the vendors themselves, so a new vendor needs no edit", async () => {
+    const { client, twin } = await connectAgent();
+    const { tools } = await client.listTools();
+    const described = (name: string) => tools.find((tool) => tool.name === name)!.description!;
+    expect(described("twin_run_action")).toContain("jobber newClients or payInvoices; housecallpro newCustomers, ");
+    expect(described("twin_run_action")).toContain("payInvoices (quickbooks has none). Each takes params: how many.");
+    for (const name of twin.vendorNames()) {
+      const vendor = twin.vendor(name);
+      for (const action of Object.keys(vendor.scenarioActions ?? {})) expect(described("twin_run_action")).toContain(action);
+      expect(described("twin_set_webhooks")).toContain(`${name} topics: ${vendor.webhooks!.topics.join(", ")}`);
+    }
+    expect(described("twin_set_webhooks")).toContain("vendor: quickbooks | jobber | housecallpro");
+  });
+
   it("answers twin_status, twin_advance_clock, and twin_reset exactly as the HTTP control plane does", async () => {
     const { app, call } = await connectAgent();
     const { app: overHttp } = setup();

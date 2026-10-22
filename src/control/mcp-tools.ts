@@ -39,9 +39,8 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     "twin_run_action",
     {
       description:
-        "Make something happen now, as if someone did it in the vendor's own app: jobber payInvoices (params: how many) " +
-        "or newClients (params: how many); housecallpro newCustomers, completeJobs, invoiceJobs, or payInvoices (params: how many). " +
-        "Webhooks for it go out before this answers.",
+        `Make something happen now, as if someone did it in the vendor's own app: ${actionsByVendor(twin)}. ` +
+        "Each takes params: how many. Webhooks for it go out before this answers.",
       inputSchema: { vendor: z.string(), action: z.string(), params: z.unknown() },
     },
     async ({ vendor, action, params }) => asText(await ops.runAction(twin, vendor, action, params)),
@@ -117,11 +116,8 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
     {
       description:
         "Replace the webhook subscriptions, as an app would set them up in the vendor's developer settings. Each: " +
-        "{ vendor: jobber | quickbooks | housecallpro, url, topics, clientId, clientSecret (signs deliveries) }. Jobber topics: CLIENT_CREATE, " +
-        "INVOICE_UPDATE; clientSecret is the app's OAuth client secret. QuickBooks topics: CloudEvents types qbo.customer.created.v1, " +
-        "qbo.customer.updated.v1, qbo.invoice.created.v1, qbo.invoice.updated.v1, qbo.payment.created.v1; clientSecret is the verifier token. " +
-        "Housecall Pro topics: customer.created, customer.updated, job.created, job.scheduled, job.completed, job.paid, " +
-        "invoice.created, invoice.sent, invoice.payment.succeeded, invoice.paid; clientSecret is the signing secret.",
+        `{ vendor: ${twin.vendorNames().join(" | ")}, url, topics, clientId, clientSecret (signs deliveries: for Jobber the app's OAuth ` +
+        `client secret, for QuickBooks its verifier token, for Housecall Pro its signing secret) }. ${topicsByVendor(twin)}.`,
       inputSchema: { subscriptions: z.array(z.unknown()) },
     },
     ({ subscriptions }) => asText(ops.setWebhooks(twin, subscriptions)),
@@ -145,4 +141,27 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
 
 function asText(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+}
+
+// The descriptions name each vendor's actions and topics from the vendors themselves, so a new vendor needs no edit here.
+
+/** "jobber newClients or payInvoices; housecallpro newCustomers, completeJobs, invoiceJobs, or payInvoices (quickbooks has none)" */
+function actionsByVendor(twin: Twin): string {
+  const actions = twin.vendorNames().map((name) => [name, Object.keys(twin.vendor(name).scenarioActions ?? {})] as const);
+  const listed = actions.filter(([, names]) => names.length).map(([name, names]) => `${name} ${oneOf(names)}`);
+  const without = actions.filter(([, names]) => !names.length).map(([name]) => name);
+  return without.length ? `${listed.join("; ")} (${oneOf(without)} has none)` : listed.join("; ");
+}
+
+/** "jobber topics: CLIENT_CREATE, INVOICE_UPDATE. quickbooks topics: qbo.customer.created.v1, ..." */
+function topicsByVendor(twin: Twin): string {
+  return twin
+    .vendorNames()
+    .map((name) => `${name} topics: ${twin.vendor(name).webhooks?.topics.join(", ") || "none yet"}`)
+    .join(". ");
+}
+
+/** "a", "a or b", "a, b, or c" */
+function oneOf(names: string[]): string {
+  return names.length <= 2 ? names.join(" or ") : `${names.slice(0, -1).join(", ")}, or ${names.at(-1)}`;
 }
