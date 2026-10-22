@@ -5,7 +5,10 @@
  */
 export type Command = { command: "score" } | { command: "record"; dryRun: boolean };
 
-const USAGE = "Use score (npm run conformance) or record (npm run conformance:record, with --dry-run to only print).";
+const USAGE =
+  "Use score (npm run conformance) or record (npm run conformance:record, with --dry-run to only print). Record reads each " +
+  "vendor's credentials from the environment (targets.ts): QBO_ACCESS_TOKEN and QBO_REALM_ID for a QuickBooks sandbox company, " +
+  "JOBBER_ACCESS_TOKEN for a Jobber testing account, and HOUSECALLPRO_API_KEY for a Housecall Pro account on the MAX or XL plan.";
 
 export function parseCommand(args: string[], env: NodeJS.ProcessEnv): Command {
   const [command = "score", ...flags] = args;

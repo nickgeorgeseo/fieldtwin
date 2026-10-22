@@ -182,6 +182,10 @@ describe("what the conformance command was asked to do", () => {
     expect(parseCommand([], {})).toEqual({ command: "score" });
   });
 
+  it("says which environment variable each vendor's recording needs, so a wrong command still tells the user what to set", () => {
+    expect(() => parseCommand(["recrod"], {})).toThrow(/QBO_ACCESS_TOKEN and QBO_REALM_ID .*JOBBER_ACCESS_TOKEN .*HOUSECALLPRO_API_KEY/);
+  });
+
   it("exits with the reason when run with a misspelled command", () => {
     const cli = new URL("./cli.ts", import.meta.url).pathname;
     const run = spawnSync(process.execPath, ["--import", "tsx", cli, "recrod"], { encoding: "utf8", timeout: 20_000 });
