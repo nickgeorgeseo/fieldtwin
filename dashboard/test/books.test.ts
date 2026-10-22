@@ -128,7 +128,7 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
       event("quickbooks", "CustomerCreated", { customer: qboCustomer("2", "Kendall Dunmore", "Kendall@Example.com") }),
     ]);
     assert.deepEqual(
-      matchCustomers(twice, "jobber").map((row) => [row.field?.id, row.quickbooks?.id, row.status]),
+      matchCustomers(twice, "jobber").map((row) => [row.service?.id, row.quickbooks?.id, row.status]),
       [
         [undefined, "2", "only-in-quickbooks"],
         ["client-1", "1", "same"],
@@ -143,7 +143,7 @@ describe("matching customers across Jobber and QuickBooks by email", () => {
       event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Kendall Dunmore", "kendall@example.com") }),
     ]);
     assert.deepEqual(
-      matchCustomers(twice, "housecallpro").map((row) => [row.field?.id, row.quickbooks?.id, row.status]),
+      matchCustomers(twice, "housecallpro").map((row) => [row.service?.id, row.quickbooks?.id, row.status]),
       [
         ["cus_2", undefined, "only-in-field-service"],
         ["cus_1", "1", "same"],
@@ -190,7 +190,7 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
   });
 
   it("adds Jobber's lines to the cent before comparing totals", () => {
-    assert.equal(byNumber["5"]?.field?.total, 20.01);
+    assert.equal(byNumber["5"]?.service?.total, 20.01);
     assert.equal(byNumber["5"]?.status, "in-sync");
   });
 
@@ -200,7 +200,7 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
   });
 
   it("names Jobber's client on each invoice", () => {
-    assert.equal(byNumber["1"]?.field?.customer, "Kendall Dunmore");
+    assert.equal(byNumber["1"]?.service?.customer, "Kendall Dunmore");
   });
 
   it("keeps an invoice the books booked twice under one number, since QuickBooks accepts the second", () => {
@@ -236,7 +236,7 @@ describe("comparing Housecall Pro with the books instead of Jobber", () => {
       event("quickbooks", "CustomerCreated", { customer: qboCustomer("2", "Jamie Lindquist", "jamie@example.com") }),
     ]);
     assert.deepEqual(
-      matchCustomers(books, "housecallpro").map((row) => [row.email, row.field?.name, row.status]),
+      matchCustomers(books, "housecallpro").map((row) => [row.email, row.service?.name, row.status]),
       [
         ["quinn@example.com", "Quinn Brooks", "only-in-field-service"],
         ["jamie@example.com", "Jamie Lindqvist", "spelled-differently"],
@@ -252,7 +252,7 @@ describe("comparing Housecall Pro with the books instead of Jobber", () => {
       event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("1", "1", "Kendall Dunmore", 955, 0) }),
     ]);
     const [row] = matchInvoices(books, "housecallpro");
-    assert.equal(row?.field?.total, 955);
+    assert.equal(row?.service?.total, 955);
     assert.equal(row?.status, "in-sync");
   });
 
@@ -264,7 +264,7 @@ describe("comparing Housecall Pro with the books instead of Jobber", () => {
       event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("5", "5", "Kendall Dunmore", 69.35, 0) }),
     ]);
     const [row] = matchInvoices(books, "housecallpro");
-    assert.deepEqual([row?.field?.total, row?.status], [69.35, "in-sync"]);
+    assert.deepEqual([row?.service?.total, row?.status], [69.35, "in-sync"]);
   });
 
   it("pairs each invoice with the books' one under its number, as the books carry Housecall Pro's numbers", () => {
@@ -293,6 +293,6 @@ describe("comparing Housecall Pro with the books instead of Jobber", () => {
       event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("31", "45", "Kendall Dunmore", 12300, 0) }),
     ]);
     const [row] = matchInvoices(books, "housecallpro");
-    assert.deepEqual([row?.field?.total, row?.quickbooks?.total, row?.status], [123, 12300, "totals-differ"]);
+    assert.deepEqual([row?.service?.total, row?.quickbooks?.total, row?.status], [123, 12300, "totals-differ"]);
   });
 });

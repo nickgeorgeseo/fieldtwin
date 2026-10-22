@@ -31,9 +31,9 @@ export function CustomerTable({ service, rows }: { service: FieldService; rows: 
         {rows.map((row) => {
           const { label, tone } = statuses[row.status];
           return (
-            <tr key={`${row.email}-${row.field?.id}-${row.quickbooks?.id}`}>
+            <tr key={`${row.email}-${row.service?.id}-${row.quickbooks?.id}`}>
               <td className={`${CELL} font-mono text-xs`}>{row.email || <span className="text-zinc-400">no email</span>}</td>
-              <td className={CELL}>{row.field ? row.field.name : MISSING}</td>
+              <td className={CELL}>{row.service ? row.service.name : MISSING}</td>
               <td className={CELL}>
                 {row.quickbooks ? (
                   <>
@@ -67,9 +67,9 @@ export function InvoiceTable({ service, rows }: { service: FieldService; rows: I
           return (
             <tr key={`${row.number}-${row.quickbooks?.id}`}>
               <td className={`${CELL} font-mono text-xs`}>#{row.number}</td>
-              <td className={CELL}>{row.field ? row.field.customer : MISSING}</td>
-              <td className={CELL}>{money(row.field?.total)}</td>
-              <td className={CELL}>{row.field && (row.field.paid ? <Badge tone="green">paid</Badge> : <Badge>open</Badge>)}</td>
+              <td className={CELL}>{row.service ? row.service.customer : MISSING}</td>
+              <td className={CELL}>{money(row.service?.total)}</td>
+              <td className={CELL}>{row.service && (row.service.paid ? <Badge tone="green">paid</Badge> : <Badge>open</Badge>)}</td>
               <td className={CELL}>{row.quickbooks ? row.quickbooks.customer : MISSING}</td>
               <td className={CELL}>{money(row.quickbooks?.total)}</td>
               <td className={CELL}>{money(row.quickbooks?.balance)}</td>

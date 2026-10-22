@@ -9,9 +9,9 @@ interface Status {
 
 /** How each kind of agreement or drift is named and colored: red needs a sync, amber needs a look, green is fine. */
 
-export function customerStatuses(field: string): Record<CustomerStatus, Status> {
+export function customerStatuses(serviceName: string): Record<CustomerStatus, Status> {
   return {
-    "only-in-field-service": { label: `Only in ${field}`, tone: "red", help: "A customer with work the books have never seen" },
+    "only-in-field-service": { label: `Only in ${serviceName}`, tone: "red", help: "A customer with work the books have never seen" },
     "only-in-quickbooks": { label: "Only in QuickBooks", tone: "neutral", help: "Entered in the books, with no field work" },
     "inactive-in-quickbooks": {
       label: "Inactive in QuickBooks",
@@ -23,18 +23,26 @@ export function customerStatuses(field: string): Record<CustomerStatus, Status> 
   };
 }
 
-export function invoiceStatuses(field: string): Record<InvoiceStatus, Status> {
+export function invoiceStatuses(serviceName: string): Record<InvoiceStatus, Status> {
   return {
-    "paid-not-booked": { label: "Paid, not in the books", tone: "red", help: `Paid in ${field}, never booked in QuickBooks` },
-    "payment-not-recorded": { label: "Payment not recorded", tone: "red", help: `Paid in ${field}, still open in QuickBooks` },
+    "paid-not-booked": { label: "Paid, not in the books", tone: "red", help: `Paid in ${serviceName}, never booked in QuickBooks` },
+    "payment-not-recorded": { label: "Payment not recorded", tone: "red", help: `Paid in ${serviceName}, still open in QuickBooks` },
     "totals-differ": { label: "Totals differ", tone: "red", help: "The two systems disagree about the amount" },
-    "paid-only-in-quickbooks": { label: "Paid only in QuickBooks", tone: "amber", help: `Closed in the books, still open in ${field}` },
+    "paid-only-in-quickbooks": {
+      label: "Paid only in QuickBooks",
+      tone: "amber",
+      help: `Closed in the books, still open in ${serviceName}`,
+    },
     "open-not-booked": {
       label: "Open, not in the books",
       tone: "amber",
       help: "Not paid yet; a sync that books paid invoices leaves it for now",
     },
-    "only-in-quickbooks": { label: "Only in QuickBooks", tone: "neutral", help: `A QuickBooks invoice with no ${field} invoice to match` },
+    "only-in-quickbooks": {
+      label: "Only in QuickBooks",
+      tone: "neutral",
+      help: `A QuickBooks invoice with no ${serviceName} invoice to match`,
+    },
     "in-sync": { label: "In sync", tone: "green", help: "Same total, and paid or open in both" },
   };
 }
