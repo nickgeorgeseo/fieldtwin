@@ -151,6 +151,25 @@ describe("saying what an event is about", () => {
     );
   });
 
+  it("labels a job the same once its appointment is complete, and an invoice the same once it carries payments", () => {
+    const appointments = [
+      { id: "appt_1", start_time: "2026-07-13T13:00:00Z", end_time: "2026-07-13T15:00:00Z", completed_at: "2026-07-13T15:10:00Z" },
+    ];
+    assert.equal(
+      describeEvent(event(1, "housecallpro", "JobUpdated", { job: { invoice_number: "12", description: "AC tune-up", appointments } })),
+      '#12 "AC tune-up"',
+    );
+    const invoice = { invoice_number: "12", items: [{ unit_price: 9300, quantity: 1 }], payments: [{ id: "pay_1", amount: 9300 }] };
+    assert.equal(describeEvent(event(1, "housecallpro", "InvoiceUpdated", { invoice })), "#12 93.00");
+  });
+
+  it("says only the number for an invoice whose line has no price", () => {
+    assert.equal(
+      describeEvent(event(1, "housecallpro", "InvoiceCreated", { invoice: { invoice_number: "12", items: [{ quantity: 1 }] } })),
+      "#12",
+    );
+  });
+
   it("rounds a Housecall Pro line's half cent up, as the twin does, though the float multiplied out falls just short", () => {
     const invoice = { invoice_number: "12", items: [{ unit_price: 3450, quantity: 2.01 }] }; // 2.01 × 3450 is 6934.4999... cents
     assert.equal(describeEvent(event(1, "housecallpro", "InvoiceCreated", { invoice })), "#12 69.35");
