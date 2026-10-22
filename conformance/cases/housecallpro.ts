@@ -54,7 +54,7 @@ export const housecallproCases: ConformanceCase[] = [
     },
   },
   {
-    name: "page-below-1",
+    name: "page-and-page-size-0",
     vendor: "housecallpro",
     endpoint: "GET /customers",
     fidelity: "Paging limits",

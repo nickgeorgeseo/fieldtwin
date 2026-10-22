@@ -61,14 +61,14 @@ describe("cases that read records the account already has", () => {
   it.each([
     "customer-not-found",
     "job-not-found",
-    "invoice-not-found",
+    "invoice-by-uuid",
     "estimate-not-found",
     "job-for-unknown-customer",
     "invoice-number-sort",
     "multi-visit-schedule",
     "amount-due-in-cents",
     "invoice-number-is-job-number",
-    "invoice-items-are-job-lines",
+    "invoice-fields",
   ])("%s records nothing from an account without those records, which could never match the twin's", async (name) => {
     await expect(housecallproCase(name).observe(empty)).rejects.toThrow("can't tell");
   });

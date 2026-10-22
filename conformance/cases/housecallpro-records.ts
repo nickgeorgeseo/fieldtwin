@@ -39,7 +39,7 @@ export const housecallproRecordCases: ConformanceCase[] = [
     observe: async (target) => errorOf(await housecallpro(target, "GET", `/jobs/${noneLike(await firstId(target, "jobs"))}`)),
   },
   {
-    name: "invoice-not-found",
+    name: "invoice-by-uuid",
     vendor: "housecallpro",
     endpoint: "GET /api/invoices/{uuid}",
     fidelity: "GET /api/invoices/{uuid}",
@@ -173,7 +173,7 @@ export const housecallproRecordCases: ConformanceCase[] = [
     },
   },
   {
-    name: "invoice-items-are-job-lines",
+    name: "invoice-fields",
     vendor: "housecallpro",
     endpoint: "GET /invoices",
     fidelity: "Invoice fields the docs don't explain",

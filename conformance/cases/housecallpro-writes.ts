@@ -61,7 +61,7 @@ export const housecallproWriteCases: ConformanceCase[] = [
     },
   },
   {
-    name: "put-keeps-omitted-fields",
+    name: "put-semantics",
     vendor: "housecallpro",
     endpoint: "PUT /customers/{id}",
     fidelity: "PUT /customers/{id}",

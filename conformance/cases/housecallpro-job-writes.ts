@@ -143,7 +143,7 @@ export const housecallproJobWriteCases: ConformanceCase[] = [
     },
   },
   {
-    name: "customer-notes-on-a-job",
+    name: "customer-on-a-job",
     vendor: "housecallpro",
     endpoint: "GET /jobs/{id}",
     fidelity: "The customer on a job",
