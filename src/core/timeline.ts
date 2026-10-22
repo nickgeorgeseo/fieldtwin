@@ -40,7 +40,7 @@ export class Timeline {
   advanceTo(targetMs: number): void {
     for (let due = this.nextAt(); due !== undefined && due <= targetMs; due = this.nextAt()) {
       this.twin.clock.advance(Math.max(0, due - this.twin.clock.nowMs()));
-      this.runDue(due, "the clock stopped there, with it still due");
+      this.runDue(due, "the clock stopped there, with it still due"); // the caller gets what happened on the way
     }
     this.twin.clock.advance(targetMs - this.twin.clock.nowMs());
   }
@@ -48,24 +48,26 @@ export class Timeline {
   /**
    * Run the entries due at or before `ms` that haven't run yet. One whose action throws has recorded nothing and stays
    * due, so the schedule never moves on past something that didn't happen. Its ScenarioEntryError names it, followed
-   * by `consequence`, what its failing means for the caller.
+   * by `ifItFails`, what its failing means for the caller: advanceTo() says the clock stopped there; a twin rebuild
+   * (load or reset) says nothing, since the twin is put back as it was and the error speaks for itself.
    */
-  runDue(ms: number, consequence?: string): void {
+  runDue(ms: number, ifItFails?: string): void {
     while (this.next < this.entries.length && this.entries[this.next]!.atMs <= ms) {
-      const events = this.run(this.entries[this.next]!, this.next, consequence);
+      const events = this.run(this.entries[this.next]!, this.next, ifItFails);
       this.next++;
       for (const event of events) this.twin.record(event, "scenario");
     }
   }
 
-  private run(entry: TimelineEntry, position: number, consequence?: string): NewEvent[] {
+  private run(entry: TimelineEntry, position: number, ifItFails?: string): NewEvent[] {
     const { twin } = this;
     const random = streams.timelineEntry(twin.seed, position);
     const context = { state: twin.state(entry.vendor), world: twin.world, random, nowIso: twin.clock.nowIso() };
     try {
+      // Anything that throws, not just run(): a vendor whose scenarioActions changed after load no longer has the action.
       return scenarioActionOf(twin.vendor(entry.vendor), entry.action).run(entry.params, context);
     } catch (error) {
-      throw new ScenarioEntryError(entry, error, consequence);
+      throw new ScenarioEntryError(entry, error, ifItFails);
     }
   }
 
@@ -98,9 +100,9 @@ export class Timeline {
  * vendor's action, named by its entry ("jobber newClients at 2026-07-13T12:00:00.000Z"), with what threw as its cause.
  */
 export class ScenarioEntryError extends Error {
-  constructor(entry: TimelineEntry, cause: unknown, consequence?: string) {
+  constructor(entry: TimelineEntry, cause: unknown, ifItFails?: string) {
     const what = `${entry.vendor} ${entry.action} at ${new Date(entry.atMs).toISOString()}`;
     const failed = `${what} failed: ${cause instanceof Error ? cause.message : String(cause)}`;
-    super(consequence ? `${failed}; ${consequence}` : failed, { cause });
+    super(ifItFails ? `${failed}; ${ifItFails}` : failed, { cause });
   }
 }
