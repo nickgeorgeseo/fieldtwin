@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALL_VENDORS } from "../src/app.ts";
-import { createCheckpoint, listChanges, loadScenario, rewindTo } from "../src/control/operations.ts";
+import { createCheckpoint, describeTwin, listChanges, loadScenario, rewindTo } from "../src/control/operations.ts";
 import { VENDOR_NAMES } from "../src/core/types.ts";
+import { quickbooksTwin } from "../src/vendors/quickbooks/index.ts";
 import { setup } from "./helpers.ts";
 
 describe("the twin", () => {
@@ -47,6 +48,41 @@ describe("the twin", () => {
     expect(twin.clock.nowIso()).toBe("2026-07-13T11:00:00.000Z");
     expect(twin.faultRules.map((rule) => rule.name)).toEqual(["qbo-throttled-writes", "jobber-slow"]);
     expect(twin.upcoming().map((entry) => `${entry.action} ${entry.params}`)).toEqual(["newClients 12", "newClients 15", "payInvoices 4"]);
+  });
+});
+
+describe("rewinding to a checkpoint", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("leaves the twin as it was when replaying the history throws, and works once it can replay again", async () => {
+    const { twin, qboPost } = setup();
+    createCheckpoint(twin, "before");
+    await qboPost("/customer", { DisplayName: "After The Checkpoint" });
+    const before = { status: describeTwin(twin), log: twin.log.toJsonl() };
+    // A stand-in for a bug in a vendor's apply(): QuickBooks failing on the first event it replays.
+    const apply = vi.spyOn(quickbooksTwin, "apply").mockImplementation(() => {
+      throw new Error("corrupt event");
+    });
+
+    expect(() => rewindTo(twin, "before")).toThrow("corrupt event");
+    expect({ status: describeTwin(twin), log: twin.log.toJsonl() }).toEqual(before);
+    apply.mockRestore();
+    expect(rewindTo(twin, "before")).toMatchObject({ eventCount: before.status.eventCount - 1, checkpoints: [{ name: "before" }] });
+  });
+
+  it("forgets the checkpoints taken later, which point at history that no longer exists", async () => {
+    const { twin, qboPost } = setup();
+    createCheckpoint(twin, "earlier");
+    await qboPost("/customer", { DisplayName: "Between Checkpoints" });
+    createCheckpoint(twin, "later");
+
+    expect(rewindTo(twin, "earlier").checkpoints.map(({ name }) => name)).toEqual(["earlier"]);
+    expect(() => rewindTo(twin, "later")).toThrow('No checkpoint named "later"');
+  });
+
+  it("is the only way back: the clock itself refuses to move backwards", () => {
+    const { twin } = setup();
+    expect(() => twin.clock.advance(-1)).toThrow("Rewind to a checkpoint");
   });
 });
 
