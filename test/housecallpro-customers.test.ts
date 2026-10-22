@@ -67,6 +67,52 @@ describe("Housecall Pro twin: listing customers", () => {
     expect((await hcpGet("/customers?expand[]=appointments")).status).toBe(400);
   });
 
+  it("adds attachments and do_not_service to each customer only when expand asks for them", async () => {
+    const { hcpGet } = setup();
+    const plain = (await (await hcpGet("/customers?page_size=1")).json()).customers[0];
+    expect(plain).not.toHaveProperty("attachments");
+    expect(plain).not.toHaveProperty("do_not_service");
+    const expanded = (await (await hcpGet("/customers?page_size=1&expand[]=attachments&expand[]=do_not_service")).json()).customers[0];
+    expect(expanded).toEqual({ ...plain, attachments: [], do_not_service: false });
+    const one = await (await hcpGet(`/customers/${plain.id}?expand[]=do_not_service`)).json();
+    expect(one).toEqual({ ...plain, do_not_service: false });
+  });
+
+  it("sorts by last name or email when asked", async () => {
+    const { hcpGet } = setup();
+    const byLastName = (await (await hcpGet("/customers?page_size=1000&sort_by=last_name&sort_direction=asc")).json()).customers;
+    const lastNames = byLastName.map((customer: { last_name: string }) => customer.last_name.toLowerCase());
+    expect(lastNames).toEqual([...lastNames].sort());
+    const byEmail = (await (await hcpGet("/customers?page_size=1000&sort_by=email")).json()).customers;
+    const emails = byEmail.map((customer: { email: string }) => customer.email);
+    expect(emails).toEqual([...emails].sort().reverse());
+  });
+
+  it("refuses a sort direction other than asc or desc, saying so", async () => {
+    const { hcpGet } = setup();
+    const response = await hcpGet("/customers?sort_direction=sideways");
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: { message: 'sort_direction must be asc or desc, not "sideways".' } });
+  });
+
+  it("answers a search that finds nobody with an empty page and no pages at all", async () => {
+    const { hcpGet } = setup();
+    expect(await (await hcpGet("/customers?q=nobody")).json()).toEqual({
+      page: 1,
+      page_size: 10,
+      total_pages: 0,
+      total_items: 0,
+      customers: [],
+    });
+  });
+
+  it("checks the page before the sort, so a request with both wrong hears about the page first", async () => {
+    const { hcpGet } = setup();
+    const response = await hcpGet("/customers?sort_by=bogus&page=0");
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toMatch(/^page must be a whole number/);
+  });
+
   it("finds customers by name, email, mobile number, or address with q", async () => {
     const { twin, hcpGet } = setup();
     const person = twin.world.customers[3]!;
@@ -100,6 +146,19 @@ describe("Housecall Pro twin: one customer", () => {
     const response = await hcpGet("/customers/cus_00000000000000000000000000000000");
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: { message: "customer not found" } });
+  });
+
+  it("looks the customer up before reading expand, so a missing customer is a 404 whatever else is wrong", async () => {
+    const { hcpGet } = setup();
+    expect((await hcpGet("/customers/cus_missing?expand[]=bogus")).status).toBe(404);
+  });
+
+  it("refuses an expand value Get Customer doesn't document, like jobs", async () => {
+    const { hcpGet } = setup();
+    const [first] = await allCustomers(hcpGet);
+    const response = await hcpGet(`/customers/${first!.id}?expand[]=jobs`);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('expand takes attachments and do_not_service, not "jobs".');
   });
 
   it("leaves out customers only the books know, like the other field-service twin", async () => {
@@ -171,6 +230,16 @@ describe("Housecall Pro twin: creating and updating customers", () => {
     }
   });
 
+  it("refuses addresses that aren't a list of address objects, naming which", async () => {
+    const { hcpPost } = setup();
+    const asText = await hcpPost("/customers", { first_name: "Ada", addresses: "12 Elm St" });
+    expect(asText.status).toBe(422);
+    expect((await asText.json()).error.message).toMatch(/^addresses must be a list/);
+    const ofText = await hcpPost("/customers", { first_name: "Ada", addresses: ["12 Elm St"] });
+    expect(ofText.status).toBe(422);
+    expect((await ofText.json()).error.message).toMatch(/^addresses\[0\] must be an address object/);
+  });
+
   it("refuses a body that isn't a JSON object, saying what to send", async () => {
     const { app } = setup();
     const response = await app.request("/housecallpro/customers", {
@@ -180,6 +249,21 @@ describe("Housecall Pro twin: creating and updating customers", () => {
     });
     expect(response.status).toBe(400);
     expect((await response.json()).error.message).toMatch(/isn't valid JSON/);
+  });
+
+  it("refuses an update of the wrong type, naming the field, or one that isn't JSON at all", async () => {
+    const { app, hcpGet, hcpPut } = setup();
+    const [first] = await allCustomers(hcpGet);
+    const wrongType = await hcpPut(`/customers/${first!.id}`, { first_name: 42 });
+    expect(wrongType.status).toBe(422);
+    expect((await wrongType.json()).error.message).toContain("first_name");
+    const notJson = await app.request(`/housecallpro/customers/${first!.id}`, {
+      method: "PUT",
+      headers: { Authorization: "Token test-key", "Content-Type": "application/json" },
+      body: "{not json",
+    });
+    expect(notJson.status).toBe(400);
+    expect((await notJson.json()).error.message).toMatch(/isn't valid JSON/);
   });
 
   it("changes only the fields a PUT sends, clears the ones it sets to null, and moves updated_at", async () => {
