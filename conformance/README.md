@@ -33,6 +33,8 @@ Fidelity: 41/44 observations match (93%)
 
 You need a QuickBooks Online **sandbox company**, a Jobber **developer testing account**, a Housecall Pro account on the **MAX or XL plan**, or any of them. Never a customer's account: the cases that write create a few records named "fieldtwin conformance ...", and the recorder refuses to run against production QuickBooks.
 
+**Check the vendor's API terms first.** Recording sends real requests from your account, so it is subject to the terms you accepted for that access: Intuit's [Developer Terms of Service](https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services), Jobber's [Developer Agreement](https://developer.getjobber.com/docs/legal/terms), or Housecall Pro's [API Terms of Service](https://docs.housecallpro.com/docs/terms/api-terms). Some of them limit what their APIs may be used for, so read them, and record only if they allow it.
+
 Get an access token however you connect apps today (Intuit's OAuth 2.0 Playground works for QuickBooks; for Jobber, your app's OAuth flow against the testing account). Tokens last an hour. For Housecall Pro, use one of the account's API keys ([how to make one](https://help.housecallpro.com/en/articles/8505035-api-overview)). The recorder only reads them from your environment, and never writes them anywhere:
 
 ```bash
