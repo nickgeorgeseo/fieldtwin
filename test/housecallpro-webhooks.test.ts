@@ -45,7 +45,7 @@ function verify(headers: Headers, body: string): boolean {
 }
 
 describe("Housecall Pro webhooks", () => {
-  it("deliver customer.created with the shared fields and the customer, signed as the docs describe", async () => {
+  it("delivers customer.created with the shared fields and the customer, signed as the docs describe", async () => {
     const { twin, received, subscribe, hcp } = twinWithEndpoint();
     await subscribe(["customer.created"]);
     const customer = await (await hcp("POST", "/customers", { first_name: "Wren", last_name: "Hook" })).json();
@@ -65,7 +65,7 @@ describe("Housecall Pro webhooks", () => {
     });
   });
 
-  it("deliver customer.updated with the customer as the update left it", async () => {
+  it("delivers customer.updated with the customer as the update left it", async () => {
     const { twin, subscribe, hcp, payloads } = twinWithEndpoint();
     await subscribe(["customer.updated"]);
     const customer = await (await hcp("POST", "/customers", { first_name: "Wren" })).json();
@@ -76,7 +76,37 @@ describe("Housecall Pro webhooks", () => {
     ]);
   });
 
-  it("deliver job.created for a new job, and job.scheduled too when it was created with a schedule", async () => {
+  it("sends no customer.updated for a PUT that changes nothing, nor anything when an address is added", async () => {
+    const { twin, received, subscribe, hcp } = twinWithEndpoint();
+    await subscribe(["customer.created", "customer.updated"]);
+    const customer = await (await hcp("POST", "/customers", { first_name: "Wren", last_name: "Hook" })).json();
+    await twin.webhooks.idle();
+    expect(received).toHaveLength(1);
+
+    expect((await hcp("PUT", `/customers/${customer.id}`, { first_name: "Wren" })).status).toBe(200);
+    const address = { street: "12 Elm St", city: "Riverton", state: "NC", zip: "28201", country: "US" };
+    expect((await hcp("POST", `/customers/${customer.id}/addresses`, address)).status).toBe(200);
+    await twin.webhooks.idle();
+    expect(received).toHaveLength(1);
+  });
+
+  it("signs every job and invoice delivery as it does a customer's, with the company's id in each", async () => {
+    const { twin, received, subscribe, hcp } = twinWithEndpoint();
+    await subscribe(["job.created", "invoice.created"]);
+    const state = twin.state<HcpState>("housecallpro");
+    const customer = [...state.customers.values()][0]!;
+    await hcp("POST", "/jobs", { customer_id: customer.id, address_id: customer.addresses[0]!.id });
+    await runAction(twin, "housecallpro", "invoiceJobs", 1);
+    await twin.webhooks.idle();
+
+    expect(received.map((delivery) => JSON.parse(delivery.body).event)).toEqual(["job.created", "invoice.created"]);
+    for (const delivery of received) {
+      expect(verify(delivery.headers, delivery.body)).toBe(true);
+      expect(JSON.parse(delivery.body).company_id).toBe(state.company.id);
+    }
+  });
+
+  it("delivers job.created for a new job, and job.scheduled too when it was created with a schedule", async () => {
     const { twin, subscribe, hcp, payloads } = twinWithEndpoint();
     await subscribe(["job.created", "job.scheduled"]);
     const state = twin.state<HcpState>("housecallpro");
@@ -98,7 +128,7 @@ describe("Housecall Pro webhooks", () => {
     expect(job.attachments).toEqual([]); // the Job Webhook Protocol has them, as the API does only when expanded
   });
 
-  it("deliver customer.created for each customer a scenario brings in", async () => {
+  it("delivers customer.created for each customer a scenario brings in", async () => {
     const { twin, subscribe, payloads } = twinWithEndpoint();
     await subscribe(["customer.created"]);
     await runAction(twin, "housecallpro", "newCustomers", 2);
@@ -106,7 +136,7 @@ describe("Housecall Pro webhooks", () => {
     expect(payloads()[0].customer.addresses).toHaveLength(1);
   });
 
-  it("deliver job.completed with the job as the work left it, once, when a tech finishes it", async () => {
+  it("delivers job.completed with the job as the work left it, once, when a tech finishes it", async () => {
     const { twin, subscribe, payloads } = twinWithEndpoint();
     await subscribe(["job.completed", "job.created", "job.scheduled"]);
     await advanceClock(twin, 9 * 60); // 20:00 on Monday, when seed 42's first two jobs of the day have begun
@@ -127,7 +157,7 @@ describe("Housecall Pro webhooks", () => {
     });
   });
 
-  it("deliver invoice.payment.succeeded, invoice.paid, and job.paid, in that order, when a customer pays an invoice in full", async () => {
+  it("delivers invoice.payment.succeeded, invoice.paid, and job.paid, in that order, when a customer pays an invoice in full", async () => {
     const { twin, subscribe, payloads } = twinWithEndpoint();
     await subscribe(["invoice.payment.succeeded", "invoice.paid", "job.paid"]);
     await runAction(twin, "housecallpro", "payInvoices", 1);
@@ -146,7 +176,7 @@ describe("Housecall Pro webhooks", () => {
     expect(payloads()[2].job).toMatchObject({ id: invoice.job_id, outstanding_balance: 0 });
   });
 
-  it("deliver invoice.created and then invoice.sent when finished work is invoiced, with the invoice as it was sent", async () => {
+  it("delivers invoice.created and then invoice.sent when finished work is invoiced, with the invoice as it was sent", async () => {
     const { twin, subscribe, payloads } = twinWithEndpoint();
     await subscribe(["invoice.created", "invoice.sent", "invoice.paid"]);
     await runAction(twin, "housecallpro", "invoiceJobs", 1);
@@ -171,7 +201,7 @@ describe("Housecall Pro webhooks", () => {
     expect(payloads()[1].invoice).toEqual(payloads()[0].invoice);
   });
 
-  it("send nothing for topics an app didn't subscribe to, or for the seeded world", async () => {
+  it("sends nothing for topics an app didn't subscribe to, or for the seeded world", async () => {
     const { twin, received, subscribe, hcp } = twinWithEndpoint();
     await subscribe(["job.created", "invoice.created", "invoice.sent"]); // the world has invoices, sent long ago
     await hcp("POST", "/customers", { first_name: "Wren" });
@@ -180,7 +210,7 @@ describe("Housecall Pro webhooks", () => {
     expect(received).toEqual([]);
   });
 
-  it("try a delivery once: the docs promise no retries, so the twin makes none", async () => {
+  it("tries a delivery once: the docs promise no retries, so the twin makes none", async () => {
     const { twin, received, subscribe, hcp } = twinWithEndpoint(() => 500);
     await subscribe(["customer.created"]);
     await hcp("POST", "/customers", { first_name: "Wren" });
@@ -191,7 +221,7 @@ describe("Housecall Pro webhooks", () => {
     expect(twin.webhooks.deliveries()[0]).toMatchObject({ status: "failed", attempts: 1, lastAnswer: "HTTP 500" });
   });
 
-  it("refuse a topic the twin can't send, naming the ones it can", async () => {
+  it("refuses a topic the twin can't send, naming the ones it can", async () => {
     const { app } = twinWithEndpoint();
     const response = await app.request("/_twin/webhooks", {
       method: "PUT",
