@@ -6,7 +6,9 @@ import {
   loadScenario,
   loadScenarioByName,
   resetTwin,
+  runAction,
   setFaults,
+  setWebhooks,
 } from "../src/control/operations.ts";
 import { jobberTwin } from "../src/vendors/jobber/index.ts";
 import type { JobberState } from "../src/vendors/jobber/types.ts";
@@ -81,6 +83,23 @@ describe("a scheduled action that throws when it runs, though its check passed",
     expect({ status: describeTwin(twin), log: twin.log.toJsonl() }).toEqual(before);
     run.mockRestore();
     expect(resetTwin(twin)).toMatchObject({ scenario: "Broken", twinTime: "2026-07-13T11:00:00.000Z", checkpoints: [] });
+  });
+
+  it("still sends the webhooks for what happens after a load that failed: only the rebuild itself was quiet", async () => {
+    const sent: string[] = [];
+    const { twin } = setup(42, {
+      sendWebhook: async (_url, init) => {
+        sent.push(JSON.parse(String(init.body)).data.webHookEvent.topic);
+        return new Response(null, { status: 200 });
+      },
+    });
+    const hook = { vendor: "jobber", url: "http://localhost:1/hooks", topics: ["INVOICE_UPDATE"], clientId: "app", clientSecret: "s" };
+    setWebhooks(twin, [hook]);
+    breakNewClients();
+    expect(() => loadScenario(twin, scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 2 }\n'))).toThrow("out of names");
+
+    await runAction(twin, "jobber", "payInvoices", 1);
+    expect(sent).toEqual(["INVOICE_UPDATE", "INVOICE_UPDATE"]);
   });
 });
 
