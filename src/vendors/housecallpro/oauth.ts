@@ -72,10 +72,8 @@ export function housecallproOAuthRoutes(app: Hono, twin: Twin): void {
       return c.json({ error: "unsupported_grant_type", error_description: "grant_type must be authorization_code or refresh_token." }, 400);
     }
 
-    if ("error" in result) {
-      const description = result.error === "invalid_grant" ? INVALID_GRANT : result.description;
-      return c.json({ error: result.error, error_description: description }, 400);
-    }
+    // exchange() and refresh() refuse nothing but the grant, so every refusal is the one invalid_grant the docs show.
+    if ("error" in result) return c.json({ error: result.error, error_description: INVALID_GRANT }, 400);
     return c.json({
       access_token: result.accessToken,
       token_type: "Bearer",
