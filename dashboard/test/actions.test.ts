@@ -10,6 +10,17 @@ describe("the actions the control room offers", () => {
     assert.ok(keys.includes("housecallpro/payInvoices"));
   });
 
+  it("offers Jobber's actions in the order work goes: clients call, then customers pay", () => {
+    assert.deepEqual(
+      ACTIONS.filter(({ vendor }) => vendor === "jobber").map(({ action }) => action),
+      ["newClients", "payInvoices"],
+    );
+  });
+
+  it("addresses an action as the control plane does, by vendor and name", () => {
+    assert.equal(actionKey({ vendor: "housecallpro", action: "completeJobs" }), "housecallpro/completeJobs");
+  });
+
   it("offers each of Housecall Pro's actions, in the order work goes: customers call, techs finish, the Pro invoices, customers pay", () => {
     assert.deepEqual(
       ACTIONS.filter(({ vendor }) => vendor === "housecallpro").map(({ action }) => action),
