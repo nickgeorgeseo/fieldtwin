@@ -19,6 +19,14 @@ export function fakeTarget(fetch: Target["fetch"], overrides: Partial<Omit<Targe
   };
 }
 
+/** A sandbox whose every answer comes from `answer`, as JSON, at once: no case waits for it. */
+export function answering(answer: (url: URL, init: RequestInit | undefined) => { status?: number; body: unknown }): Target {
+  return fakeTarget(async (url, init) => {
+    const { status = 200, body } = answer(new URL(url), init);
+    return Response.json(body, { status });
+  });
+}
+
 /** The case with this id ("quickbooks/read-missing-entity"). A test naming a case that doesn't exist fails here, by name. */
 export function caseNamed(id: string): ConformanceCase {
   const found = CASES.find((testCase) => caseId(testCase) === id);

@@ -4,10 +4,9 @@ import { errorOf, firstId, noneLike, shapeOf } from "./housecallpro-shared.ts";
 /**
  * Housecall Pro cases about records the account already has: a customer with an address, a job, an estimate, an
  * invoice for a job with something still due, jobs numbered with different numbers of digits, and a job with two
- * visits. All but one only read; job-for-unknown-customer POSTs a job for a customer that doesn't exist, which is made
- * only if Housecall Pro takes it. Housecall Pro's API makes no invoices, and the twin doesn't model the writes that
- * make estimates or second visits, so make these in Housecall Pro first. A case missing its records says what it
- * needs, and isn't recorded.
+ * visits. All but one only read: job-for-unknown-customer POSTs a job for a customer that doesn't exist, made only if
+ * Housecall Pro takes it. Its API makes no invoices, and the twin doesn't model the writes that make estimates or
+ * second visits, so make these in Housecall Pro first. A case missing its records says what it needs, and isn't recorded.
  */
 
 interface Job {

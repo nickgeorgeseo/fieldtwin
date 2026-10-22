@@ -1,23 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Target } from "./case.ts";
-import { housecallproJobWriteCases } from "./cases/housecallpro-job-writes.ts";
 import { CASES } from "./cases/index.ts";
 import { nextRecording } from "./recordings.ts";
 import { observeAll } from "./run.ts";
-import { caseNamed, fakeTarget } from "./test-support.ts";
+import { answering as account, caseNamed } from "./test-support.ts";
 
 /**
  * What the Housecall Pro cases make of answers a real account might give, and what they refuse to record. Housecall
- * Pro has no sandbox, so a recording is made in a real account, reached with one of its API keys.
+ * Pro has no sandbox, so a recording is made in a real account, reached with one of its API keys. The cases that make
+ * jobs have a test file of their own (housecallpro-jobs.test.ts).
  */
-
-/** A Housecall Pro account whose every answer comes from `answer`. It answers at once, so no case waits for it. */
-function account(answer: (url: URL, init: RequestInit | undefined) => { status?: number; body: unknown }): Target {
-  return fakeTarget(async (url, init) => {
-    const { status = 200, body } = answer(new URL(url), init);
-    return Response.json(body, { status });
-  });
-}
 
 const housecallproCase = (name: string) => caseNamed(`housecallpro/${name}`);
 
@@ -155,54 +147,5 @@ describe("cases that make customers", () => {
     await expect(search.observe(twoSearchesLate.target)).resolves.toMatchObject({ email: true });
     expect(twoSearchesLate.pauses).toEqual([2000, 2000]);
     await expect(search.observe(indexingSlowly(Number.POSITIVE_INFINITY).target)).rejects.toThrow("can't tell how q matches");
-  });
-});
-
-describe("cases that make jobs", () => {
-  /** Answers for the job cases' writes: the customer they make, with an address, and the job. */
-  const made = (url: URL) => ({
-    status: 201,
-    body: url.pathname === "/customers" ? { id: "cus_1", addresses: [{ id: "adr_1" }] } : { id: "job_1" },
-  });
-
-  it("make one customer for every job, since Housecall Pro's API can delete neither", async () => {
-    let customers = 0;
-    const counting = account((url, init) => {
-      if (init?.method === "POST" && url.pathname === "/customers") customers++;
-      return init?.method === "POST" ? made(url) : { body: { id: "c", time_zone: "America/Chicago", jobs: [{ id: "job_1" }], data: [] } };
-    });
-    await observeAll(counting, housecallproJobWriteCases);
-    expect(customers).toBe(1);
-  });
-
-  it("tell a time without an offset read on the company's clock from one read as UTC, and can't tell in a zone at UTC", async () => {
-    const offset = housecallproCase("schedule-without-an-offset");
-    /** A company in `timeZone` that reads times without an offset as Chicago's in January, in writes and filters alike. */
-    const readingChicagoTime = (timeZone: string) => {
-      const chicago = (text: string) => Date.parse(`${text}-06:00`);
-      const jobs: { id: string; start: number }[] = [];
-      return account((url, init) => {
-        if (url.pathname === "/company") return { body: { id: "c", time_zone: timeZone } };
-        if (init?.method === "POST" && url.pathname === "/jobs") {
-          jobs.push({ id: `job_${jobs.length + 1}`, start: chicago(JSON.parse(String(init.body)).schedule.scheduled_start) });
-          return { status: 201, body: { id: jobs.at(-1)!.id, schedule: { scheduled_start: new Date(jobs.at(-1)!.start).toISOString() } } };
-        }
-        if (init?.method === "POST") return made(url);
-        const [min, max] = [url.searchParams.get("scheduled_start_min"), url.searchParams.get("scheduled_start_max")];
-        const within = (job: { start: number }) =>
-          (min === null || job.start >= chicago(min)) && (max === null || job.start <= chicago(max));
-        return { body: { jobs: jobs.filter(within) } };
-      });
-    };
-    await expect(offset.observe(readingChicagoTime("America/Chicago"))).resolves.toEqual({
-      createdAs: "the company's time zone",
-      filteredAs: "not UTC",
-    });
-    await expect(offset.observe(readingChicagoTime("Europe/London"))).rejects.toThrow("can't tell");
-  });
-
-  it("record nothing about the work_status filter when the new job never shows up among its customer's jobs", async () => {
-    const neverListing = account((url, init) => (init?.method === "POST" ? made(url) : { body: { jobs: [] } }));
-    await expect(housecallproCase("work-status-filter").observe(neverListing)).rejects.toThrow("can't tell");
   });
 });
