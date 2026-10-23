@@ -65,7 +65,7 @@ describe("webhooks never break anything else", () => {
           },
         },
         notify: (event: TwinEvent) => [{ topic: "TOPIC", itemId: String(event.seq), occurredAtMs: 0 }],
-        request: () => ({ headers: {}, body: "{}" }),
+        request: () => ({ body: "{}", headersAt: () => ({}) }),
       },
     } as unknown as VendorTwin;
     const answers = [500, 200];
@@ -95,7 +95,7 @@ describe("a reset while a webhook is on its way", () => {
         topics: ["TOPIC"],
         delivery: { answerWithinMs: 1000, accepts: (status: number) => status === 200, retryAfterMs: () => 10_000 },
         notify: (event: TwinEvent) => [{ topic: "TOPIC", itemId: String(event.seq), occurredAtMs: 0 }],
-        request: () => ({ headers: {}, body: "{}" }),
+        request: () => ({ body: "{}", headersAt: () => ({}) }),
       },
     } as unknown as VendorTwin;
     let answer: (response: Response) => void = () => {};

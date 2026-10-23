@@ -45,6 +45,21 @@ function verify(headers: Headers, body: string): boolean {
 }
 
 describe("Housecall Pro webhooks", () => {
+  it("signs a delivery with the time it is sent, so one a fault rule holds back still passes a replay guard", async () => {
+    const { twin, received, subscribe, hcp } = twinWithEndpoint();
+    await subscribe(["customer.created"]);
+    twin.faultRules = [{ name: "late", vendor: "housecallpro", webhook: "*", rate: 1, effect: { delayMs: 300_000 } }];
+    await hcp("POST", "/customers", { first_name: "Wren", last_name: "Hook" });
+    await twin.webhooks.idle();
+    expect(received).toHaveLength(0);
+
+    await advanceClock(twin, 5);
+    const [delivery] = received;
+    expect(delivery!.headers.get("Api-Timestamp")).toBe(String(Date.parse("2026-07-13T11:05:00Z") / 1000));
+    expect(JSON.parse(delivery!.body).event_occurred_at).toBe("2026-07-13T11:00:00Z");
+    expect(verify(delivery!.headers, delivery!.body)).toBe(true);
+  });
+
   it("delivers customer.created with the shared fields and the customer, signed as the docs describe", async () => {
     const { twin, received, subscribe, hcp } = twinWithEndpoint();
     await subscribe(["customer.created"]);

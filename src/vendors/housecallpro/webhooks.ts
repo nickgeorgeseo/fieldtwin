@@ -92,13 +92,18 @@ export const housecallproWebhooks: VendorWebhooks<HcpState> = {
   },
 
   // Called as the event is recorded, so the record is as the event left it, even if the delivery goes out later.
+  // The signature is made as it goes out: Api-Timestamp is the time of sending, so a delivery a fault rule holds
+  // back still passes a replay guard that rejects stale timestamps.
   request(notification, subscription, state) {
     const at = hcpTimeAt(notification.occurredAtMs);
     const shared = { event: notification.topic, company_id: state.company.id, event_occurred_at: at, event_created_at: at };
     const body = JSON.stringify({ ...shared, ...payloadRecord(notification, state) });
-    const timestamp = String(Math.floor(notification.occurredAtMs / 1000));
-    const signature = createHmac("sha256", subscription.clientSecret).update(`${timestamp}.${body}`).digest("hex");
-    return { headers: { "Content-Type": "application/json", "Api-Timestamp": timestamp, "Api-Signature": signature }, body };
+    const headersAt = (sentAtMs: number) => {
+      const timestamp = String(Math.floor(sentAtMs / 1000));
+      const signature = createHmac("sha256", subscription.clientSecret).update(`${timestamp}.${body}`).digest("hex");
+      return { "Content-Type": "application/json", "Api-Timestamp": timestamp, "Api-Signature": signature };
+    };
+    return { body, headersAt };
   },
 };
 

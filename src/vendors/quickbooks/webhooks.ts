@@ -78,6 +78,6 @@ export const quickbooksWebhooks: VendorWebhooks<QboState> = {
     };
     const body = JSON.stringify([event]);
     const signature = createHmac("sha256", subscription.clientSecret).update(body).digest("base64");
-    return { headers: { "content-type": "application/json; charset=utf-8", "intuit-signature": signature }, body };
+    return { body, headersAt: () => ({ "content-type": "application/json; charset=utf-8", "intuit-signature": signature }) };
   },
 };

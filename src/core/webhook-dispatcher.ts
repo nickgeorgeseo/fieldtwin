@@ -1,6 +1,6 @@
 import type { TwinEvent } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
-import type { Delivery, DeliveryFaults, DeliveryPolicy, WebhookSender, WebhookSubscription } from "./webhooks.ts";
+import type { Delivery, DeliveryFaults, DeliveryPolicy, DeliveryRequest, WebhookSender, WebhookSubscription } from "./webhooks.ts";
 
 /**
  * Queues webhook deliveries as events are recorded, and sends them when they are due in twin time: each URL its
@@ -11,7 +11,7 @@ const KEEP_DELIVERIES = 200;
 
 interface Queued extends Delivery {
   dueMs: number;
-  request: { headers: Record<string, string>; body: string };
+  request: DeliveryRequest;
   policy: DeliveryPolicy;
 }
 
@@ -58,7 +58,6 @@ export class WebhookDispatcher {
   }
 
   private enqueue(delivery: Pick<Queued, "vendor" | "topic" | "itemId" | "url" | "policy" | "request" | "dueMs" | "fault">): void {
-    const { request, fault } = delivery;
     const queued: Queued = {
       ...delivery,
       id: this.nextId++,
@@ -66,8 +65,6 @@ export class WebhookDispatcher {
       attempts: 0,
       status: "pending",
       lastAnswer: null,
-      // An injected fault says so, like X-Twin-Fault on API answers. The signature covers the body only.
-      request: fault ? { ...request, headers: { ...request.headers, "X-Twin-Fault": fault } } : request,
     };
     this.queue.push(queued);
     this.recent = [...this.recent, queued].slice(-KEEP_DELIVERIES);
@@ -132,7 +129,7 @@ export class WebhookDispatcher {
   private async sendInOrder(deliveries: Queued[], nowMs: number, generation: number): Promise<void> {
     for (const due of deliveries) {
       due.attempts++;
-      const { answer, accepted } = await this.attempt(due);
+      const { answer, accepted } = await this.attempt(due, nowMs);
       if (this.generation !== generation) return; // reset or rewound while it was on its way: neither retry nor go on
       due.lastAnswer = answer;
       const retryAfterMs = accepted ? null : due.policy.retryAfterMs(due.attempts);
@@ -148,12 +145,16 @@ export class WebhookDispatcher {
     }
   }
 
-  private async attempt(delivery: Queued): Promise<{ answer: string; accepted: boolean }> {
+  /** One try, at twin time `sentAtMs`: the headers are made now, so a signed timestamp is the time of sending. */
+  private async attempt(delivery: Queued, sentAtMs: number): Promise<{ answer: string; accepted: boolean }> {
     const { answerWithinMs, accepts } = delivery.policy;
+    // An injected fault says so, like X-Twin-Fault on API answers. No vendor's signature covers its headers.
+    const headers = delivery.request.headersAt(sentAtMs);
     try {
       const response = await this.send(delivery.url, {
         method: "POST",
-        ...delivery.request,
+        headers: delivery.fault ? { ...headers, "X-Twin-Fault": delivery.fault } : headers,
+        body: delivery.request.body,
         signal: AbortSignal.timeout(answerWithinMs),
       });
       await response.body?.cancel();

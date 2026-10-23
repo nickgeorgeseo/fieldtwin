@@ -14,7 +14,7 @@ const vendor = {
     topics: ["TOPIC"],
     delivery: { answerWithinMs: 1000, accepts: (status: number) => status === 200, retryAfterMs: () => 60_000 },
     notify: (event: TwinEvent) => [{ topic: "TOPIC", itemId: String(event.seq), occurredAtMs: 0 }],
-    request: (notification: { itemId: string }) => ({ headers: { "X-Item": notification.itemId }, body: "{}" }),
+    request: (notification: { itemId: string }) => ({ body: "{}", headersAt: () => ({ "X-Item": notification.itemId }) }),
   },
 } as unknown as VendorTwin;
 

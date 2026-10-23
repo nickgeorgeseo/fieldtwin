@@ -44,11 +44,17 @@ export interface VendorWebhooks<State = unknown> {
   topics: readonly string[];
   delivery: DeliveryPolicy;
   notify(event: TwinEvent, state: State): WebhookNotification[];
-  request(
-    notification: NumberedNotification,
-    subscription: WebhookSubscription,
-    state: State,
-  ): { headers: Record<string, string>; body: string };
+  /**
+   * The delivery for a notification. Called as the event is recorded, so the body holds the record as the event left
+   * it; the headers are asked for at each attempt, with the twin time it is sent at (`sentAtMs`), so a signature that
+   * covers a timestamp, as Housecall Pro's does, carries the time of sending rather than of the event.
+   */
+  request(notification: NumberedNotification, subscription: WebhookSubscription, state: State): DeliveryRequest;
+}
+
+export interface DeliveryRequest {
+  body: string;
+  headersAt(sentAtMs: number): Record<string, string>;
 }
 
 /** How a vendor delivers: how long an app has to answer, which answers count as accepted, and when to try again. */

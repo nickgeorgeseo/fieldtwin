@@ -49,6 +49,6 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
     };
     const body = JSON.stringify({ data: { webHookEvent } });
     const signature = createHmac("sha256", subscription.clientSecret).update(body).digest("base64");
-    return { headers: { "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }, body };
+    return { body, headersAt: () => ({ "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }) };
   },
 };
