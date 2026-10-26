@@ -4,7 +4,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22%2B-brightgreen.svg)](#quick-start)
 
-**Jobber and QuickBooks Online, running on your laptop: real API shapes, a believable fake business, and every failure on demand. Build and test integrations and AI agents without touching a customer's account.**
+**Jobber, Housecall Pro, and QuickBooks Online, running on your laptop: real API shapes, a believable fake business, and every failure on demand. Build and test integrations and AI agents without touching a customer's account.**
 
 [Watch the two-minute demo](https://nickgeorgeai.com/fieldtwin#demo): the dashboard drives a twin, an agent's changes are listed and rewound, and a sync brings drifted books back into line.
 
@@ -37,7 +37,7 @@ If you build software for field-service and trades businesses, you know the opti
 | Safe to break | No | Yes | Yes | **Yes** |
 | Ready to use | When the client trusts you | After a developer account, an app, and setup | After you write each endpoint | **`npm start`** |
 | Realistic data | Yes | Generic samples, or none | What you typed | **A seeded business with months of history** |
-| Jobber and QuickBooks describe the same business | Yes | No | No | **Yes, or drifted on purpose** |
+| Jobber, Housecall Pro, and QuickBooks describe the same business | Yes | No | No | **Yes, or drifted on purpose** |
 | Back to a clean start | Never | By hand | Restart | **`POST /_twin/reset`** |
 | 429s, 5xx, lost answers, duplicate webhooks on demand | No | No | Only the ones you thought of | **Yes, in the vendor's own error format** |
 | Skip ahead in time (token expiry, retries, scheduled events) | No | No | Rarely | **Yes, instantly** |
@@ -49,11 +49,11 @@ fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't, and
 
 ## Who it's for
 
-**Developers building integrations for trades and field-service software.** The bugs that cost you are the ones you can't make happen on purpose: a throttled API, a write whose answer never came back, a webhook that arrives twice, a token that expires halfway through a sync. fieldtwin makes them happen whenever you ask, in a business that looks real in both systems, and twin time skips the waiting. The [reference integration](#a-worked-example-jobber-to-quickbooks) gets through more than a hundred retries and two hours of token expiry in a couple of seconds. Every run starts from a seed, so a failure replays exactly, in CI or on a teammate's laptop. You ship sooner, and you find the bad night in testing instead of in a customer's books.
+**Developers building integrations for trades and field-service software.** The bugs that cost you are the ones you can't make happen on purpose: a throttled API, a write whose answer never came back, a webhook that arrives twice, a token that expires halfway through a sync. fieldtwin makes them happen whenever you ask, in a business that looks real in every system, and twin time skips the waiting. The [reference integration](#a-worked-example-jobber-to-quickbooks) gets through more than a hundred retries and two hours of token expiry in a couple of seconds. Every run starts from a seed, so a failure replays exactly, in CI or on a teammate's laptop. You ship sooner, and you find the bad night in testing instead of in a customer's books.
 
-**Teams building AI agents that touch a business's money.** An agent needs somewhere to make mistakes, many times over, and you need proof of what it actually did. Mark a checkpoint, let the agent work, and judge it on the exact list of changes it made, not on what it says it did. Then rewind and run it again. Load `mismatched-books` to see whether it notices the two systems disagree, or `flaky-apis` to see whether it gives up. The [dashboard](#the-dashboard) shows all of it as it happens.
+**Teams building AI agents that touch a business's money.** An agent needs somewhere to make mistakes, many times over, and you need proof of what it actually did. Mark a checkpoint, let the agent work, and judge it on the exact list of changes it made, not on what it says it did. Then rewind and run it again. Load `mismatched-books` to see whether it notices the systems disagree, or `flaky-apis` to see whether it gives up. The [dashboard](#the-dashboard) shows all of it as it happens.
 
-**Agencies and integrators who sell to trades businesses.** "We test against a full simulation of your Jobber and QuickBooks before anything touches your account" is a promise you can keep, and a reason a cautious owner says yes.
+**Agencies and integrators who sell to trades businesses.** "We test against a full simulation of your Jobber or Housecall Pro and your QuickBooks before anything touches your account" is a promise you can keep, and a reason a cautious owner says yes.
 
 **The businesses themselves**, though they never run it. They get syncs that don't create duplicate customers, leave invoices out of the books, or record a payment twice, and AI assistants that made their mistakes in a copy of the business instead of in theirs.
 
@@ -61,7 +61,7 @@ fieldtwin doesn't replace the vendors' sandboxes; it covers what they can't, and
 
 | You get | Instead of |
 |---|---|
-| A working fake business, in Jobber and QuickBooks at once, from one command | Developer accounts, app setup, and test data typed in by hand |
+| A working fake business, in Jobber, Housecall Pro, and QuickBooks at once, from one command | Developer accounts, app setup, and test data typed in by hand |
 | Throttling, outages, lost answers, and duplicate webhooks whenever you ask | Meeting them for the first time in production |
 | Hours of retry waits and token expiry, in seconds | Tests that sleep, or that never cover it |
 | The same results from the same seed, every run | "Works on my machine" |
