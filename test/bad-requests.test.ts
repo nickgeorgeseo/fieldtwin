@@ -157,8 +157,27 @@ describe("request bodies too big to be real", () => {
 });
 
 describe("values nested too deeply to write out", () => {
-  // JSON.parse reads a list nested thousands deep, which JSON.stringify can't write back: 4,000 deep is about 8 KB.
-  const deep = (depth = 4000) => `${"[".repeat(depth)}"x"${"]".repeat(depth)}`;
+  // JSON.parse reads a value nested thousands deep that JSON.stringify can't write back. Where the two part depends on
+  // the engine's stack (about 4,000 lists deep here, deeper for objects on some runners), so each test finds the
+  // shallowest nesting its machine reads but can't write, rather than assuming one.
+  const tooDeepToShow = (open: string, close: string): string => {
+    for (let depth = 4000; depth <= 512_000; depth *= 2) {
+      const text = `${open.repeat(depth)}"x"${close.repeat(depth)}`;
+      let value: unknown;
+      try {
+        value = JSON.parse(text);
+      } catch {
+        break;
+      }
+      try {
+        JSON.stringify(value);
+      } catch {
+        return text;
+      }
+    }
+    throw new Error("JSON.stringify wrote back every nesting JSON.parse read, so this engine needs no guard");
+  };
+  const deep = () => tooDeepToShow("[", "]");
 
   it("answer QuickBooks' 2010 naming the field, not a 500", async () => {
     const response = await qboRaw(setup(), "/customer", `{"DisplayName": ${deep()}}`);
@@ -167,7 +186,7 @@ describe("values nested too deeply to write out", () => {
   });
 
   it("say that an object, too, was nested too deeply, rather than writing it out", async () => {
-    const deepObject = `${'{"a":'.repeat(4000)}"x"${"}".repeat(4000)}`;
+    const deepObject = tooDeepToShow('{"a":', "}");
     const response = await qboRaw(setup(), "/customer", `{"DisplayName": ${deepObject}}`);
     expect(response.status).toBe(400);
     const [error] = (await response.json()).Fault.Error;
