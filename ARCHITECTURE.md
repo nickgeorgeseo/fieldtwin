@@ -169,7 +169,7 @@ The goal is code a new contributor can read top to bottom without jumping around
 
 ## Roadmap
 
-- **Shipped.** v0.1 to v0.4, from the first twins to the dashboard: see [CHANGELOG.md](CHANGELOG.md).
+- **Shipped.** v0.1 to v0.5, from the first twins to the dashboard and a third vendor: see [CHANGELOG.md](CHANGELOG.md).
 - **Next.** More Jobber writes (`jobCreate` and visit scheduling) as their inputs reach the public docs, and the first conformance recordings from real sandboxes.
-- **v0.5.** More vendors: Housecall Pro (begun; the changelog's Unreleased section says how far), Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
-- **v0.6.** A benchmark for dispatch and operations agents, built on these twins.
+- **v0.6.** More vendors: Samsara or Motive, and an EDI trading-partner twin for load tenders (204), responses (990), and status messages (214).
+- **v0.7.** A benchmark for dispatch and operations agents, built on these twins.

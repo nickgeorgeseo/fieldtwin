@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+## 0.5.0 - 2026-10-26
+
+A third twin. Housecall Pro joins Jobber and QuickBooks, served under `/housecallpro`: customers, addresses, employees, jobs, invoices, and estimates, with API keys and OAuth, webhooks signed as documented, scenario actions that finish, invoice, and pay work, and 33 conformance cases ready to record against a real account. It is in the dashboard and in `flaky-apis`, injected faults carry the vendor's own headers, and a scenario that fails to load, or a timeline entry that throws, now leaves the twin exactly as it was.
+
 ### Added
 
 - A Housecall Pro twin, served under `/housecallpro`: set your client's base URL to `http://localhost:4010/housecallpro` and keep the rest of the path. It describes the same business as the other twins, as a field-service system like Jobber, and answers errors in Housecall Pro's documented format. Endpoints it doesn't model yet answer 501.
