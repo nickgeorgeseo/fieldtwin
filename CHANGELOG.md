@@ -6,7 +6,7 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## 0.5.1 - 2026-10-29
 
-On npm. `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer, in any ready-made scenario or a scenario file of your own, and `npx fieldtwin mcp` gives a coding agent the twin and its MCP server in one command. Tests start their own twin with `startTwin()`, on a free port with its own world, so each test file or worker gets one and CI needs no second checkout. The MCP server now exits when the agent closes its stdin instead of holding the port, and `@hono/node-server` moves to 2.x, past an advisory no 1.x release fixes.
+On npm. `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer, in any ready-made scenario or a scenario file of your own, and `npx fieldtwin mcp` gives a coding agent the twin and its MCP server in one command. Tests start their own twin with `startTwin()`, on a free port with its own world, so each test file or worker gets one and CI needs no second checkout. The MCP server now exits when the agent closes its stdin instead of holding the port, and `@hono/node-server` and `zod` move to new major versions, past advisories their old ones don't fix, so `npm audit` comes back clean.
 
 ### Added
 
@@ -25,6 +25,7 @@ On npm. `npx fieldtwin` starts the twin with no clone and no build, on plain Nod
 ### Security
 
 - `@hono/node-server`, which serves the twin over HTTP, is on 2.x, past GHSA-rmxm-3fg6-px4f, which no 1.x release fixes. The advisory is in its `serveStatic`, which fieldtwin doesn't use, and 2.x keeps the API fieldtwin calls, so the twin answers as it did.
+- `zod`, which checks scenarios, fault rules, webhook subscriptions, and MCP tool input, is on 4.x, past GHSA-mrhx-c7xc-m3w5 (memory exhaustion validating an oversized array), which no 3.x release fixes. What it accepts is unchanged; some refusals are worded differently, like `seed: Invalid input: expected number, received string`.
 
 ## 0.5.0 - 2026-10-26
 
