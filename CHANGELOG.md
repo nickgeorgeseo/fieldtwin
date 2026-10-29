@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+## 0.5.1 - 2026-10-29
+
+On npm. `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer, in any ready-made scenario or a scenario file of your own, and `npx fieldtwin mcp` gives a coding agent the twin and its MCP server in one command. Tests start their own twin with `startTwin()`, on a free port with its own world, so each test file or worker gets one and CI needs no second checkout. The MCP server now exits when the agent closes its stdin instead of holding the port, and `@hono/node-server` moves to 2.x, past an advisory no 1.x release fixes.
+
 ### Added
 
 - fieldtwin is an npm package: `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer. The package holds the compiled twin and the ready-made scenarios, about 150 kB.
