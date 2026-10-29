@@ -1,6 +1,6 @@
 {
   "name": "fieldtwin",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "mcpName": "io.github.nickgeorgeseo/fieldtwin",
   "description": "Local, stateful twins of the Jobber, Housecall Pro, and QuickBooks Online APIs. Build and test integrations and AI agents against a believable fake business, with resets, rewind, controllable time and failures on demand. No real accounts.",
   "keywords": [

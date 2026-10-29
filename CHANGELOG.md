@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+## 0.5.3 - 2026-10-29
+
+The MCP tools say more about themselves. Each carries MCP's tool annotations (read-only, destructive, idempotent, and whether it reaches outside the twin), has a title, and describes its parameters. The descriptions say what each tool leaves alone and what it answers with. Glama shows the annotations as tags and grades the descriptions. The twin itself is unchanged.
+
 ### Added
 
 - Every MCP tool carries MCP's tool annotations: read-only, destructive, idempotent, and whether it reaches outside the twin. A client that asks before running a tool that changes things can now tell `twin_status` from `twin_reset`. Tests check the claims: every read-only tool changes nothing, and every idempotent one leaves the twin as one call did when called again.
