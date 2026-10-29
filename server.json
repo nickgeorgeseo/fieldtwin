@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.nickgeorgeseo/fieldtwin",
+  "title": "fieldtwin",
+  "description": "Local, stateful twins of the Jobber, Housecall Pro, and QuickBooks Online APIs, for agents and tests",
+  "repository": {
+    "url": "https://github.com/nickgeorgeseo/fieldtwin",
+    "source": "github",
+    "id": "1412581362"
+  },
+  "websiteUrl": "https://nickgeorgeai.com/fieldtwin",
+  "version": "0.5.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "fieldtwin",
+      "version": "0.5.1",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }],
+      "environmentVariables": [
+        {
+          "name": "FIELDTWIN_PORT",
+          "description": "The port the twin listens on. The MCP server starts a twin of its own, so pick another port if one already runs on 4010.",
+          "format": "number",
+          "default": "4010"
+        },
+        {
+          "name": "FIELDTWIN_HOST",
+          "description": "The address the twin listens on. Keep the loopback address unless something else must reach the twin.",
+          "default": "127.0.0.1"
+        },
+        {
+          "name": "FIELDTWIN_AUTH",
+          "description": "any-token accepts any Bearer token; oauth accepts only tokens from the twin's OAuth endpoints.",
+          "default": "any-token",
+          "choices": ["any-token", "oauth"]
+        },
+        {
+          "name": "FIELDTWIN_SEED",
+          "description": "Which fake business to generate: the same seed builds the same world.",
+          "format": "number",
+          "default": "42"
+        }
+      ]
+    }
+  ]
+}

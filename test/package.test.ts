@@ -71,3 +71,21 @@ describe("the npm package", () => {
     expect((await fetch(`${url}/housecallpro/jobs?page_size=1`, { headers: { Authorization: "Token dev" } })).status).toBe(200);
   }, 20_000);
 });
+
+/** server.json, the package's entry in the official MCP Registry, which publishing it checks against the npm package. */
+describe("the MCP Registry entry", () => {
+  const server = JSON.parse(readFileSync(join(ROOT, "server.json"), "utf8"));
+  const [npm] = server.packages;
+
+  it("names the package and version being released, under the package's mcpName", () => {
+    expect(server.name).toBe(pkg.mcpName);
+    expect(npm.identifier).toBe(pkg.name);
+    expect([server.version, npm.version]).toEqual([pkg.version, pkg.version]);
+  });
+
+  it("starts the MCP server, with every setting the twin reads from the environment", () => {
+    expect(npm.packageArguments).toEqual([{ type: "positional", value: "mcp" }]);
+    const settings = new Set(readFileSync(join(ROOT, "src", "server.ts"), "utf8").match(/FIELDTWIN_[A-Z]+/g));
+    expect(npm.environmentVariables.map((variable: { name: string }) => variable.name).sort()).toEqual([...settings].sort());
+  });
+});

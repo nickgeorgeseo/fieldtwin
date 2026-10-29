@@ -4,6 +4,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Added
+
+- The MCP server has an entry in the official MCP Registry, `io.github.nickgeorgeseo/fieldtwin`, so MCP clients and directories that read the registry can find it and start it with `npx -y fieldtwin mcp`. `server.json` describes it, with the `FIELDTWIN_*` settings, and the package's `mcpName` proves the registry entry and the npm package belong together.
+
 ## 0.5.1 - 2026-10-29
 
 On npm. `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer, in any ready-made scenario or a scenario file of your own, and `npx fieldtwin mcp` gives a coding agent the twin and its MCP server in one command. Tests start their own twin with `startTwin()`, on a free port with its own world, so each test file or worker gets one and CI needs no second checkout. The MCP server now exits when the agent closes its stdin instead of holding the port, and `@hono/node-server` and `zod` move to new major versions, past advisories their old ones don't fix, so `npm audit` comes back clean.
