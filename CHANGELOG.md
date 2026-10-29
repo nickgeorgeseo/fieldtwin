@@ -7,6 +7,11 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 ### Added
 
 - The MCP server has an entry in the official MCP Registry, `io.github.nickgeorgeseo/fieldtwin`, so MCP clients and directories that read the registry can find it and start it with `npx -y fieldtwin mcp`. `server.json` describes it, with the `FIELDTWIN_*` settings, and the package's `mcpName` proves the registry entry and the npm package belong together.
+- `glama.json` names the owner as the MCP server's maintainer on Glama, whose listing punkpeye/awesome-mcp-servers asks for.
+
+### Changed
+
+- The README's MCP section says where the server is in the MCP Registry.
 
 ## 0.5.1 - 2026-10-29
 

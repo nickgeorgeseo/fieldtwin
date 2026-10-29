@@ -454,6 +454,8 @@ Other MCP clients (Cursor, Claude Desktop, VS Code) take the same command in the
 { "mcpServers": { "fieldtwin": { "command": "npx", "args": ["-y", "fieldtwin", "mcp"] } } }
 ```
 
+It is in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.nickgeorgeseo/fieldtwin) as `io.github.nickgeorgeseo/fieldtwin`, so clients and directories that read the registry install it with the same command and its settings.
+
 Add a scenario's name after `mcp` to start in it. The MCP server starts a twin of its own, on port 4010 unless `FIELDTWIN_PORT` says otherwise, so stop any other twin there first (`claude mcp add -e FIELDTWIN_PORT=4011 ...` picks another port). It exits when the agent closes the session.
 
 The MCP tools only control the test world. Your agent still calls the vendor APIs over HTTP, the same way production code will.
