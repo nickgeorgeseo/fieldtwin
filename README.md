@@ -442,6 +442,8 @@ It is a Next.js package of its own and a client of the twin like any other: it u
 | `twin_run_action` | Make something happen now: customers pay, clients call in, techs finish jobs, finished work is invoiced |
 | `twin_set_webhooks`, `twin_webhooks` | Subscribe your app to webhooks; see what was delivered and how it answered |
 
+Each tool carries MCP's tool annotations, so a client that asks before running a tool that changes things knows which ones do. The five that only look are marked read-only. The ones that replace or throw away what's there are marked destructive: resetting, rewinding, loading a scenario, setting faults or webhooks, and reusing a checkpoint's name. Only `twin_advance_clock` and `twin_run_action` reach outside the twin, by delivering webhooks to the URLs you subscribed.
+
 Claude Code:
 
 ```bash

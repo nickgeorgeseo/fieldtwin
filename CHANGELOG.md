@@ -4,6 +4,15 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Added
+
+- Every MCP tool carries MCP's tool annotations: read-only, destructive, idempotent, and whether it reaches outside the twin. A client that asks before running a tool that changes things can now tell `twin_status` from `twin_reset`. Tests check the claims: every read-only tool changes nothing, and every idempotent one leaves the twin as one call did when called again.
+- Every MCP tool has a title, and every parameter a description.
+
+### Changed
+
+- The MCP tools' descriptions say what each one leaves alone and what it answers with, and point to the tool to use instead where two are close (`twin_reset` and `twin_rewind`, `twin_changes` and `twin_export_log`). They live in `src/control/mcp-tool-text.ts`.
+
 ## 0.5.2 - 2026-10-29
 
 The MCP server is in the official MCP Registry, as `io.github.nickgeorgeseo/fieldtwin`: the package now carries the `mcpName` the registry checks, and `server.json` describes how to start it, with `npx -y fieldtwin mcp` and the `FIELDTWIN_*` settings. `glama.json` claims its listing on Glama. The twin itself is unchanged.

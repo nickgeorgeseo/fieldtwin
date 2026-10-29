@@ -67,6 +67,16 @@ describe("MCP tool hints", () => {
     });
   });
 
+  it("gives every tool a title, and every parameter a description", async () => {
+    const { tools } = await connectAgent();
+    for (const tool of tools) {
+      expect(tool.title, tool.name).toMatch(/^[A-Z]/);
+      for (const [name, schema] of Object.entries(tool.inputSchema.properties ?? {})) {
+        expect((schema as { description?: string }).description, `${tool.name} ${name}`).toMatch(/^[A-Z]/);
+      }
+    }
+  });
+
   it("changes nothing with a tool it marks read-only", async () => {
     const { client, tools, snapshot } = await connectAgent();
     expect(hinted(tools, "readOnlyHint")).toHaveLength(5);
