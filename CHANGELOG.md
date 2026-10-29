@@ -4,6 +4,16 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Added
+
+- fieldtwin is an npm package: `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer. The package holds the compiled twin and the ready-made scenarios, about 150 kB.
+- The `fieldtwin` command: `fieldtwin [scenario]` starts the twin, in a ready-made scenario or a scenario YAML file, as `npm start` does; `fieldtwin mcp [scenario]` adds the MCP server over stdio, so a coding agent adds it with `claude mcp add fieldtwin -- npx -y fieldtwin mcp`. `--help` lists the scenarios and settings, and `--version` prints the version. Settings still come from the environment (`FIELDTWIN_PORT` and the rest).
+- `startTwin()`, for tests: `import { startTwin } from "fieldtwin"` starts a twin on a free port with its own world and answers its `url`, `port`, and `close()`, so each test file, or each worker, can have its own. It takes `seed`, `auth`, `scenario`, `port`, and `hostname`, and throws instead of printing or exiting. Its types ship with it.
+
+### Changed
+
+- The README's quick start, testing, and MCP sections use the package: a test starts its own twin with `startTwin()`, and CI needs no second checkout.
+
 ## 0.5.0 - 2026-10-26
 
 A third twin. Housecall Pro joins Jobber and QuickBooks, served under `/housecallpro`: customers, addresses, employees, jobs, invoices, and estimates, with API keys and OAuth, webhooks signed as documented, scenario actions that finish, invoice, and pay work, and 33 conformance cases ready to record against a real account. It is in the dashboard and in `flaky-apis`, injected faults carry the vendor's own headers, and a scenario that fails to load, or a timeline entry that throws, now leaves the twin exactly as it was.

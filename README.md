@@ -35,7 +35,7 @@ If you build software for field-service and trades businesses, you know the opti
 | | A client's live account | Vendor sandbox | Hand-written mocks | **fieldtwin** |
 |---|---|---|---|---|
 | Safe to break | No | Yes | Yes | **Yes** |
-| Ready to use | When the client trusts you | After a developer account, an app, and setup | After you write each endpoint | **`npm start`** |
+| Ready to use | When the client trusts you | After a developer account, an app, and setup | After you write each endpoint | **`npx fieldtwin`** |
 | Realistic data | Yes | Generic samples, or none | What you typed | **A seeded business with months of history** |
 | Jobber, Housecall Pro, and QuickBooks describe the same business | Yes | No | No | **Yes, or drifted on purpose** |
 | Back to a clean start | Never | By hand | Restart | **`POST /_twin/reset`** |
@@ -88,9 +88,7 @@ Anything not listed fails clearly in the vendor's own error format rather than r
 Requires Node 22+.
 
 ```bash
-git clone https://github.com/nickgeorgeseo/fieldtwin && cd fieldtwin
-npm ci
-npm start
+npx fieldtwin
 ```
 
 ```text
@@ -122,7 +120,9 @@ curl -H "Authorization: Token dev" \
   "http://localhost:4010/housecallpro/jobs?work_status[]=scheduled&page_size=5"
 ```
 
-Start it in a ready-made situation instead: `npm start -- flaky-apis` (see [Scenarios and faults](#scenarios-and-faults)).
+Start it in a ready-made situation instead: `npx fieldtwin flaky-apis` (see [Scenarios and faults](#scenarios-and-faults)). `npx fieldtwin --help` lists the scenarios and settings.
+
+To work on fieldtwin itself, or run the [dashboard](#the-dashboard) and the [worked example](#a-worked-example-jobber-to-quickbooks), clone it instead: `git clone https://github.com/nickgeorgeseo/fieldtwin && cd fieldtwin && npm ci && npm start`.
 
 ## Using it with your code
 
@@ -149,17 +149,19 @@ The QuickBooks and Jobber twins enforce the vendors' documented rate limits in t
 
 ## Testing on every commit
 
-Your tests reach the twin the way your app does. Each test loads a fresh world, runs your code against it, and checks the change list: what your code really did, not what it logged. Twin time skips the waiting, so retries and token expiry take seconds, and every world comes from a seed, so a test that fails in CI fails the same way on your laptop.
+Your tests start a twin of their own and reach it the way your app does. Each test loads a fresh world, runs your code against it, and checks the change list: what your code really did, not what it logged. Twin time skips the waiting, so retries and token expiry take seconds, and every world comes from a seed, so a test that fails in CI fails the same way on your laptop.
 
 **1. Write a test.** This one checks for the bug a lost answer causes. QuickBooks can accept two invoices with the same number, so code that retries a create after a timeout, without a `requestid`, books the same work twice:
 
 ```ts
-// test/sync.test.ts in your project. Run it with a twin at FIELDTWIN_URL (npm start in the fieldtwin folder).
+// test/sync.test.ts in your project, with fieldtwin installed: npm install --save-dev fieldtwin
 import assert from "node:assert/strict";
-import { beforeEach, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
+import { startTwin } from "fieldtwin";
 import { syncPaidInvoices } from "../src/sync.ts"; // your code
 
-const TWIN = process.env.FIELDTWIN_URL ?? "http://localhost:4010";
+const running = await startTwin(); // a twin of this file's own, on a free port
+after(() => running.close());
 
 /** Something the twin recorded: what changed, in which vendor, with the whole record as that vendor's API returns it. */
 interface Change {
@@ -170,7 +172,7 @@ interface Change {
 
 /** A request to the twin's control plane, failing the test with the twin's reason if it refuses. */
 async function twin(method: string, path: string) {
-  const response = await fetch(`${TWIN}/_twin${path}`, { method });
+  const response = await fetch(`${running.url}/_twin${path}`, { method });
   if (!response.ok) throw new Error(`${method} /_twin${path}: ${await response.text()}`);
   return response.json();
 }
@@ -181,7 +183,7 @@ beforeEach(async () => {
 });
 
 test("books each invoice once, even when QuickBooks loses the answer to a write", async () => {
-  await syncPaidInvoices({ jobberUrl: TWIN, quickbooksUrl: TWIN });
+  await syncPaidInvoices({ jobberUrl: running.url, quickbooksUrl: running.url });
 
   const changes: Change[] = await twin("GET", "/checkpoints/before-sync/changes?source=api"); // what your code did
   const booked = changes
@@ -200,14 +202,9 @@ It uses Node's built-in test runner; Vitest and Jest work the same way. Against 
   AssertionError [ERR_ASSERTION]: an invoice was booked twice: 41, 41
 ```
 
-**2. Run it locally.**
+**2. Run it.** `node --test` (or `npm test`). There's nothing else to start: the test file starts its twin and closes it.
 
-```bash
-npm start                                         # in the fieldtwin folder
-FIELDTWIN_URL=http://localhost:4010 npm test      # in your project
-```
-
-**3. Run it on every commit.** In GitHub Actions, check out fieldtwin beside your code, start it, and wait until it answers:
+**3. Run it on every commit.** The same command runs in CI, since fieldtwin is a dev dependency like any other. If your tests aren't in Node, or you'd rather keep one twin running beside them, start it as a step of its own and wait until it answers. In GitHub Actions:
 
 ```yaml
 # .github/workflows/test.yml in your project
@@ -219,37 +216,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
-        with:
-          repository: nickgeorgeseo/fieldtwin
-          path: fieldtwin # pin `ref:` to a release tag, like v0.4.0, for repeatable runs
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Start the twin
-        working-directory: fieldtwin
         run: |
-          npm ci
-          nohup npm start > twin.log 2>&1 &
+          nohup npx -y fieldtwin@0.5 > twin.log 2>&1 & # pin the version for repeatable runs
           timeout 60 bash -c 'until curl -sf localhost:4010/_twin > /dev/null; do sleep 1; done'
-      - run: npm ci && npm test
-        env:
-          FIELDTWIN_URL: http://localhost:4010
+      - run: npm ci && npm test # your tests, with the twin at http://localhost:4010
       - name: Keep the twin's event log
         if: failure()
-        run: curl -s localhost:4010/_twin/log.jsonl > fieldtwin/log.jsonl
+        run: curl -s localhost:4010/_twin/log.jsonl > fieldtwin-log.jsonl
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: fieldtwin-log
-          path: fieldtwin/log.jsonl
+          path: fieldtwin-log.jsonl
 ```
 
 When a run fails, its event log is kept with it: everything your code did to the twin, to read or to replay.
 
 A few things to know:
 
-- **Tests that share a twin share its world.** Run the files that use it one at a time (`node --test --test-concurrency=1`, Vitest's `--no-file-parallelism`, Jest's `--runInBand`), or start a twin for each worker on its own `FIELDTWIN_PORT`.
+- **Tests that share a twin share its world.** Each file that calls `startTwin()` gets its own, so files can run in parallel; tests within a file take turns, as Node's runner and Vitest run them by default. One twin started beside the tests is shared by all of them: run the files one at a time (`node --test --test-concurrency=1`, Vitest's `--no-file-parallelism`, Jest's `--runInBand`).
+- **`startTwin()` takes the settings the command does**: `seed`, `auth` (`"any-token"` or `"oauth"`), `scenario` (a ready-made one's name or a YAML file's path), and `port` (a free one unless you say). It answers `url`, `port`, and `close()`.
 - **`flaky-apis` checks OAuth tokens for real**, so your code connects through the twin's [OAuth endpoints](#authentication), as it will in production. To test retries alone, follow the scenario with `PUT /_twin/auth` and `{"mode": "any-token"}`.
 - **For a stronger check**, the reference integration's [flaky test](examples/sync-jobber-invoice-to-quickbooks/test/sync-flaky.test.ts) syncs through `flaky-apis` and checks the books end exactly as a clean run leaves them.
 
@@ -281,7 +271,7 @@ Load `flaky-apis` to see how it copes when the APIs fight back, or `mismatched-b
 
 > **By default the twin accepts any bearer token.** That keeps the quick start to one command, and it is the
 > wrong setting for testing your OAuth code. To make the twin check tokens the way the real APIs do, start it
-> with `FIELDTWIN_AUTH=oauth npm start`, put `auth: oauth` in a scenario, or switch a running twin:
+> with `FIELDTWIN_AUTH=oauth npx fieldtwin`, put `auth: oauth` in a scenario, or switch a running twin:
 > `curl -X PUT localhost:4010/_twin/auth -H "Content-Type: application/json" -d '{"mode":"oauth"}'`.
 
 Each vendor has a twin OAuth 2.0 server at the vendor's own paths (under `/housecallpro` for Housecall Pro), so your OAuth client only needs new URLs:
@@ -354,8 +344,8 @@ faults:
 A scenario is a YAML file: seed, start time, world size, faults, and what happens as time passes. Start the twin with a ready-made one by name, or with your own file:
 
 ```bash
-npm start -- heat-wave-monday
-npm start -- my-scenario.yaml
+npx fieldtwin heat-wave-monday
+npx fieldtwin my-scenario.yaml
 ```
 
 | Scenario | What it tests |
@@ -437,7 +427,7 @@ It is a Next.js package of its own and a client of the twin like any other: it u
 
 ## Using it from a coding agent (MCP)
 
-`npm run mcp` starts the twin and an MCP server over stdio. Its tools mirror the control plane:
+`npx fieldtwin mcp` starts the twin and an MCP server over stdio (`npm run mcp` in a clone). Its tools mirror the control plane:
 
 | Tool | What it does |
 |---|---|
@@ -455,8 +445,16 @@ It is a Next.js package of its own and a client of the twin like any other: it u
 Claude Code:
 
 ```bash
-claude mcp add fieldtwin -- npx tsx /path/to/fieldtwin/src/mcp.ts
+claude mcp add fieldtwin -- npx -y fieldtwin mcp
 ```
+
+Other MCP clients (Cursor, Claude Desktop, VS Code) take the same command in their JSON config:
+
+```json
+{ "mcpServers": { "fieldtwin": { "command": "npx", "args": ["-y", "fieldtwin", "mcp"] } } }
+```
+
+Add a scenario's name after `mcp` to start in it.
 
 The MCP tools only control the test world. Your agent still calls the vendor APIs over HTTP, the same way production code will.
 
@@ -464,7 +462,7 @@ The MCP tools only control the test world. Your agent still calls the vendor API
 
 | You see | What it means |
 |---|---|
-| `fieldtwin: port 4010 is already in use` | Another twin (or something else) has the port. `FIELDTWIN_PORT=4011 npm start` |
+| `fieldtwin: port 4010 is already in use` | Another twin (or something else) has the port. `FIELDTWIN_PORT=4011 npx fieldtwin` |
 | HTTP 401 from any vendor | The twin is checking tokens (`auth` is `oauth`, from `FIELDTWIN_AUTH`, a scenario, or `PUT /_twin/auth`). Get a token from the twin's OAuth endpoints, or switch back to `any-token`. Housecall Pro also answers 401 for an `Authorization` header not written exactly `Token <key>` or `Bearer <token>` |
 | Jobber `THROTTLED` on every try | The query asks for more than the whole 10,000-point budget, so it can never run. Ask for fewer nodes with `first` or `last` |
 | QuickBooks 5010 `Stale Object` | Your update sent an old `SyncToken`, as the real API would refuse too. Read the record again and retry |
@@ -486,8 +484,9 @@ src/
   app.ts       wires it together
   start.ts     startTwin(): a twin on its own port, from code
   index.ts     what `import { startTwin } from "fieldtwin"` gets
+  cli.ts       the fieldtwin command
   server.ts    entry point for `npm start`
-  mcp.ts       entry point for `npm run mcp`
+  mcp.ts       entry point for `npm run mcp` and `fieldtwin mcp`
 scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-apis)
 examples/      code that uses the twins the way yours will: over HTTP, never importing src/
   sync-jobber-invoice-to-quickbooks/   the reference integration, its demo, and its tests

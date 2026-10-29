@@ -90,6 +90,7 @@ describe("the whole README", () => {
     const scenarios = listScenarios().map((scenario) => scenario.name);
     const named = [
       ...README.matchAll(/npm start -- ([a-z-]+)(?=[\s`)])/g),
+      ...README.matchAll(/npx fieldtwin (?!mcp\b)([a-z][a-z-]*)(?=[\s`)])/g),
       ...README.matchAll(/^\| `([a-z-]+)` \| (?:A busy|Jobber and|Retry)/gm),
     ];
     expect(named.length).toBeGreaterThan(0);
