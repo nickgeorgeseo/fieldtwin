@@ -68,6 +68,23 @@ describe("the fieldtwin command", () => {
     expect(stderr).toContain("fieldtwin: give one scenario at most, not flaky-apis mismatched-books");
   }, 20_000);
 
+  it("ends `fieldtwin mcp` when the agent closes its stdin, instead of leaving a twin holding the port", async () => {
+    const child = spawn(process.execPath, ["--import", "tsx", CLI, "mcp"], { env: { ...process.env, FIELDTWIN_PORT: "0" } });
+    children.push(child);
+    let stderr = "";
+    await new Promise<void>((resolve) =>
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+        if (stderr.includes("is open for business at")) resolve();
+      }),
+    );
+    const url = /http:\/\/localhost:\d+/.exec(stderr)![0];
+    const exited = new Promise<number | null>((resolve) => child.on("exit", resolve));
+    child.stdin.end();
+    expect(await exited).toBe(0);
+    await expect(fetch(`${url}/_twin`)).rejects.toThrow();
+  }, 20_000);
+
   it("serves the control tools over stdio with `fieldtwin mcp`, the way a coding agent starts it", async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,

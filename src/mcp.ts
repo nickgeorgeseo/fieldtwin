@@ -10,6 +10,10 @@ import { VERSION } from "./version.ts";
 export async function startMcp(args = process.argv.slice(2)) {
   const twin = await startServer(args);
   await createMcpServer(twin, VERSION).connect(new StdioServerTransport());
+  // An MCP client ends a stdio session by closing the server's stdin. The HTTP server would keep the process, and its
+  // port, alive after that, so exit: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle#stdio
+  process.stdin.once("end", () => process.exit(0));
+  process.stdin.once("close", () => process.exit(0));
 }
 
 if (isEntryPoint(import.meta.url)) await startMcp();
