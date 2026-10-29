@@ -11,12 +11,12 @@ import type { ResolverContext } from "./context.ts";
  * https://developer.getjobber.com/docs/using_jobbers_api/api_queries_and_mutations/ (Mutations)
  */
 
-interface UserError {
+export interface UserError {
   message: string;
   path: string[];
 }
 
-interface ClientCreateInput {
+export interface ClientCreateInput {
   firstName?: string;
   lastName?: string;
   companyName?: string;
