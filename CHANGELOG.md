@@ -18,6 +18,10 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 - The README's quick start, testing, and MCP sections use the package: a test starts its own twin with `startTwin()`, and CI needs no second checkout.
 
+### Security
+
+- `@hono/node-server`, which serves the twin over HTTP, is on 2.x, past GHSA-rmxm-3fg6-px4f, which no 1.x release fixes. The advisory is in its `serveStatic`, which fieldtwin doesn't use, and 2.x keeps the API fieldtwin calls, so the twin answers as it did.
+
 ## 0.5.0 - 2026-10-26
 
 A third twin. Housecall Pro joins Jobber and QuickBooks, served under `/housecallpro`: customers, addresses, employees, jobs, invoices, and estimates, with API keys and OAuth, webhooks signed as documented, scenario actions that finish, invoice, and pay work, and 33 conformance cases ready to record against a real account. It is in the dashboard and in `flaky-apis`, injected faults carry the vendor's own headers, and a scenario that fails to load, or a timeline entry that throws, now leaves the twin exactly as it was.
