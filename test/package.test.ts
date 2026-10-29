@@ -13,7 +13,13 @@ describe("the npm package", () => {
 
   beforeAll(() => {
     execFileSync(process.execPath, ["--import", "tsx", join(ROOT, "scripts", "build.ts")], { cwd: ROOT, stdio: "pipe" });
-    const [report] = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: ROOT, encoding: "utf8" }));
+    const [report] = JSON.parse(
+      execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+        cwd: ROOT,
+        encoding: "utf8",
+        shell: process.platform === "win32", // npm is npm.cmd there, which Node runs only through a shell
+      }),
+    );
     packed = report.files.map((file: { path: string }) => file.path);
   }, 120_000);
   afterAll(() => {
@@ -21,7 +27,8 @@ describe("the npm package", () => {
   });
 
   it("ships the compiled twin, Jobber's GraphQL schema, and the ready-made scenarios", () => {
-    for (const file of [pkg.bin.fieldtwin, pkg.exports["."].default, pkg.exports["."].types, "dist/vendors/jobber/schema/base.graphql"]) {
+    const entries = [pkg.bin.fieldtwin, pkg.main, pkg.types, pkg.exports["."].default, pkg.exports["."].types];
+    for (const file of [...entries, "dist/vendors/jobber/schema/base.graphql"]) {
       expect(packed).toContain(file.replace(/^\.\//, ""));
     }
     expect(packed).toEqual(
