@@ -46,6 +46,9 @@ export async function startServer(args = process.argv.slice(2), env: Env = proce
     announce(running, hostname); // the port it really got: FIELDTWIN_PORT=0 lets the system pick one
     return running.twin;
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
+      return exitWith(`port ${listenOn(env).port} is already in use (is another twin running?). Set FIELDTWIN_PORT to use another one.`);
+    }
     return exitWith(error instanceof Error ? error.message : String(error));
   }
 }

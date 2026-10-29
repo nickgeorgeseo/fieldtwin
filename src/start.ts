@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { createAdaptorServer } from "@hono/node-server";
 import { type AppOptions, createApp } from "./app.ts";
-import { listScenarios, loadScenario, loadScenarioByName } from "./control/operations.ts";
+import { listScenarios, loadScenario, loadScenarioByName, parseAuthMode } from "./control/operations.ts";
 import type { Twin } from "./core/twin.ts";
 
 export interface StartOptions extends Omit<AppOptions, "startTime"> {
@@ -29,31 +29,40 @@ export interface RunningTwin {
  * `npx fieldtwin`, without printing anything or exiting the process: anything wrong is thrown.
  */
 export async function startTwin(options: StartOptions = {}): Promise<RunningTwin> {
-  const { port = 0, hostname = "127.0.0.1", scenario, ...appOptions } = options;
-  const { app, twin } = createApp(appOptions);
+  const { port = 0, hostname = "127.0.0.1", scenario, seed, auth, ...appOptions } = options;
+  // Checked as the command checks FIELDTWIN_SEED and FIELDTWIN_AUTH: a typo shouldn't quietly make another twin.
+  if (seed !== undefined && !(Number.isSafeInteger(seed) && seed >= 0)) throw new Error(`seed must be a whole number like 42, not ${seed}`);
+  const { app, twin } = createApp({ ...appOptions, seed, auth: auth === undefined ? undefined : parseAuthMode(auth) });
   if (scenario) loadScenarioArgument(twin, scenario);
-  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+  // Left as they are, @hono/node-server swaps in its own Request and Response globals, in the caller's process too.
+  const server = createAdaptorServer({ fetch: app.fetch, overrideGlobalObjects: false }) as Server;
   await new Promise<void>((resolve, reject) => {
-    server.once("error", (error: NodeJS.ErrnoException) =>
+    const refuse = (error: NodeJS.ErrnoException) =>
       reject(
         error.code === "EADDRINUSE"
-          ? new Error(`port ${port} is already in use (is another twin running?). Set FIELDTWIN_PORT to use another one.`)
+          ? Object.assign(new Error(`port ${port} is already in use (is another twin running?). Pass another port, or 0 for a free one.`), {
+              code: "EADDRINUSE",
+            })
           : error,
-      ),
-    );
-    server.listen(port, hostname, resolve);
+      );
+    server.once("error", refuse);
+    server.listen(port, hostname, () => {
+      server.off("error", refuse); // a later error is the process's to handle, not this promise's
+      resolve();
+    });
   });
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
+  let closing: Promise<void> | undefined; // the first close, which later calls wait for: afterEach and afterAll may both close
   return {
     url: addressOf(hostname, actualPort).url,
     port: actualPort,
     twin,
     close: () =>
-      new Promise((resolve, reject) => {
+      (closing ??= new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
         server.closeAllConnections();
-      }),
+      })),
   };
 }
 

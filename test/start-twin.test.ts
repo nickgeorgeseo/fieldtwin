@@ -3,6 +3,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RunningTwin, startTwin } from "../src/index.ts";
 
+// Captured before any twin starts, to check that starting one leaves the test process's own globals alone.
+const { Request: OWN_REQUEST, Response: OWN_RESPONSE } = globalThis;
+
 /** startTwin() from a test file in someone else's project: a twin of its own on a port of its own, closed after. */
 describe("startTwin()", () => {
   const running: RunningTwin[] = [];
@@ -60,6 +63,35 @@ describe("startTwin()", () => {
     } finally {
       blocker.close();
     }
+  });
+
+  it("leaves the test process's own Request and Response alone, so its instanceof checks still hold", async () => {
+    const twin = await start();
+    expect(globalThis.Request).toBe(OWN_REQUEST);
+    expect(globalThis.Response).toBe(OWN_RESPONSE);
+    expect(await fetch(`${twin.url}/_twin`)).toBeInstanceOf(OWN_RESPONSE);
+  });
+
+  it("refuses an auth mode or seed it can't use, as the fieldtwin command does", async () => {
+    await expect(startTwin({ auth: "bogus" as "oauth" })).rejects.toThrow('Unknown auth mode "bogus". Use "any-token" or "oauth".');
+    for (const seed of [Number.NaN, -1, 1.5, "abc" as unknown as number]) {
+      await expect(startTwin({ seed })).rejects.toThrow("seed must be a whole number like 42");
+    }
+  });
+
+  it("names the port option, not an environment variable, when its port is taken", async () => {
+    const first = await start();
+    const refusal = startTwin({ port: first.port });
+    await expect(refusal).rejects.toThrow(
+      `port ${first.port} is already in use (is another twin running?). Pass another port, or 0 for a free one.`,
+    );
+    await expect(refusal).rejects.toMatchObject({ code: "EADDRINUSE" });
+  });
+
+  it("can be closed more than once, as afterEach and afterAll both might", async () => {
+    const twin = await startTwin();
+    await Promise.all([twin.close(), twin.close()]);
+    await twin.close();
   });
 
   it("frees its port when closed, even with a client still connected", async () => {
