@@ -9,13 +9,13 @@
     "id": "1412581362"
   },
   "websiteUrl": "https://nickgeorgeai.com/fieldtwin",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "fieldtwin",
-      "version": "0.5.1",
+      "version": "0.5.2",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }],
