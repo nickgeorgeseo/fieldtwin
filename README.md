@@ -484,6 +484,8 @@ src/
   faults/      makes vendor APIs misbehave on purpose
   control/     /_twin HTTP routes, MCP tools, scenarios (one shared operations.ts)
   app.ts       wires it together
+  start.ts     startTwin(): a twin on its own port, from code
+  index.ts     what `import { startTwin } from "fieldtwin"` gets
   server.ts    entry point for `npm start`
   mcp.ts       entry point for `npm run mcp`
 scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-apis)

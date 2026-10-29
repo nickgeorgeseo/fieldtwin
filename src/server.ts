@@ -1,9 +1,8 @@
-import { readFileSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { serve } from "@hono/node-server";
-import { createApp } from "./app.ts";
-import { listScenarios, loadScenario, loadScenarioByName, parseAuthMode } from "./control/operations.ts";
+import { parseAuthMode } from "./control/operations.ts";
 import type { Twin } from "./core/twin.ts";
+import { addressOf, type RunningTwin, startTwin } from "./start.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -37,50 +36,24 @@ function wholeNumber(env: Env, name: string, description: string, fallback: numb
 }
 
 /**
- * Load the scenario named on the command line: a ready-made one by name (`npm start -- flaky-apis`) or a YAML
- * file (`npm start -- my-scenario.yaml`).
- */
-export function loadScenarioArgument(twin: Twin, argument: string) {
-  if (!/\.ya?ml$/i.test(argument)) return loadScenarioByName(twin, argument);
-  let yaml: string;
-  try {
-    yaml = readFileSync(argument, "utf8");
-  } catch {
-    const names = listScenarios().map((scenario) => scenario.name);
-    throw new Error(`Can't read the scenario file "${argument}". Ready-made scenarios: ${names.join(", ")}`);
-  }
-  return loadScenario(twin, yaml);
-}
-
-/**
- * Start the twin's HTTP server, as `npm start` and `npm run mcp` do. Anything wrong with the environment, the
+ * Start the twin's HTTP server, as `npx fieldtwin` and `npm start` do. Anything wrong with the environment, the
  * scenario, or the port is printed as one line and exits, rather than as a stack trace.
  */
-export function startServer(args = process.argv.slice(2), env: Env = process.env): Twin {
+export async function startServer(args = process.argv.slice(2), env: Env = process.env): Promise<Twin> {
   try {
-    const { app, twin } = createApp(settingsFrom(env));
-    if (args[0]) loadScenarioArgument(twin, args[0]);
     const { hostname, port } = listenOn(env);
-    // The port it really got: FIELDTWIN_PORT=0 lets the system pick one.
-    const server = serve({ fetch: app.fetch, hostname, port }, (address) => announce(twin, hostname, address.port));
-    server.on("error", (error: NodeJS.ErrnoException) =>
-      exitWith(
-        error.code === "EADDRINUSE"
-          ? `port ${port} is already in use (is another twin running?). Set FIELDTWIN_PORT to use another one.`
-          : error.message,
-      ),
-    );
-    return twin;
+    const running = await startTwin({ ...settingsFrom(env), hostname, port, scenario: args[0] });
+    announce(running, hostname); // the port it really got: FIELDTWIN_PORT=0 lets the system pick one
+    return running.twin;
   } catch (error) {
     return exitWith(error instanceof Error ? error.message : String(error));
   }
 }
 
 // stderr, not stdout: when running as an MCP server, stdout belongs to the MCP protocol.
-function announce(twin: Twin, hostname: string, port: number) {
-  const { url, reachableByOthers } = addressOf(hostname, port);
+function announce({ twin, url }: RunningTwin, hostname: string) {
   console.error(`fieldtwin: ${twin.world.company.name} is open for business at ${url}`);
-  if (reachableByOthers) {
+  if (addressOf(hostname, 0).reachableByOthers) {
     console.error(`fieldtwin: listening on ${hostname}: anyone who can reach this machine can control the twin and send webhooks from it.`);
   }
   console.error(
@@ -89,16 +62,6 @@ function announce(twin: Twin, hostname: string, port: number) {
       : "fieldtwin: auth is oauth: only access tokens from the twin's OAuth endpoints are accepted, until they expire. " +
           "Housecall Pro API keys (Token <key>) work too, as the twin can't check them.",
   );
-}
-
-const LOOPBACK = ["127.0.0.1", "localhost", "::1"];
-const EVERY_ADDRESS = ["0.0.0.0", "::"];
-
-/** The URL to print for where the twin listens, and whether other machines can reach it there. */
-export function addressOf(hostname: string, port: number): { url: string; reachableByOthers: boolean } {
-  const local = LOOPBACK.includes(hostname) || EVERY_ADDRESS.includes(hostname);
-  const host = local ? "localhost" : hostname.includes(":") ? `[${hostname}]` : hostname;
-  return { url: `http://${host}:${port}`, reachableByOthers: !LOOPBACK.includes(hostname) };
 }
 
 function exitWith(message: string): never {
@@ -110,7 +73,7 @@ function exitWith(message: string): never {
  * Whether this file is the one node was asked to run. Node resolves symlinks in the module's URL, so compare it with
  * the real path of what was run, as a URL: the path may hold spaces (percent-encoded in a URL) or be a Windows path.
  */
-function isEntryPoint(moduleUrl: string, scriptPath = process.argv[1]): boolean {
+export function isEntryPoint(moduleUrl: string, scriptPath = process.argv[1]): boolean {
   if (!scriptPath) return false;
   try {
     return moduleUrl === pathToFileURL(realpathSync(scriptPath)).href;
@@ -119,4 +82,4 @@ function isEntryPoint(moduleUrl: string, scriptPath = process.argv[1]): boolean 
   }
 }
 
-if (isEntryPoint(import.meta.url)) startServer();
+if (isEntryPoint(import.meta.url)) void startServer();

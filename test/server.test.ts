@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
-import { addressOf, listenOn, loadScenarioArgument, settingsFrom } from "../src/server.ts";
+import { listenOn, settingsFrom } from "../src/server.ts";
+import { addressOf, loadScenarioArgument } from "../src/start.ts";
 
 /**
  * The twin accepts any bearer token by default and its control plane has no auth (it is a local test tool), so

@@ -70,7 +70,9 @@ vendors/x/    imports core/ and world/ only. Never another vendor.
 faults/       imports core/ only. Never a specific vendor.
 control/      imports core/ only; HTTP and MCP adapters both go through operations.ts
 app.ts        the only file that knows every piece exists
-server.ts     entry point for `npm start`: imports app.ts and control/, and nothing imports it
+start.ts      startTwin(): app.ts on a port of its own, for code and for server.ts
+index.ts      what `import ... from "fieldtwin"` gets: startTwin and createApp
+server.ts     entry point for `npm start`: start.ts plus settings from the environment, printed and exiting on trouble
 mcp.ts        entry point for `npm run mcp`, the same plus MCP over stdio
 examples/     imports nothing from src/: it reaches the twin over HTTP, like any client
 conformance/  the same
