@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpServer } from "./control/mcp-tools.ts";
 import { isEntryPoint, startServer } from "./server.ts";
-
-/** The package's version, which the MCP server reports to the agent. */
-export const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+import { VERSION } from "./version.ts";
 
 /**
  * `npx fieldtwin mcp` and `npm run mcp`: start the twin's HTTP server (so your code can call the vendor APIs) and
