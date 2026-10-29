@@ -195,14 +195,14 @@ test("books each invoice once, even when QuickBooks loses the answer to a write"
 });
 ```
 
-It uses Node's built-in test runner; Vitest and Jest work the same way. Against a sync that retries without a `requestid`, it fails with the duplicate it found:
+It uses Node's built-in test runner, and Vitest works the same way. Jest needs its [ESM mode](https://jestjs.io/docs/ecmascript-modules), since fieldtwin is an ES module. Against a sync that retries without a `requestid`, it fails with the duplicate it found:
 
 ```text
 ✖ books each invoice once, even when QuickBooks loses the answer to a write
   AssertionError [ERR_ASSERTION]: an invoice was booked twice: 41, 41
 ```
 
-**2. Run it.** `node --test` (or `npm test`). There's nothing else to start: the test file starts its twin and closes it.
+**2. Run it.** `node --test` (or `npm test`). There's nothing else to start: the test file starts its twin and closes it. Node runs a `.ts` test file as it is from 22.18 (and 23.6); on an older Node, run `node --test --experimental-strip-types`, or `node --test` finds no tests.
 
 **3. Run it on every commit.** The same command runs in CI, since fieldtwin is a dev dependency like any other. If your tests aren't in Node, or you'd rather keep one twin running beside them, start it as a step of its own and wait until it answers. In GitHub Actions:
 
@@ -427,7 +427,7 @@ It is a Next.js package of its own and a client of the twin like any other: it u
 
 ## Using it from a coding agent (MCP)
 
-`npx fieldtwin mcp` starts the twin and an MCP server over stdio (`npm run mcp` in a clone). Its tools mirror the control plane:
+`npx fieldtwin mcp` starts the twin and an MCP server over stdio (`npm run --silent mcp` in a clone, so npm's own lines stay off stdout). Its tools mirror the control plane:
 
 | Tool | What it does |
 |---|---|
@@ -454,7 +454,7 @@ Other MCP clients (Cursor, Claude Desktop, VS Code) take the same command in the
 { "mcpServers": { "fieldtwin": { "command": "npx", "args": ["-y", "fieldtwin", "mcp"] } } }
 ```
 
-Add a scenario's name after `mcp` to start in it.
+Add a scenario's name after `mcp` to start in it. The MCP server starts a twin of its own, on port 4010 unless `FIELDTWIN_PORT` says otherwise, so stop any other twin there first (`claude mcp add -e FIELDTWIN_PORT=4011 ...` picks another port). It exits when the agent closes the session.
 
 The MCP tools only control the test world. Your agent still calls the vendor APIs over HTTP, the same way production code will.
 

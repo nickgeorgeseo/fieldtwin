@@ -8,7 +8,11 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 - fieldtwin is an npm package: `npx fieldtwin` starts the twin with no clone and no build, on plain Node 22 or newer. The package holds the compiled twin and the ready-made scenarios, about 150 kB.
 - The `fieldtwin` command: `fieldtwin [scenario]` starts the twin, in a ready-made scenario or a scenario YAML file, as `npm start` does; `fieldtwin mcp [scenario]` adds the MCP server over stdio, so a coding agent adds it with `claude mcp add fieldtwin -- npx -y fieldtwin mcp`. `--help` lists the scenarios and settings, and `--version` prints the version. Settings still come from the environment (`FIELDTWIN_PORT` and the rest).
-- `startTwin()`, for tests: `import { startTwin } from "fieldtwin"` starts a twin on a free port with its own world and answers its `url`, `port`, and `close()`, so each test file, or each worker, can have its own. It takes `seed`, `auth`, `scenario`, `port`, and `hostname`, and throws instead of printing or exiting. Its types ship with it.
+- `startTwin()`, for tests: `import { startTwin } from "fieldtwin"` starts a twin on a free port with its own world and answers its `url`, `port`, and `close()`, so each test file, or each worker, can have its own. It takes `seed`, `auth`, `scenario`, `port`, and `hostname`, checks them as the command checks its settings, and throws instead of printing or exiting. It leaves the process's own `Request` and `Response` globals alone, and `close()` can be called more than once. Its types ship with it.
+
+### Fixed
+
+- The MCP server (`npm run mcp`, and now `fieldtwin mcp`) exits when the agent closes its stdin, as MCP's stdio lifecycle says to end a session. It used to keep running, and keep the port, until it was killed, so an agent that crashed could leave a twin on 4010 behind.
 
 ### Changed
 
