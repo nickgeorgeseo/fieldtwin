@@ -37,7 +37,7 @@ const FaultRuleSchema = z
   })
   .strict()
   .superRefine((rule, context) => {
-    const problem = (message: string) => context.addIssue({ code: z.ZodIssueCode.custom, message });
+    const problem = (message: string) => context.addIssue({ code: "custom", message });
     const { duplicate, delayMs, ...requestEffects } = rule.effect;
     if (rule.webhook === undefined) {
       if (duplicate !== undefined || delayMs !== undefined) {
@@ -53,7 +53,7 @@ const FaultRuleSchema = z
   });
 
 /** One timeline entry: when, and what each vendor should do then ({ jobber: { newClients: 15 } }). */
-const vendorActions = z.record(z.unknown()).optional();
+const vendorActions = z.record(z.string(), z.unknown()).optional();
 const TimelineEntrySchema = z
   .object({ at: z.string() })
   .extend(Object.fromEntries(VENDOR_NAMES.map((vendor) => [vendor, vendorActions])) as Record<VendorName, typeof vendorActions>)
@@ -118,7 +118,7 @@ export function parseFaultRules(value: unknown): FaultRule[] {
   return validate(z.array(FaultRuleSchema), value, "Invalid fault rules");
 }
 
-function validate<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown, what: string): T {
+function validate<T>(schema: z.ZodType<T>, value: unknown, what: string): T {
   const result = schema.safeParse(value);
   if (result.success) return result.data;
   const problems = result.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
