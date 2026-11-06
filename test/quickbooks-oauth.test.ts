@@ -144,6 +144,15 @@ describe("QuickBooks API with real token checks (auth: oauth)", () => {
     });
   });
 
+  it("refuses to revoke a token for an app it wasn't issued to, and leaves that app connected", async () => {
+    const harness = setup(42, { auth: "oauth" });
+    const tokens = await connect(harness);
+    const other = await revoke(harness, tokens.refresh_token, basic("another-app", "another-secret"));
+    expect(other.status).toBe(400);
+    expect(await other.json()).toEqual({ error: "invalid_request", error_description: expect.stringMatching(/another app/) });
+    expect((await customerAs(harness, tokens.access_token)).status).toBe(200);
+  });
+
   it("keeps the connection through a reset, the way an app stays connected while data changes", async () => {
     const harness = setup(42, { auth: "oauth" });
     const tokens = await connect(harness);

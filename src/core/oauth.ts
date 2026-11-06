@@ -140,12 +140,25 @@ export class OAuthServer {
     return { clientId: issued.clientId, grantId: issued.grantId };
   }
 
-  /** Revoke the connection an access or refresh token belongs to. Returns false for a token never issued. */
-  revoke(token: string): boolean {
-    const issued = this.accessTokens.get(token) ?? this.refreshTokens.get(token);
-    if (!issued) return false;
+  /**
+   * Revoke the connection an access or refresh token belongs to, for the app it was issued to: RFC 7009 2.1 has the
+   * server refuse a token issued to another client, so one app can't disconnect another.
+   */
+  revoke(request: { clientId: string; token: string }): OAuthError | undefined {
+    const issued = this.accessTokens.get(request.token) ?? this.refreshTokens.get(request.token);
+    if (!issued)
+      return {
+        error: "invalid_request",
+        description: "That token was never issued. Send an access or refresh token from the token endpoint.",
+      };
+    if (issued.clientId !== request.clientId) {
+      return {
+        error: "invalid_request",
+        description: "That token was issued to another app. Send that app's client_id and client_secret.",
+      };
+    }
     this.revokedGrants.add(issued.grantId);
-    return true;
+    return undefined;
   }
 
   private issue(clientId: string, grantId: string, refreshToken: string, nowMs: number): TokenSet {

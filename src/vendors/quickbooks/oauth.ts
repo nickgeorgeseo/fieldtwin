@@ -68,16 +68,19 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
 
   // Step 16: revoke a token, which disconnects the app from the company.
   app.post("/v2/oauth2/tokens/revoke", async (c) => {
-    if (!basicCredentials(c.req.header("Authorization"))) return c.json({ error: "invalid_client" }, 401);
+    const client = basicCredentials(c.req.header("Authorization"));
+    if (!client) return c.json({ error: "invalid_client" }, 401);
     const isJson = c.req.header("Content-Type")?.includes("json");
     const read = isJson ? await readJsonObject(c, '{"token": "..."}') : await readForm(c);
     if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
     const token = "body" in read ? read.body.token : read.form.token;
-    if (typeof token !== "string" || !oauth().revoke(token)) {
-      // Revoking a token already revoked answers 200 again, as RFC 7009 2.2 allows, so only this case is a 400.
-      const description = "That token was never issued. Send an access or refresh token from /oauth2/v1/tokens/bearer";
-      return c.json({ error: "invalid_request", error_description: description }, 400);
+    if (typeof token !== "string") {
+      return c.json({ error: "invalid_request", error_description: 'Send the token to revoke, like {"token": "..."}' }, 400);
     }
+    // Revoking a token already revoked answers 200 again, as RFC 7009 2.2 allows: only a token never issued, or
+    // issued to another app, is a 400.
+    const refused = oauth().revoke({ clientId: client.id, token });
+    if (refused) return c.json({ error: refused.error, error_description: refused.description }, 400);
     return c.body(null, 200);
   });
 }

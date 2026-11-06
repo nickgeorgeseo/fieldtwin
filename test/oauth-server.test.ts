@@ -102,10 +102,17 @@ describe("the twin OAuth server", () => {
     const second = oauth.refresh({ clientId: "app-1", refreshToken: first.refreshToken }, 0);
     if ("error" in second) throw new Error(second.description);
 
-    expect(oauth.revoke(first.accessToken)).toBe(true);
+    expect(oauth.revoke({ clientId: "app-1", token: first.accessToken })).toBeUndefined();
     expect(oauth.verify(second.accessToken, 0)).toEqual({ problem: "revoked" });
     expect(oauth.refresh({ clientId: "app-1", refreshToken: second.refreshToken }, 0)).toMatchObject({ error: "invalid_grant" });
-    expect(oauth.revoke("not-a-token")).toBe(false);
+    expect(oauth.revoke({ clientId: "app-1", token: "not-a-token" })).toMatchObject({ error: "invalid_request" });
+  });
+
+  it("only revokes for the app the token was issued to", () => {
+    const oauth = server();
+    const tokens = connect(oauth);
+    expect(oauth.revoke({ clientId: "someone-else", token: tokens.refreshToken })).toMatchObject({ error: "invalid_request" });
+    expect(oauth.verify(tokens.accessToken, 0)).toMatchObject({ clientId: "app-1" });
   });
 
   it("issues the same tokens for the same requests, so runs are reproducible", () => {
