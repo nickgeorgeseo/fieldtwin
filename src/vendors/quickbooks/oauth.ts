@@ -74,7 +74,9 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
     const token = "body" in read ? read.body.token : read.form.token;
     if (typeof token !== "string" || !oauth().revoke(token)) {
-      return c.json({ error: "invalid_request", error_description: "That token was never issued, or was already revoked" }, 400);
+      // Revoking a token already revoked answers 200 again, as RFC 7009 2.2 allows, so only this case is a 400.
+      const description = "That token was never issued. Send an access or refresh token from /oauth2/v1/tokens/bearer";
+      return c.json({ error: "invalid_request", error_description: description }, 400);
     }
     return c.body(null, 200);
   });

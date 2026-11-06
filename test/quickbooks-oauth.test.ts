@@ -34,6 +34,13 @@ async function connect(harness: Harness) {
   return (await tokenRequest(harness, { grant_type: "authorization_code", code, redirect_uri: CLIENT.redirectUri })).json();
 }
 
+const revoke = (harness: Harness, token: string, authorization = basic()) =>
+  harness.app.request("/v2/oauth2/tokens/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: authorization },
+    body: JSON.stringify({ token }),
+  });
+
 const customerAs = (harness: Harness, accessToken: string) =>
   harness.app.request("/v3/company/9341000000000001/customer/1", { headers: { Authorization: `Bearer ${accessToken}` } });
 
@@ -119,13 +126,22 @@ describe("QuickBooks API with real token checks (auth: oauth)", () => {
   it("stops accepting tokens once they are revoked", async () => {
     const harness = setup(42, { auth: "oauth" });
     const tokens = await connect(harness);
-    const revoke = await harness.app.request("/v2/oauth2/tokens/revoke", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: basic() },
-      body: JSON.stringify({ token: tokens.refresh_token }),
-    });
-    expect(revoke.status).toBe(200);
+    expect((await revoke(harness, tokens.refresh_token)).status).toBe(200);
     expect((await customerAs(harness, tokens.access_token)).status).toBe(401);
+  });
+
+  it("answers 200 again for a token already revoked, and 400 saying it was never issued for a token the twin never issued", async () => {
+    const harness = setup(42, { auth: "oauth" });
+    const tokens = await connect(harness);
+    expect((await revoke(harness, tokens.refresh_token)).status).toBe(200);
+    expect((await revoke(harness, tokens.refresh_token)).status).toBe(200);
+
+    const unknown = await revoke(harness, "never-issued");
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toEqual({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^That token was never issued\./),
+    });
   });
 
   it("keeps the connection through a reset, the way an app stays connected while data changes", async () => {
