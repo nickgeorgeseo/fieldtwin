@@ -53,9 +53,13 @@ export function requestIdFor(entity: string, body: string): string {
   return createHash("sha256").update(`${entity}\n${body}`).digest("hex").slice(0, 40);
 }
 
-/** A query value in quotes, with apostrophes escaped as the query docs show: 'Adam\'s Candy Shop'. */
+/**
+ * A query value in quotes, with apostrophes escaped as the query docs show: 'Adam\'s Candy Shop'. The backslash is
+ * the escape character, so a backslash in the value is escaped first: unescaped, it would swallow the character
+ * after it ('Smith \ Sons' looks for "Smith  Sons"), or the closing quote ('Acme\', which QuickBooks can't parse).
+ */
 export function quoted(value: string): string {
-  return `'${value.replaceAll("'", "\\'")}'`;
+  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
 
 export function createQuickBooksClient(options: {

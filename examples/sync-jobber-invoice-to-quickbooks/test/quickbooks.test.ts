@@ -42,8 +42,17 @@ function once(match: (url: string, init?: RequestInit) => boolean, response: () 
 }
 
 describe("the QuickBooks client", () => {
-  it("quotes query values, escaping apostrophes the documented way", () => {
+  it("quotes query values, escaping apostrophes the documented way, and the backslash that escapes them", () => {
     expect(quoted("O'Brien's Plumbing")).toBe("'O\\'Brien\\'s Plumbing'");
+    expect(quoted("Acme\\")).toBe("'Acme\\\\'");
+  });
+
+  it("finds a customer by name, even one with a backslash in it", async () => {
+    const { qbo } = await connected();
+    for (const name of ["Smith \\ Sons", "Acme\\"]) {
+      const created = await books.createCustomer(qbo, { DisplayName: name });
+      expect((await books.findCustomerByName(qbo, name))?.Id).toBe(created.Id);
+    }
   });
 
   it("finds a customer by email, even one with an apostrophe in it", async () => {
