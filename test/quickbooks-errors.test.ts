@@ -43,6 +43,14 @@ describe("QuickBooks twin: error responses", () => {
     });
   });
 
+  it("answers a SyncToken sent as null with 2020, as one left out, not 5010: nobody changed the record", async () => {
+    const { qboPost } = setup();
+    expect(await firstError(await qboPost("/customer", { Id: "1", SyncToken: null, sparse: true, DisplayName: "Edit" }))).toMatchObject({
+      code: "2020",
+      element: "SyncToken",
+    });
+  });
+
   it("rejects a duplicate DisplayName with 6240, naming the customer that already has it", async () => {
     const { qboGet, qboPost } = setup();
     const { Customer: existing } = await (await qboGet("/customer/3")).json();

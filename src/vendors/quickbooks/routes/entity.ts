@@ -47,10 +47,11 @@ export async function readEntityBody<T>(c: Context, example: string, now: string
 
 /**
  * The quirk that breaks real integrations: you must send the SyncToken you last read.
- * If anyone changed the record since then, QuickBooks rejects the update with 5010.
+ * If anyone changed the record since then, QuickBooks rejects the update with 5010. A null SyncToken (Python's None)
+ * is one not sent: answering it 5010 would send a client that re-reads and retries chasing a conflict that isn't there.
  */
 export function checkSyncToken(existing: Versioned, body: UpdateBody<unknown>, now: string): QboFault | undefined {
-  if (body.SyncToken === undefined) return qboErrors.missingField("SyncToken", now);
+  if (body.SyncToken === undefined || body.SyncToken === null) return qboErrors.missingField("SyncToken", now);
   if (String(body.SyncToken) !== existing.SyncToken) return qboErrors.staleObject(now);
   return undefined;
 }
