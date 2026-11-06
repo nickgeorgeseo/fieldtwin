@@ -176,6 +176,11 @@ describe("which vendors a recording covers", () => {
     expect(elsewhere.target.housecallpro.apiBase).toBe("http://localhost:4010/housecallpro");
   });
 
+  it("takes a QBO_API_BASE written with a trailing slash, as it takes HOUSECALLPRO_API_URL", () => {
+    const { target } = sandboxTarget({ QBO_ACCESS_TOKEN: "t", QBO_REALM_ID: "1", QBO_API_BASE: "http://localhost:4010/v3/" });
+    expect(target.quickbooks.apiBase).toBe("http://localhost:4010/v3");
+  });
+
   it("says what each vendor needs when nothing is set", () => {
     expect(() => sandboxTarget({})).toThrow(
       /QBO_ACCESS_TOKEN and QBO_REALM_ID .*JOBBER_ACCESS_TOKEN .*HOUSECALLPRO_API_KEY \(a Housecall Pro/,

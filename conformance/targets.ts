@@ -142,7 +142,8 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
       );
     }
   }
-  const quickbooksApiBase = env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase;
+  // Paths follow it after a slash of their own, so a trailing one would make .../v3//company/..., which nothing serves.
+  const quickbooksApiBase = (env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase).replace(/\/+$/, "");
   // Cases write test records. URL hostnames ignore case and anything before an @, so compare the parsed hostname, and
   // without the trailing dot of a fully qualified name, which reaches the same host but stays in the parsed hostname.
   if (vendors.includes("quickbooks") && hostnameOf(quickbooksApiBase)?.replace(/\.+$/, "") === "quickbooks.api.intuit.com") {
