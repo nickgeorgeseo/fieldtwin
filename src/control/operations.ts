@@ -101,9 +101,14 @@ export async function runAction(twin: Twin, vendorName: string, action: string, 
 /**
  * Mark this moment, to list or rewind what happens after it. An empty name is refused: the log export over HTTP reads
  * `?since=` as no checkpoint at all, so every adapter does, and a checkpoint named "" could never be exported from.
+ * "." and ".." are refused for the same reason: a URL reads them as "this folder" and "the folder above", even written
+ * %2E, so POST /_twin/checkpoints/./rewind reaches /_twin/checkpoints/rewind and makes a checkpoint named "rewind".
  */
 export function createCheckpoint(twin: Twin, name: string) {
   if (name === "") throw new Error('A checkpoint needs a name, like "before-sync".');
+  if (name === "." || name === "..") {
+    throw new Error(`A checkpoint can't be named "${name}": a URL can't carry it. Pick another name, like "before-sync".`);
+  }
   return twin.checkpoint(name);
 }
 

@@ -68,6 +68,15 @@ describe("the twin's client", async () => {
     expect(refusal).toMatchObject({ status: 400, message: expect.stringContaining("never-taken") });
   });
 
+  it("refuses a checkpoint named . or .., which a URL can't carry, rather than reaching another route", async () => {
+    for (const name of [".", ".."]) {
+      for (const call of [() => twin.checkpoint(name), () => twin.changes(name), () => twin.rewind(name)]) {
+        await expect(call()).rejects.toMatchObject({ name: "TwinError", status: 400, message: expect.stringContaining(`"${name}"`) });
+      }
+    }
+    expect((await twin.status()).checkpoints).toEqual([]);
+  });
+
   it("follows the log from a position, and says when its history is gone", async () => {
     const all = await twin.log();
     expect(all.events.length).toBeGreaterThan(100);

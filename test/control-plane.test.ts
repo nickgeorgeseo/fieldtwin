@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.ts";
 import { controlRoutes } from "../src/control/http.ts";
+import * as ops from "../src/control/operations.ts";
 import { jobberTwin } from "../src/vendors/jobber/index.ts";
 import { setup } from "./helpers.ts";
 
@@ -44,6 +45,12 @@ describe("control-plane mistakes", () => {
     expect(status).toBe(400);
     expect(error).toContain(says);
     expect(error).not.toMatch(/Cannot read properties|Unexpected end of JSON input$/);
+  });
+
+  it.each([".", ".."])("refuses a checkpoint named %j in every adapter, since its URL would reach another route", (name) => {
+    const { twin } = setup();
+    expect(() => ops.createCheckpoint(twin, name)).toThrow(`A checkpoint can't be named "${name}"`);
+    expect(ops.describeTwin(twin).checkpoints).toEqual([]);
   });
 
   it.each([

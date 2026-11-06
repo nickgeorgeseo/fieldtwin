@@ -123,9 +123,9 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
     scenarios: () => json("GET", "/scenarios"),
     advance: ({ minutes = 0, hours = 0, days = 0 }) =>
       json("POST", "/clock/advance", { json: { minutes: minutes + hours * 60 + days * 1440 } }),
-    runAction: (vendor, action, params) => json("POST", `/actions/${segment(vendor)}/${segment(action)}`, { json: params }),
+    runAction: async (vendor, action, params) => json("POST", `/actions/${segment(vendor)}/${segment(action)}`, { json: params }),
     vendors: () => json("GET", "/vendors"),
-    checkpoint: (name) => json("POST", `/checkpoints/${segment(name)}`),
+    checkpoint: async (name) => json("POST", `/checkpoints/${segment(name)}`),
     changes: async (checkpoint, filter = {}) => {
       const query = new URLSearchParams();
       if (filter.source) query.set("source", filter.source);
@@ -135,7 +135,7 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
         (change) => (!filter.vendor || change.vendor === filter.vendor) && (!filter.type || change.type === filter.type),
       ) as never;
     },
-    rewind: (checkpoint) => json("POST", `/checkpoints/${segment(checkpoint)}/rewind`),
+    rewind: async (checkpoint) => json("POST", `/checkpoints/${segment(checkpoint)}/rewind`),
     log: async ({ since, after } = {}) => {
       const query = new URLSearchParams();
       if (since) query.set("since", since);
@@ -153,8 +153,15 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
   };
 }
 
-/** A name in a path, so a checkpoint called "a/b" or "50%" is still one segment. */
+/**
+ * A name in a path, so a checkpoint called "a/b" or "50%" is still one segment. "." and ".." can't be one, even encoded:
+ * the URL parser drops them, so rewind(".") would reach POST /_twin/checkpoints/rewind. They are refused here, before
+ * anything is sent, as the twin refuses them as checkpoint names.
+ */
 function segment(name: string): string {
+  if (name === "." || name === "..") {
+    throw new TwinError(`"${name}" can't be sent as a name in a URL: the URL would reach another route. Pick another name.`, 400);
+  }
   return encodeURIComponent(name);
 }
 
