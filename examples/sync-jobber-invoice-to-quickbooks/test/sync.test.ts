@@ -3,6 +3,7 @@ import { createApp } from "../../../src/app.ts";
 import { createCheckpoint, listChanges, loadScenario } from "../../../src/control/operations.ts";
 import type { JobberState } from "../../../src/vendors/jobber/types.ts";
 import type { QboState } from "../../../src/vendors/quickbooks/types.ts";
+import { syncPaidInvoices } from "../src/sync.ts";
 import { EVER, syncHarness } from "./harness.ts";
 
 const MINUTE = 60_000;
@@ -40,6 +41,35 @@ describe("syncing paid Jobber invoices into QuickBooks", () => {
     }
     const payments = [...after.qbo.payments.values()].filter((payment) => payment.PaymentRefNum?.startsWith("JOBBER-"));
     expect(payments).toHaveLength(missing + open);
+  });
+
+  it("dates each invoice on the company's own day, as the bookkeeper does, though Jobber's timestamps are UTC", async () => {
+    const target = createApp({ seed: 1, auth: "oauth" });
+    const offsetMs = target.twin.world.company.utcOffsetHours * 3_600_000;
+    const companyDay = (dateTime: string) => new Date(Date.parse(dateTime) + offsetMs).toISOString().slice(0, 10);
+    const before = snapshot(target);
+    const evening = before.paid.filter(
+      (invoice) => !before.booked(invoice.invoiceNumber).length && companyDay(invoice.issuedDate) !== invoice.issuedDate.slice(0, 10),
+    );
+    expect(evening.length).toBeGreaterThan(0); // issued after midnight UTC, still the evening before at the company
+
+    expect(await (await syncHarness(target)).sync(EVER)).toMatchObject({ failed: 0 });
+    const after = snapshot(target);
+    for (const invoice of after.paid) {
+      const booked = after.booked(invoice.invoiceNumber)[0];
+      expect(booked).toMatchObject({ TxnDate: companyDay(invoice.issuedDate), DueDate: companyDay(invoice.dueDate) });
+    }
+  });
+
+  it("refuses a time zone it doesn't know before writing anything, and says what to pass", async () => {
+    const target = createApp({ seed: 1, auth: "oauth" });
+    const harness = await syncHarness(target);
+    createCheckpoint(target.twin, "before");
+
+    await expect(syncPaidInvoices({ ...harness.clients, timeZone: "America/Chicgo" }, EVER)).rejects.toThrow(
+      'Pass the company\'s IANA zone, like "America/Chicago"',
+    );
+    expect(listChanges(target.twin, "before", { onlyFromApi: true })).toEqual([]);
   });
 
   it("changes nothing when it runs again", async () => {

@@ -20,8 +20,7 @@ async function subscribedSync(scenario?: string) {
   const target = createApp({ seed: 42, auth: "oauth", sendWebhook: (url, init) => handle(new Request(url, init)) });
   if (scenario) loadScenarioByName(target.twin, scenario);
   const harness = await syncHarness(target);
-  const clients = { jobber: harness.jobber, quickbooks: harness.quickbooks, log: harness.runtime.log };
-  const queue = new InvoiceQueue((invoiceId) => syncPaidInvoice(clients, invoiceId), harness.runtime.log);
+  const queue = new InvoiceQueue((invoiceId) => syncPaidInvoice(harness.clients, invoiceId), harness.runtime.log);
   handle = jobberWebhookHandler({ clientSecret: JOBBER_APP.clientSecret, onEvent: (event) => queue.add(event) });
   setWebhooks(target.twin, [
     { vendor: "jobber", url: HOOK_URL, topics: ["INVOICE_UPDATE"], clientId: JOBBER_APP.clientId, clientSecret: JOBBER_APP.clientSecret },

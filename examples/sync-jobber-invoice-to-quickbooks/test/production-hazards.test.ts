@@ -20,8 +20,7 @@ describe("two syncs at the same moment", () => {
   it("book each invoice and its payment once, as the scheduled sync and a webhook's sync may", async () => {
     const target = createApp({ seed: 42, auth: "oauth" });
     const harness = await syncHarness(target);
-    const clients = { jobber: harness.jobber, quickbooks: harness.quickbooks, log: harness.runtime.log };
-    await Promise.all([syncPaidInvoices(clients, EVER), syncPaidInvoices(clients, EVER)]);
+    await Promise.all([syncPaidInvoices(harness.clients, EVER), syncPaidInvoices(harness.clients, EVER)]);
 
     const qbo = target.twin.state<QboState>("quickbooks");
     const docNumbers = [...qbo.invoices.values()].map((invoice) => invoice.DocNumber);
@@ -52,7 +51,7 @@ describe("a token endpoint that is down", () => {
     );
     const quickbooks = createQuickBooksClient({ apiBase: ENDPOINTS.quickbooks.apiBase, realmId: harness.realmId, tokens, runtime });
 
-    await expect(syncPaidInvoices({ jobber: harness.jobber, quickbooks, log: () => {} }, EVER)).rejects.toBeInstanceOf(TokenEndpointError);
+    await expect(syncPaidInvoices({ ...harness.clients, quickbooks, log: () => {} }, EVER)).rejects.toBeInstanceOf(TokenEndpointError);
     expect(tokenRequests).toBe(4); // one refresh, retried, for the first invoice; none for the rest
   });
 });

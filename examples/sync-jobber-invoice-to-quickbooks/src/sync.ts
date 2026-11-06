@@ -1,3 +1,4 @@
+import { companyDayIn } from "./company-day.ts";
 import type { JobberClient } from "./jobber.ts";
 import { fetchPaidInvoice, fetchPaidInvoicesSince, type JobberInvoice } from "./jobber-invoices.ts";
 import { type QuickBooksClient, QuickBooksError } from "./quickbooks.ts";
@@ -24,6 +25,7 @@ import { OAuthError, TokenEndpointError } from "./token-endpoint.ts";
 export interface SyncClients {
   jobber: JobberClient;
   quickbooks: QuickBooksClient;
+  timeZone: string; // the company's IANA time zone, which QuickBooks dates its transactions in (company-day.ts)
   log: (line: string) => void;
 }
 
@@ -44,6 +46,7 @@ export interface SyncContext extends SyncClients {
   stats: SyncStats;
   customers: Map<string, books.Customer>; // by Jobber client id, for this run
   items: Map<string, books.Item>; // by line item name, for this run
+  companyDay: (dateTime: string) => string; // YYYY-MM-DD at the company
 }
 
 export const stampFor = (invoiceNumber: string) => `Synced from Jobber invoice #${invoiceNumber}`;
@@ -77,7 +80,8 @@ export function emptyStats(): SyncStats {
 
 async function syncAll(clients: SyncClients, invoices: JobberInvoice[]): Promise<SyncStats> {
   const stats = { ...emptyStats(), invoices: invoices.length };
-  const context: SyncContext = { ...clients, stats, customers: new Map(), items: new Map() };
+  const companyDay = companyDayIn(clients.timeZone);
+  const context: SyncContext = { ...clients, stats, customers: new Map(), items: new Map(), companyDay };
   for (const invoice of invoices) {
     try {
       await syncInvoice(invoice, context);
@@ -122,8 +126,8 @@ async function ensureInvoice(invoice: JobberInvoice, customer: books.Customer, c
   const created = await books.createInvoice(quickbooks, {
     CustomerRef: { value: customer.Id },
     DocNumber: invoice.invoiceNumber,
-    ...(invoice.issuedDate && { TxnDate: dateOf(invoice.issuedDate) }),
-    ...(invoice.dueDate && { DueDate: dateOf(invoice.dueDate) }),
+    ...(invoice.issuedDate && { TxnDate: context.companyDay(invoice.issuedDate) }),
+    ...(invoice.dueDate && { DueDate: context.companyDay(invoice.dueDate) }),
     ...(invoice.client.email && { BillEmail: { Address: invoice.client.email } }),
     Line,
   });
@@ -174,9 +178,4 @@ async function stamp(booked: books.Invoice, invoiceNumber: string, context: Sync
       current = await books.readInvoice(quickbooks, current.Id);
     }
   }
-}
-
-/** Jobber sends date-times; QuickBooks transaction dates are YYYY-MM-DD. The date as Jobber wrote it. */
-function dateOf(dateTime: string): string {
-  return dateTime.slice(0, 10);
 }

@@ -4,7 +4,7 @@ import { TokenManager } from "../src/oauth.ts";
 import { createQuickBooksClient } from "../src/quickbooks.ts";
 import type { Runtime } from "../src/runtime.ts";
 import { syncPaidInvoices } from "../src/sync.ts";
-import { connectWithoutBrowser } from "../src/twin.ts";
+import { companyTimeZone, connectWithoutBrowser } from "../src/twin.ts";
 
 /**
  * Runs the integration against an in-process twin: requests go straight to the twin's Hono app, sleeping
@@ -62,7 +62,8 @@ export async function syncHarness(target: InProcessTwin, options: { requestIds?:
     runtime,
     newRequestId,
   });
-  return { ...connection, jobber, quickbooks, sync: (since: string) => syncPaidInvoices({ jobber, quickbooks, log: runtime.log }, since) };
+  const clients = { jobber, quickbooks, timeZone: await companyTimeZone(TWIN_URL, runtime.fetch), log: runtime.log };
+  return { ...connection, jobber, quickbooks, clients, sync: (since: string) => syncPaidInvoices(clients, since) };
 }
 
 /** The beginning of time, for a first run that syncs everything. */

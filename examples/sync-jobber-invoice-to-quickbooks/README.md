@@ -58,6 +58,7 @@ The demo then logs every retry (QuickBooks 429s wait 60 seconds, 503s back off, 
 | Answering a webhook in time | [`webhooks.ts`](src/webhooks.ts), [`invoice-queue.ts`](src/invoice-queue.ts) | Jobber allows [one second](https://developer.getjobber.com/docs/using_jobbers_api/setting_up_webhooks/): the handler only verifies and queues, and the sync runs in the background |
 | Losing the connection | [`invoice-queue.ts`](src/invoice-queue.ts) | An `OAuthError` pauses the webhook queue instead of failing every invoice or crashing the server. What hadn't synced stays queued, news keeps arriving, and `resume()` carries on once the person reconnects |
 | A token endpoint that is down | [`token-endpoint.ts`](src/token-endpoint.ts) | A 429, a 5xx, or no answer from the token endpoint, after retries, is a `TokenEndpointError`, not a lost connection: the run stops, nobody is asked to reconnect, and the API client doesn't retry the refresh all over again |
+| Dates in another time zone | [`company-day.ts`](src/company-day.ts) | Jobber's `issuedDate` and `dueDate` are UTC, and QuickBooks dates a transaction on the company's own calendar, so an invoice issued at 8 p.m. in Texas would be booked tomorrow. Each date is converted to the company's day first, the way the bookkeeper dates their own invoices |
 | Clocks that disagree | [`jobber-invoices.ts`](src/jobber-invoices.ts) | The scheduled sync reads again what changed in the ten minutes before its cutoff: your server's clock and Jobber's never agree exactly, and reading an invoice twice is harmless where missing one is not |
 | Prices finer than a cent | [`sales-lines.ts`](src/sales-lines.ts) | QuickBooks refuses a line whose Amount isn't Qty × UnitPrice to the cent (6070). A Jobber line that doesn't add up is booked at its total, with the pricing in its description, rather than failing every run |
 | Repeated and out-of-order webhooks | [`invoice-queue.ts`](src/invoice-queue.ts) | Queues invoice ids, not events, so news about an invoice already waiting is folded in, and reads each invoice as it is when its turn comes. A payment's two `INVOICE_UPDATE`s, redeliveries, and late arrivals all end in one booking |
@@ -70,8 +71,9 @@ Four things change, and none of them is in the sync itself:
 
 1. **Endpoints.** Use `VENDOR_ENDPOINTS` from [`endpoints.ts`](src/endpoints.ts) instead of `endpointsAt(twinUrl)`.
 2. **The runtime.** Use `systemRuntime()` from [`runtime.ts`](src/runtime.ts): real `fetch`, `setTimeout`, `Date.now`, and `Math.random`.
-3. **Connecting.** Send the person to the authorize URL with your `client_id`, `redirect_uri`, a random `state` tied to their session, and (for QuickBooks) `scope=com.intuit.quickbooks.accounting`. In your callback, check `state`, then call `exchangeCode(oauth, code, redirectUri, runtime)` from [`token-endpoint.ts`](src/token-endpoint.ts). Save the tokens, and QuickBooks' `realmId` from the callback.
-4. **Tokens and the schedule.** Load saved tokens into a `TokenManager` with an `onTokens` that saves them again. Run the sync on a schedule, passing the time the last clean run started:
+3. **The company's time zone.** Neither Jobber's `account` nor the QuickBooks entities the sync reads say which time zone the business is in, so ask for it (or take it from your own records of the business) when they connect, and save its IANA name, like `America/Chicago`. The sync passes it as `timeZone`; the demo reads the twin company's from the control plane.
+4. **Connecting.** Send the person to the authorize URL with your `client_id`, `redirect_uri`, a random `state` tied to their session, and (for QuickBooks) `scope=com.intuit.quickbooks.accounting`. In your callback, check `state`, then call `exchangeCode(oauth, code, redirectUri, runtime)` from [`token-endpoint.ts`](src/token-endpoint.ts). Save the tokens, and QuickBooks' `realmId` from the callback.
+5. **Tokens and the schedule.** Load saved tokens into a `TokenManager` with an `onTokens` that saves them again. Run the sync on a schedule, passing the time the last clean run started:
 
 ```ts
 const runtime = systemRuntime();
@@ -82,7 +84,7 @@ const jobberTokens = new TokenManager(jobberOAuth, await db.tokens("jobber"), ru
 // ...the same for QuickBooks, then createJobberClient and createQuickBooksClient as in main.ts
 
 const startedAt = new Date().toISOString();
-const stats = await syncPaidInvoices({ jobber, quickbooks, log: runtime.log }, await db.lastCleanRun());
+const stats = await syncPaidInvoices({ jobber, quickbooks, timeZone: await db.timeZone(), log: runtime.log }, await db.lastCleanRun());
 if (stats.failed === 0) await db.saveLastCleanRun(startedAt); // otherwise the next run tries those invoices again
 if (stats.conflicts > 0) alertTheBookkeeper(stats);
 ```
@@ -112,6 +114,6 @@ The tests in [`test/`](test/) run the code against an in-process twin with real 
 - **Sales tax.** The twin has none. If QuickBooks adds tax to an invoice, the totals differ, the sync logs it, and the tax stays open in the books.
 - **Edits after booking.** An invoice already in QuickBooks isn't updated when it changes in Jobber, and voids and refunds aren't synced.
 - **Server-side filtering.** Jobber's filter arguments aren't in the public docs, so every scheduled run pages through all invoices and filters them here. Webhooks avoid that for everything that happens while the app is subscribed.
-- **Dates.** `TxnDate` and `DueDate` are the date part of Jobber's timestamps, as Jobber wrote them.
+- **Dates.** `TxnDate` and `DueDate` are the company's own calendar day for Jobber's timestamps, in the `timeZone` you pass. A business that moves to another zone has its earlier invoices dated in the new one if they are synced after the move.
 
 Some behaviors the code depends on are the twin's best reading of the docs rather than confirmed facts, notably that applying a payment bumps an invoice's SyncToken. If real QuickBooks doesn't, the stamp simply succeeds the first time. [FIDELITY.md](../../FIDELITY.md) marks each one.

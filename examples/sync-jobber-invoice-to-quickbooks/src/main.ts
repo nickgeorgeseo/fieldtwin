@@ -9,7 +9,7 @@ import { createQuickBooksClient } from "./quickbooks.ts";
 import type { Fetch } from "./runtime.ts";
 import { type SyncStats, syncPaidInvoice, syncPaidInvoices } from "./sync.ts";
 import type { VendorOAuth } from "./token-endpoint.ts";
-import { connectWithoutBrowser, subscribeToWebhooks, twinAction, twinRuntime } from "./twin.ts";
+import { companyTimeZone, connectWithoutBrowser, subscribeToWebhooks, twinAction, twinRuntime } from "./twin.ts";
 import { jobberWebhookHandler } from "./webhooks.ts";
 
 /**
@@ -54,6 +54,7 @@ export async function runDemo(baseUrl: string, log: (line: string) => void = con
       tokens: new TokenManager(quickbooksOAuth, quickbooksConnection.tokens, runtime),
       runtime,
     }),
+    timeZone: await companyTimeZone(baseUrl, runtime.fetch), // in production, saved when the business connected
     log,
   };
 

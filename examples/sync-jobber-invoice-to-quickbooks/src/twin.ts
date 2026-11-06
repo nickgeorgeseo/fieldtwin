@@ -71,6 +71,18 @@ export async function twinRuntime(baseUrl: string, log: (line: string) => void, 
   return runtime;
 }
 
+/**
+ * The company's time zone, which production code saves when the business connects. The twin's company keeps a fixed
+ * UTC offset with no daylight saving, which is an IANA "Etc/GMT" zone, signed the POSIX way: UTC-5 is "Etc/GMT+5".
+ */
+export async function companyTimeZone(baseUrl: string, fetchImpl: Fetch): Promise<string> {
+  const response = await fetchImpl(`${baseUrl}/_twin`);
+  if (!response.ok) throw new Error(`The twin at ${baseUrl} answered HTTP ${response.status}: ${await response.text()}`);
+  const { utcOffsetHours } = ((await response.json()) as { company: { utcOffsetHours: number } }).company;
+  if (!Number.isInteger(utcOffsetHours)) throw new Error(`No Etc/GMT zone has the twin company's offset, UTC${utcOffsetHours}.`);
+  return utcOffsetHours === 0 ? "Etc/GMT" : `Etc/GMT${utcOffsetHours < 0 ? "+" : "-"}${Math.abs(utcOffsetHours)}`;
+}
+
 /** Subscribe to webhooks, as an app would in Jobber's Developer Center. An empty list unsubscribes. */
 export async function subscribeToWebhooks(baseUrl: string, fetchImpl: Fetch, subscriptions: object[]): Promise<void> {
   const response = await fetchImpl(`${baseUrl}/_twin/webhooks`, {
