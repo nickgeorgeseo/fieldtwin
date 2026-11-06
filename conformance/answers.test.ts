@@ -30,6 +30,24 @@ describe("recording a sandbox that sends the credential back", () => {
   );
 });
 
+describe("recording with a token fetch won't send", () => {
+  it("keeps the token out of a case's error, though the error fetch throws quotes the header", async () => {
+    const refusingTheHeader = fakeTarget(async (_, init) => {
+      throw new TypeError(`Headers.append: "${new Headers(init?.headers).get("Authorization")}" is an invalid header value.`);
+    });
+    const results = await observeAll(refusingTheHeader, CASES);
+    expect(JSON.stringify(results)).toContain("(the access token)");
+    expect(JSON.stringify(results)).toContain("(the API key)");
+    for (const credential of [
+      refusingTheHeader.quickbooks.accessToken,
+      refusingTheHeader.jobber.accessToken,
+      refusingTheHeader.housecallpro.apiKey,
+    ]) {
+      expect(JSON.stringify(results)).not.toContain(credential);
+    }
+  });
+});
+
 describe("answers that are never evidence", () => {
   const readMissing = caseNamed("quickbooks/read-missing-entity");
   const jobberSyntax = caseNamed("jobber/syntax-error");

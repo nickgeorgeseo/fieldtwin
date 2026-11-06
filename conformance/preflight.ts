@@ -1,4 +1,5 @@
 import { housecallpro, jobber, quickbooks, refuseUnrecordable, type Target, type Vendor } from "./case.ts";
+import { withoutCredentials } from "./run.ts";
 
 /**
  * Before recording anything, make sure each sandbox accepts its token and its URL is right. Tokens last an hour,
@@ -11,6 +12,7 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
     const answer = await reach(
       quickbooks(target, "GET", `companyinfo/${target.quickbooks.realmId}`, undefined, { anyAnswer: true }),
       "QuickBooks",
+      target,
       target.quickbooks.apiBase,
     );
     refuseUnrecordable("QuickBooks", answer, false);
@@ -27,7 +29,7 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
     }
   }
   if (vendors.includes("jobber")) {
-    const answer = await reach(jobber(target, "{ account { id } }", { anyAnswer: true }), "Jobber", target.jobber.apiUrl);
+    const answer = await reach(jobber(target, "{ account { id } }", { anyAnswer: true }), "Jobber", target, target.jobber.apiUrl);
     refuseUnrecordable("Jobber", answer, false);
     if (answer.status === 401 || answer.status === 403) {
       throw new Error(`Jobber refused JOBBER_ACCESS_TOKEN (HTTP ${answer.status}). Access tokens last an hour: get a fresh one.`);
@@ -39,7 +41,7 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
   if (vendors.includes("housecallpro")) {
     // "This API is available to any Pro on the MAX or XL Plan": https://docs.housecallpro.com/
     const { apiBase } = target.housecallpro;
-    const answer = await reach(housecallpro(target, "GET", "/company", undefined, { anyAnswer: true }), "Housecall Pro", apiBase);
+    const answer = await reach(housecallpro(target, "GET", "/company", undefined, { anyAnswer: true }), "Housecall Pro", target, apiBase);
     refuseUnrecordable("Housecall Pro", answer, false);
     if (answer.status === 401 || answer.status === 403) {
       throw new Error(
@@ -54,9 +56,10 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
   }
 }
 
-/** The answer, or an error naming the URL that couldn't be reached at all. */
-function reach<T>(answer: Promise<T>, vendor: string, url: string): Promise<T> {
+/** The answer, or an error naming the URL that couldn't be reached at all, and never the target's credentials. */
+function reach<T>(answer: Promise<T>, vendor: string, target: Target, url: string): Promise<T> {
   return answer.catch((error: Error) => {
-    throw new Error(`Couldn't reach ${vendor} at ${url} (${error.message}). Check the URL and your connection.`);
+    const why = withoutCredentials(target, error.message);
+    throw new Error(`Couldn't reach ${vendor} at ${url} (${why}). Check the URL and your connection.`);
   });
 }

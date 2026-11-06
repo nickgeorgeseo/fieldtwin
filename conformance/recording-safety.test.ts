@@ -93,6 +93,15 @@ describe("recording against a sandbox it can't reach", () => {
       "Couldn't reach QuickBooks at https://sandbox-quickbooks.api.intuit.com/v3 (fetch failed)",
     );
   });
+
+  it("never repeats the token, though the error it names quotes the header it was sent in", async () => {
+    const refusingTheHeader = fakeTarget(async (_, init) => {
+      throw new TypeError(`Headers.append: "${new Headers(init?.headers).get("Authorization")}" is an invalid header value.`);
+    });
+    const checked = checkTokens(refusingTheHeader, ["quickbooks"]);
+    await expect(checked).rejects.toThrow("(the access token)");
+    await expect(checked).rejects.not.toThrow(refusingTheHeader.quickbooks.accessToken);
+  });
 });
 
 describe("what the conformance command was asked to do", () => {
@@ -139,6 +148,15 @@ describe("what the recorder says before it runs", () => {
 });
 
 describe("which vendors a recording covers", () => {
+  it.each(["QBO_ACCESS_TOKEN", "JOBBER_ACCESS_TOKEN", "HOUSECALLPRO_API_KEY"])(
+    "refuses a %s with a line break in it, naming the variable but never repeating its value",
+    (name) => {
+      const env = { ...(name === "QBO_ACCESS_TOKEN" && { QBO_REALM_ID: "1" }), [name]: "eyJpart-one\neyJpart-two" };
+      expect(() => sandboxTarget(env)).toThrow(`${name} has a space, a line break, or a character outside ASCII`);
+      expect(() => sandboxTarget(env)).not.toThrow("eyJpart");
+    },
+  );
+
   it("names the missing variable when only part of QuickBooks' settings are given, instead of quietly skipping it", () => {
     expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", JOBBER_ACCESS_TOKEN: "j" })).toThrow("QBO_REALM_ID");
     expect(() => sandboxTarget({ QBO_REALM_ID: "1" })).toThrow("QBO_ACCESS_TOKEN");

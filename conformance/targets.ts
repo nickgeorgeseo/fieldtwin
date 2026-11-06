@@ -133,6 +133,15 @@ export function sandboxTarget(env: NodeJS.ProcessEnv): { target: Target; vendors
         "HOUSECALLPRO_API_KEY (a Housecall Pro account on the MAX or XL plan, by API key), or any of them together.",
     );
   }
+  // Each goes in a header, where fetch refuses a line break (say, from a wrapped copy) with an error quoting the whole
+  // header, token and all. Refused here by name instead, so the value never reaches the console.
+  for (const name of ["QBO_ACCESS_TOKEN", "JOBBER_ACCESS_TOKEN", "HOUSECALLPRO_API_KEY"] as const) {
+    if (env[name] && !/^[\x21-\x7e]+$/.test(env[name])) {
+      throw new Error(
+        `${name} has a space, a line break, or a character outside ASCII, which no token or key has. Copy it again, as one line.`,
+      );
+    }
+  }
   const quickbooksApiBase = env.QBO_API_BASE ?? SANDBOX_DEFAULTS.quickbooksApiBase;
   // Cases write test records. URL hostnames ignore case and anything before an @, so compare the parsed hostname, and
   // without the trailing dot of a fully qualified name, which reaches the same host but stays in the parsed hostname.

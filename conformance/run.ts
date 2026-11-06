@@ -10,10 +10,23 @@ export async function observeAll(target: Target, cases: ConformanceCase[]): Prom
     try {
       results[caseId(testCase)] = await testCase.observe(target);
     } catch (error) {
-      results[caseId(testCase)] = { error: error instanceof Error ? error.message : String(error) };
+      results[caseId(testCase)] = { error: withoutCredentials(target, error instanceof Error ? error.message : String(error)) };
     }
   }
   return results;
+}
+
+/**
+ * `text` with the target's tokens and key replaced by what they are. An error can quote a request's headers (fetch
+ * does, for a header it won't send), and errors reach the console, where no token or key may.
+ */
+export function withoutCredentials(target: Target, text: string): string {
+  const credentials: [string, string][] = [
+    [target.quickbooks.accessToken, "(the access token)"],
+    [target.jobber.accessToken, "(the access token)"],
+    [target.housecallpro.apiKey, "(the API key)"],
+  ];
+  return credentials.reduce((redacted, [credential, label]) => (credential ? redacted.replaceAll(credential, label) : redacted), text);
 }
 
 export interface Comparison {
