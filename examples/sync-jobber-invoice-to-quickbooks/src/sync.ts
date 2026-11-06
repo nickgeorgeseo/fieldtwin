@@ -30,7 +30,7 @@ export interface SyncClients {
 export interface SyncStats {
   invoices: number; // paid Jobber invoices changed since `since`
   customersCreated: number;
-  customersSpelledDifferently: number; // matched by email, with a different name in the books; left as is
+  customersSpelledDifferently: number; // matched by email, or by name in other letter case, spelled differently in the books; left as is
   customersReactivated: number; // inactive in the books, made active again to book new work
   invoicesCreated: number;
   paymentsCreated: number;

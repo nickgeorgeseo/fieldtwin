@@ -149,4 +149,21 @@ describe("syncing, where the books need a person's judgment", () => {
     const customer = qbo().customers.get(booked(invoice.invoiceNumber)[0]!.CustomerRef.value)!;
     expect(customer.DisplayName).toBe(`${client.firstName} ${client.lastName}`);
   });
+
+  it("says a client with no email matched by a name in other letter case matched by name, not by email", async () => {
+    const { target, jobber, qbo, firstPaidMissingFromBooks } = twinWithBooks();
+    const client = jobber().clients.get(firstPaidMissingFromBooks().clientId)!;
+    const shouted = { ...client, firstName: client.firstName.toUpperCase(), emails: [] };
+    target.twin.record({ vendor: "jobber", type: "ClientCreated", data: { client: shouted } }, "control");
+    const customersBefore = qbo().customers.size;
+    const harness = await syncHarness(target);
+
+    const stats = await harness.sync(EVER);
+    expect(stats).toMatchObject({ customersCreated: 0, customersSpelledDifferently: 1, failed: 0 });
+    expect(qbo().customers.size).toBe(customersBefore);
+    const matched = harness.lines.filter((line) => line.includes("Matched, and left as the books have it"));
+    expect(matched).toEqual([
+      `Customer "${shouted.firstName} ${client.lastName}" is "${client.firstName} ${client.lastName}" in QuickBooks (same name, in other letter case). Matched, and left as the books have it.`,
+    ]);
+  });
 });

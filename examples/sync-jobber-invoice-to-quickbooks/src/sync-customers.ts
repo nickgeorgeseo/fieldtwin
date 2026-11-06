@@ -8,8 +8,9 @@ import type { SyncContext } from "./sync.ts";
  * Match by email first: names drift between systems (typos, alternate spellings, "Bob" for "Robert"), while the
  * email address stays the same. A customer the books spell differently is matched and left alone, because the
  * books belong to the bookkeeper; the sync only says so in the log. Only a client with no email is matched by
- * exact name. Anyone not found is created, so customers who exist only in Jobber reach the books. Customers the
- * bookkeeper made inactive are found too, and stay inactive until a write needs them (ensureActive).
+ * name, which QuickBooks compares without regard to case. Anyone not found is created, so customers who exist
+ * only in Jobber reach the books. Customers the bookkeeper made inactive are found too, and stay inactive until a
+ * write needs them (ensureActive).
  */
 export async function ensureCustomer(client: JobberInvoiceClient, context: SyncContext): Promise<books.Customer> {
   const known = context.customers.get(client.id);
@@ -25,8 +26,10 @@ async function findCustomer(client: JobberInvoiceClient, { quickbooks, stats, lo
   const found = email ? await books.findCustomerByEmail(quickbooks, email) : await books.findCustomerByName(quickbooks, name);
   // A name the sync gave the customer itself, when createCustomer found the plain one taken, is not drift.
   if (found && found.DisplayName !== name && !(email && found.DisplayName === books.nameWithEmail(name, email))) {
+    // Queries compare text without regard to case, so a name match can still differ in letter case.
+    const how = email ? "same email" : "same name, in other letter case";
     stats.customersSpelledDifferently++;
-    log(`Customer "${client.name}" is "${found.DisplayName}" in QuickBooks (same email). Matched, and left as the books have it.`);
+    log(`Customer "${client.name}" is "${found.DisplayName}" in QuickBooks (${how}). Matched, and left as the books have it.`);
   }
   return found;
 }
