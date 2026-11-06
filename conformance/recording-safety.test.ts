@@ -27,6 +27,12 @@ describe("recording against a sandbox", () => {
     await expect(checkTokens(sandboxAnswering(404), ["quickbooks"])).rejects.toThrow("QBO_API_BASE");
   });
 
+  it("stops when something other than QuickBooks answers the QuickBooks base URL with a 200, rather than recording it", async () => {
+    await expect(checkTokens(sandboxAnswering(200, { status: "ok" }), ["quickbooks"])).rejects.toThrow("QBO_API_BASE");
+    const devServer = fakeTarget(async () => new Response("<html>a dev server</html>", { status: 200 }));
+    await expect(checkTokens(devServer, ["quickbooks"])).rejects.toThrow("QBO_API_BASE");
+  });
+
   it("stops before recording a Housecall Pro account that refuses its API key, and says which accounts have keys", async () => {
     await expect(checkTokens(sandboxAnswering(401, { message: "Unauthorized" }), ["housecallpro"])).rejects.toThrow(
       "Housecall Pro refused HOUSECALLPRO_API_KEY (HTTP 401). Use one of the account's API keys: the API is for Pros on the MAX or XL plan",

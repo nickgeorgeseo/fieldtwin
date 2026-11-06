@@ -22,9 +22,11 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
         `QuickBooks refused QBO_ACCESS_TOKEN (HTTP ${status}). Access tokens last an hour: get a fresh one, for the sandbox company in QBO_REALM_ID.`,
       );
     }
-    if (status !== 200) {
+    // A 200 alone could be a dev server or a proxy that answers everything: QuickBooks answers with the CompanyInfo.
+    // https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/companyinfo
+    if (status !== 200 || typeof answer.body?.CompanyInfo !== "object" || answer.body.CompanyInfo === null) {
       throw new Error(
-        `QuickBooks answered HTTP ${status} to reading CompanyInfo. Check QBO_API_BASE (${target.quickbooks.apiBase}) and QBO_REALM_ID.`,
+        `QuickBooks didn't answer reading CompanyInfo with the company (HTTP ${status}). Check QBO_API_BASE (${target.quickbooks.apiBase}) and QBO_REALM_ID.`,
       );
     }
   }
