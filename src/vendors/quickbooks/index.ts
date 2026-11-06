@@ -2,7 +2,7 @@ import type { VendorTwin } from "../../core/vendor-twin.ts";
 import { qboErrorForStatus } from "./errors.ts";
 import { describeQboEvent } from "./events.ts";
 import { quickbooksRoutes } from "./routes/index.ts";
-import { seedQuickBooks } from "./seed.ts";
+import { seedQuickBooks, TWIN_REALM_ID } from "./seed.ts";
 import { applyQboEvent, createQboState } from "./state.ts";
 import type { QboState } from "./types.ts";
 import { quickbooksWebhooks } from "./webhooks.ts";
@@ -16,5 +16,6 @@ export const quickbooksTwin: VendorTwin<QboState> = {
   seed: seedQuickBooks,
   routes: quickbooksRoutes,
   webhooks: quickbooksWebhooks,
+  startHere: (origin) => ({ baseUrl: origin, realmId: TWIN_REALM_ID, try: `GET ${origin}/v3/company/${TWIN_REALM_ID}/customer/1` }),
   errorBody: (status, message, twin) => qboErrorForStatus(status, message, twin.clock.nowIso()),
 };

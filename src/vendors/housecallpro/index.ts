@@ -19,6 +19,7 @@ export const housecallproTwin: VendorTwin<HcpState> = {
   routes: housecallproRoutes,
   scenarioActions: housecallproScenarioActions,
   webhooks: housecallproWebhooks,
+  startHere: (origin) => ({ baseUrl: `${origin}${HCP}`, try: `GET ${origin}${HCP}/company`, headers: { Authorization: "Token dev" } }),
   errorBody: hcpErrorForStatus,
   errorHeaders: (status, twin) => hcpErrorHeaders(status, twin.clock.nowMs()),
 };

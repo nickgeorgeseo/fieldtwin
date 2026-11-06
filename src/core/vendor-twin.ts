@@ -39,6 +39,12 @@ export interface VendorTwin<State = unknown> {
   /** HTTP routes shaped like the vendor's real API, mounted at the server root. */
   routes(twin: Twin): Hono;
 
+  /**
+   * Where to begin with this vendor, for GET / at `origin` (the twin's own address): its base URL, a request to try,
+   * and any header it needs. Shown to whoever opens the twin in a browser first.
+   */
+  startHere(origin: string): Record<string, unknown>;
+
   /** An error body in the vendor's own format, so injected faults look real and the twin's own bugs stay readable. */
   errorBody(status: number, message: string, twin: Twin): unknown;
 

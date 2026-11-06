@@ -9,9 +9,7 @@ import { faultMiddleware } from "./faults/fault-middleware.ts";
 import { webhookFaults } from "./faults/webhook-faults.ts";
 import { housecallproTwin } from "./vendors/housecallpro/index.ts";
 import { jobberTwin } from "./vendors/jobber/index.ts";
-import { ACTIVE_VERSIONS } from "./vendors/jobber/versions.ts";
 import { quickbooksTwin } from "./vendors/quickbooks/index.ts";
-import { TWIN_REALM_ID } from "./vendors/quickbooks/seed.ts";
 
 /** Every vendor twin this build serves. Adding a vendor = one import and one entry here. */
 export const ALL_VENDORS: VendorTwin[] = [quickbooksTwin, jobberTwin, housecallproTwin];
@@ -64,25 +62,20 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
 /** 413 for a body over the limit: in the vendor's own error format on its paths, so its SDKs can read it. */
 function answerTooLarge(twin: Twin, c: Context) {
   const message = "The request body is over the twin's 10 MB limit. No real request is that big: check what is being sent.";
-  const vendor = vendorAt(twin, c.req.path);
+  const vendor = vendorAt(c.req.path);
   return c.json((vendor ? vendor.errorBody(413, message, twin) : { error: message }) as object, 413);
 }
 
 /** The vendor whose API a path belongs to, if any. */
-function vendorAt(twin: Twin, path: string) {
-  return twin
-    .vendorNames()
-    .map((name) => twin.vendor(name))
-    .find((candidate) => path.startsWith(`${candidate.pathPrefix}/`));
+function vendorAt(path: string) {
+  return ALL_VENDORS.find((candidate) => path.startsWith(`${candidate.pathPrefix}/`));
 }
 
 /** What GET / answers: where everything is, for whoever opens the twin's address in a browser first. */
 function startHere(twin: Twin, origin: string) {
   return {
     fieldtwin: `${twin.world.company.name} is open for business`,
-    quickbooks: { baseUrl: origin, realmId: TWIN_REALM_ID, try: `GET ${origin}/v3/company/${TWIN_REALM_ID}/customer/1` },
-    jobber: { graphql: `POST ${origin}/api/graphql`, headers: { "X-JOBBER-GRAPHQL-VERSION": ACTIVE_VERSIONS[0] } },
-    housecallpro: { baseUrl: `${origin}/housecallpro`, try: `GET ${origin}/housecallpro/company`, headers: { Authorization: "Token dev" } },
+    ...Object.fromEntries(ALL_VENDORS.map((vendor) => [vendor.name, vendor.startHere(origin)])),
     auth:
       twin.authMode === "any-token"
         ? "Any bearer token works: Authorization: Bearer dev (and any Housecall Pro API key: Authorization: Token dev)"
@@ -100,7 +93,7 @@ export function answerUnexpectedErrors(twin: Twin): ErrorHandler {
   return (error, c) => {
     console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${error.stack ?? error.message}`);
     const message = "The twin hit an unexpected error. This is a bug in fieldtwin: the twin's log has the details.";
-    const vendor = vendorAt(twin, c.req.path);
+    const vendor = vendorAt(c.req.path);
     return c.json((vendor ? vendor.errorBody(500, message, twin) : { error: message }) as object, 500);
   };
 }

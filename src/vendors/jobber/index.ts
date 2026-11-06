@@ -5,6 +5,7 @@ import { jobberScenarioActions } from "./scenario-actions.ts";
 import { seedJobber } from "./seed.ts";
 import { applyJobberEvent, createJobberState } from "./state.ts";
 import type { JobberState } from "./types.ts";
+import { ACTIVE_VERSIONS } from "./versions.ts";
 import { jobberWebhooks } from "./webhooks.ts";
 
 export const jobberTwin: VendorTwin<JobberState> = {
@@ -17,6 +18,7 @@ export const jobberTwin: VendorTwin<JobberState> = {
   routes: jobberRoutes,
   scenarioActions: jobberScenarioActions,
   webhooks: jobberWebhooks,
+  startHere: (origin) => ({ graphql: `POST ${origin}/api/graphql`, headers: { "X-JOBBER-GRAPHQL-VERSION": ACTIVE_VERSIONS[0] } }),
   // Jobber's DDoS guard answers 429 with a plain HTTP error; other injected faults use GraphQL's error shape.
   errorBody: (status, message) => {
     if (status === 429) return { message: "Too Many Requests" };
