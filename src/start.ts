@@ -93,12 +93,13 @@ export function loadScenarioArgument(twin: Twin, argument: string | Scenario) {
   return loadScenario(twin, yaml);
 }
 
-const LOOPBACK = ["127.0.0.1", "localhost", "::1"];
-const EVERY_ADDRESS = ["0.0.0.0", "::"];
+const LOCALHOST = ["127.0.0.1", "localhost", "::1", "0.0.0.0", "::"];
 
 /** The URL to print for where the twin listens, and whether other machines can reach it there. */
 export function addressOf(hostname: string, port: number): { url: string; reachableByOthers: boolean } {
-  const local = LOOPBACK.includes(hostname) || EVERY_ADDRESS.includes(hostname);
-  const host = local ? "localhost" : hostname.includes(":") ? `[${hostname}]` : hostname;
-  return { url: `http://${host}:${port}`, reachableByOthers: !LOOPBACK.includes(hostname) };
+  // Hostnames ignore case, and all of 127.0.0.0/8 is the loopback, so FIELDTWIN_HOST=LOCALHOST or 127.0.0.2 is private too.
+  const name = hostname.toLowerCase();
+  const loopback = name === "localhost" || name === "::1" || /^127\.\d+\.\d+\.\d+$/.test(name);
+  const host = LOCALHOST.includes(name) ? "localhost" : hostname.includes(":") ? `[${hostname}]` : hostname;
+  return { url: `http://${host}:${port}`, reachableByOthers: !loopback };
 }

@@ -24,6 +24,8 @@ describe("the server", () => {
   it("prints an address that works for where it listens, and warns only when others can reach it", () => {
     expect(addressOf("127.0.0.1", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: false });
     expect(addressOf("::1", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: false });
+    expect(addressOf("LOCALHOST", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: false });
+    expect(addressOf("127.0.0.2", 4010)).toEqual({ url: "http://127.0.0.2:4010", reachableByOthers: false });
     expect(addressOf("0.0.0.0", 4010)).toEqual({ url: "http://localhost:4010", reachableByOthers: true });
     expect(addressOf("192.168.1.20", 4010)).toEqual({ url: "http://192.168.1.20:4010", reachableByOthers: true });
   });
