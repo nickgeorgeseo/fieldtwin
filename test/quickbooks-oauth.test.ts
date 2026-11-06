@@ -88,6 +88,17 @@ describe("QuickBooks OAuth twin", () => {
     expect(await noCode.json()).toEqual({ error: "invalid_request", error_description: expect.stringMatching(/^code is required/) });
   });
 
+  it("answers a code exchange without the redirect_uri it was authorized with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const code = new URL((await authorize(harness)).headers.get("Location")!).searchParams.get("code")!;
+    const response = await tokenRequest(harness, { grant_type: "authorization_code", code });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "redirect_uri is required with grant_type=authorization_code.",
+    });
+  });
+
   it("refuses a parameter sent twice, as OAuth forbids: 400 for a second redirect_uri, an invalid_request redirect otherwise", async () => {
     const harness = setup();
     const query = new URLSearchParams({ client_id: CLIENT.id, response_type: "code", redirect_uri: CLIENT.redirectUri, scope: "openid" });

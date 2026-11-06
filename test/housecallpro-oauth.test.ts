@@ -138,6 +138,17 @@ describe("Housecall Pro OAuth twin", () => {
     expect(await noCode.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^code/) });
   });
 
+  it("answers a code exchange without the redirect_uri it was authorized with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const code = codeFrom(await authorize(harness));
+    const response = await token(harness, { grant_type: "authorization_code", code, redirect_uri: "" });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "redirect_uri is required with grant_type=authorization_code.",
+    });
+  });
+
   it("refuses an authorization request that sends a parameter twice, as OAuth forbids (400 invalid_request)", async () => {
     const query = new URLSearchParams({ response_type: "code", client_id: CLIENT.id, redirect_uri: CLIENT.redirectUri });
     const response = await setup().app.request(`/housecallpro/oauth/authorize?${query}&redirect_uri=https%3A%2F%2Fevil.example.com%2Fcb`);

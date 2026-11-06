@@ -134,6 +134,17 @@ describe("Jobber OAuth twin", () => {
     expect((await reused.json()).error_description).toBe("The provided refresh token is not valid.");
   });
 
+  it("answers a code exchange without the redirect_uri it was authorized with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const code = codeFrom(await authorize(harness));
+    const response = await token(harness, { grant_type: "authorization_code", code });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "redirect_uri is required with grant_type=authorization_code.",
+    });
+  });
+
   it("answers a token request missing grant_type, or a refresh missing its refresh_token, with 400 invalid_request naming it", async () => {
     const harness = setup();
     const noGrantType = await token(harness, { refresh_token: "x" });

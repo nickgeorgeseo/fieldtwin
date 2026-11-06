@@ -90,13 +90,16 @@ const repeatedProblem = (name: string) => `${name} was sent more than once. Send
 
 /**
  * The token request parameter its grant needs but didn't get, if any. RFC 6749 5.2 answers a missing parameter
- * with invalid_request, keeping unsupported_grant_type and invalid_grant for values that were sent.
+ * with invalid_request, keeping unsupported_grant_type and invalid_grant for values that were sent. A code exchange
+ * needs redirect_uri too, since every twin's authorization request requires one (RFC 6749 4.1.3): without this, a
+ * client that forgot it would be told its code was issued to someone else.
  */
 export function missingGrantParameter(field: (name: string) => string): string | undefined {
   const grantType = field("grant_type");
   if (!grantType) return "grant_type is required: send authorization_code or refresh_token.";
-  const needs = grantType === "authorization_code" ? "code" : grantType === "refresh_token" ? "refresh_token" : undefined;
-  return needs && !field(needs) ? `${needs} is required with grant_type=${grantType}.` : undefined;
+  const needs = grantType === "authorization_code" ? ["code", "redirect_uri"] : grantType === "refresh_token" ? ["refresh_token"] : [];
+  const missing = needs.find((name) => !field(name));
+  return missing ? `${missing} is required with grant_type=${grantType}.` : undefined;
 }
 
 /**
