@@ -70,7 +70,8 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
   app.post("/v2/oauth2/tokens/revoke", async (c) => {
     const client = basicCredentials(c.req.header("Authorization"));
     if (!client) return c.json({ error: "invalid_client" }, 401);
-    const isJson = c.req.header("Content-Type")?.includes("json");
+    // The docs send JSON; a form works too. Media types are case-insensitive (RFC 9110 8.3.1).
+    const isJson = /application\/json/i.test(c.req.header("Content-Type") ?? "");
     const read = isJson ? await readJsonObject(c, '{"token": "..."}') : await readForm(c);
     if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
     const token = "body" in read ? read.body.token : read.form.token;

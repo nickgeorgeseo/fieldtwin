@@ -34,10 +34,10 @@ async function connect(harness: Harness) {
   return (await tokenRequest(harness, { grant_type: "authorization_code", code, redirect_uri: CLIENT.redirectUri })).json();
 }
 
-const revoke = (harness: Harness, token: string, authorization = basic()) =>
+const revoke = (harness: Harness, token: string, authorization = basic(), contentType = "application/json") =>
   harness.app.request("/v2/oauth2/tokens/revoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authorization },
+    headers: { "Content-Type": contentType, Authorization: authorization },
     body: JSON.stringify({ token }),
   });
 
@@ -151,6 +151,13 @@ describe("QuickBooks API with real token checks (auth: oauth)", () => {
     expect(other.status).toBe(400);
     expect(await other.json()).toEqual({ error: "invalid_request", error_description: expect.stringMatching(/another app/) });
     expect((await customerAs(harness, tokens.access_token)).status).toBe(200);
+  });
+
+  it("reads a revoke body as JSON whatever the case of its media type, as media types are case-insensitive", async () => {
+    const harness = setup(42, { auth: "oauth" });
+    const tokens = await connect(harness);
+    expect((await revoke(harness, tokens.refresh_token, basic(), "APPLICATION/JSON; charset=UTF-8")).status).toBe(200);
+    expect((await customerAs(harness, tokens.access_token)).status).toBe(401);
   });
 
   it("keeps the connection through a reset, the way an app stays connected while data changes", async () => {
