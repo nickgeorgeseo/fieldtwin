@@ -3,6 +3,7 @@ import { readJsonObject } from "../../../core/request-body.ts";
 import type { QboFault } from "../errors.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboEntityName, QboState } from "../types.ts";
+import { keepLongIntegers } from "../values.ts";
 
 /**
  * What every QuickBooks entity route shares: the company path, the SyncToken rule, and sparse vs full updates.
@@ -44,7 +45,7 @@ export function writeKind(
  * because the body is the client's: one with a property named Fault must still be read as a body, not an error.
  */
 export async function readEntityBody<T>(c: Context, example: string, now: string): Promise<{ body: UpdateBody<T> } | { fault: QboFault }> {
-  const read = await readJsonObject(c, example);
+  const read = await readJsonObject(c, example, keepLongIntegers);
   return "problem" in read ? { fault: qboErrors.invalidProperty(undefined, read.problem, now) } : { body: read.body as UpdateBody<T> };
 }
 

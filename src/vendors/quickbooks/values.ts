@@ -49,6 +49,17 @@ export function readOptionalNumber(
 }
 
 /**
+ * A JSON.parse reviver for write bodies. An integer JavaScript can't write back digit for digit (12345678901234567890
+ * comes back as 12345678901234567000, and 1e21 and up as "1e+21") is kept as the digits sent, so a text field reads
+ * every digit, as QuickBooks' own reader would. numberFrom reads those digits as the same number as before, so
+ * amounts and quantities don't change.
+ */
+export function keepLongIntegers(_key: string, value: unknown, context?: { source?: string }): unknown {
+  const source = context?.source;
+  return typeof value === "number" && source !== undefined && /^-?\d+$/.test(source) && String(value) !== source ? source : value;
+}
+
+/**
  * Text fields as QuickBooks' JSON reader takes them: a string as sent, a number as its digits. Anything else (an
  * object, a list) answers 2010 naming the field. Normalizes `fields` in place; the Fault, if any, is returned.
  */

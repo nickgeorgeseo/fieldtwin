@@ -5,11 +5,28 @@ import type { Context } from "hono";
  * so a developer can fix the request; each vendor answers it in its own error format.
  */
 
-/** The body as a JSON object, or what's wrong with it. `example` shows the shape the endpoint expects. */
-export async function readJsonObject(c: Context, example: string): Promise<{ body: Record<string, unknown> } | { problem: string }> {
+/** A JSON.parse reviver. `context.source` is the value's text as sent (Node 22 and up pass it for numbers). */
+export type JsonReviver = (key: string, value: unknown, context?: { source?: string }) => unknown;
+
+/**
+ * The body as a JSON object, or what's wrong with it. `example` shows the shape the endpoint expects; `reviver`, if
+ * given, reads each value as JSON.parse's does. A reviver recurses, so it runs out of stack on nesting a plain
+ * JSON.parse still reads; such a body is read without it, so the vendor still answers with what was wrong.
+ */
+export async function readJsonObject(
+  c: Context,
+  example: string,
+  reviver?: JsonReviver,
+): Promise<{ body: Record<string, unknown> } | { problem: string }> {
+  const text = await c.req.text();
   let body: unknown;
   try {
-    body = JSON.parse(await c.req.text());
+    try {
+      body = JSON.parse(text, reviver);
+    } catch (error) {
+      if (!reviver || !(error instanceof RangeError)) throw error;
+      body = JSON.parse(text);
+    }
   } catch (error) {
     return { problem: `The request body isn't valid JSON (${(error as Error).message}). Send a JSON object, like ${example}.` };
   }

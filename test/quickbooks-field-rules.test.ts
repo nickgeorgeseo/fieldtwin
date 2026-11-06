@@ -46,6 +46,34 @@ describe("QuickBooks twin: text fields", () => {
   });
 });
 
+describe("QuickBooks twin: long numbers in text fields", () => {
+  // Built by hand: JSON.stringify would write these numbers the way JavaScript reads them, digits lost.
+  const raw = (harness: Harness, path: string, json: string) =>
+    harness.app.request(`/v3/company/9341000000000001${path}`, {
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      body: json,
+    });
+  const line = JSON.stringify(sale(40));
+
+  it("keeps every digit of a number too long for JavaScript to hold exactly", async () => {
+    const harness = setup();
+    const invoiceBody = `{"CustomerRef": {"value": "1"}, "Line": [${line}], "DocNumber": 12345678901234567890}`;
+    expect((await (await raw(harness, "/invoice", invoiceBody)).json()).Invoice.DocNumber).toBe("12345678901234567890");
+    const paymentBody = '{"CustomerRef": {"value": "1"}, "TotalAmt": 5, "PaymentRefNum": 12345678901234567890}';
+    expect((await (await raw(harness, "/payment", paymentBody)).json()).Payment.PaymentRefNum).toBe("12345678901234567890");
+  });
+
+  it("counts a 22-digit DocNumber sent as a number by its 22 digits, past the 21 allowed (2050)", async () => {
+    const response = await raw(
+      setup(),
+      "/invoice",
+      `{"CustomerRef": {"value": "1"}, "Line": [${line}], "DocNumber": 1000000000000000000000}`,
+    );
+    expect(await faultOf(response)).toMatchObject({ code: "2050", element: "DocNumber" });
+  });
+});
+
 describe("QuickBooks twin: a customer's Active", () => {
   const everyone = (harness: Harness) =>
     harness.qboGet(`/query?query=${encodeURIComponent("select * from Customer where Active IN (true, false)")}`);
