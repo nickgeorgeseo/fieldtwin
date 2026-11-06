@@ -52,12 +52,14 @@ export const FAULT_PRESETS: { label: string; rule: FaultRule }[] = [
   },
   {
     // Customers only: a lost answer from the token endpoint would cost a client its rotated refresh token for good.
+    // Not their addresses either, which are created under /customers/:id/addresses.
     label: "Housecall Pro loses 1 in 10 answers after creating a customer (504)",
     rule: {
       name: "hcp-lost-customers",
       vendor: "housecallpro",
       method: "POST",
       pathIncludes: "/customers",
+      pathExcludes: "/addresses",
       rate: 0.1,
       effect: { status: 504, lostResponse: true },
     },

@@ -50,6 +50,15 @@ describe("the ready-made Housecall Pro fault rules", () => {
     assert.deepEqual(rule?.effect, { status: 504, lostResponse: true });
   });
 
+  it("leaves creating a customer's address alone, though its path is under /customers too", () => {
+    const rule = preset("hcp-lost-customers");
+    // As the twin matches a rule's path (src/faults/fault-middleware.ts), which the dashboard can't import.
+    const matches = (path: string) =>
+      (!rule?.pathIncludes || path.includes(rule.pathIncludes)) && (!rule?.pathExcludes || !path.includes(rule.pathExcludes));
+    assert.equal(matches("/housecallpro/customers"), true);
+    assert.equal(matches("/housecallpro/customers/cus_1/addresses"), false);
+  });
+
   it("gives every lost answer a status for the twin to answer with", () => {
     for (const { rule } of FAULT_PRESETS) {
       if (rule.effect.lostResponse) assert.equal(typeof rule.effect.status, "number", rule.name);
