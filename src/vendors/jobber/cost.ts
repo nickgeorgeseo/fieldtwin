@@ -1,6 +1,6 @@
 import type { DocumentNode, FieldNode, GraphQLNamedType, GraphQLSchema, SelectionSetNode } from "graphql";
-import { MAX_PAGE_SIZE } from "./resolvers/connection.ts";
-import { type Context, collectFields, fieldType, isConnection, operationOf, readInt, rootType } from "./selections.ts";
+import { PER_NODE_FIELDS, requestedSelectionCost } from "./requested-cost.ts";
+import { type Context, collectFields, fieldsOf, fieldType, isConnection, operationOf, rootType } from "./selections.ts";
 
 /**
  * Jobber's query cost, exactly as documented:
@@ -22,23 +22,14 @@ import { type Context, collectFields, fieldType, isConnection, operationOf, read
 /** The published budget: 10,000 points per app and account, restoring at 500 points per second. */
 export const COST_LIMITS = { capacity: 10_000, restorePerSecond: 500 };
 
-const PER_NODE_FIELDS = new Set(["nodes", "edges"]);
-
-/**
- * Nested page sizes multiply, and a few dozen levels of `first: 2147483647` overflow a double to Infinity, which
- * JSON writes as null and which a page size of 0 below it turns into NaN, a cost no throttle check refuses. Costs
- * stop at the largest whole number a double holds exactly: any query that reaches it costs more than the bucket.
- */
-const MAX_COST = Number.MAX_SAFE_INTEGER;
-
 export function requestedQueryCost(
   schema: GraphQLSchema,
   document: DocumentNode,
   variables: Record<string, unknown>,
   operationName?: string,
-): number {
+): number | undefined {
   const { operation, context } = operationOf(schema, document, variables, operationName);
-  return operation ? selectionCost(operation.selectionSet, rootType(schema, operation), 1, context) : 0;
+  return operation ? requestedSelectionCost(fieldsOf([operation.selectionSet], context), rootType(schema, operation), context) : 0;
 }
 
 export function actualQueryCost(
@@ -50,44 +41,6 @@ export function actualQueryCost(
 ): number {
   const { operation, context } = operationOf(schema, document, variables, operationName);
   return operation && data ? actualSelectionCost(operation.selectionSet, rootType(schema, operation), data, context) : 0;
-}
-
-// ---------------------------------------------------------------------------------------------------
-// requested cost: what the query could cost, before it runs
-
-function selectionCost(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, multiplier: number, context: Context): number {
-  let cost = 0;
-  for (const field of collectFields(selectionSet, context)) cost += fieldCost(field, parentType, multiplier, context);
-  return Math.min(cost, MAX_COST);
-}
-
-function fieldCost(field: FieldNode, parentType: GraphQLNamedType, multiplier: number, context: Context): number {
-  const type = fieldType(parentType, field);
-  if (!type) return 0; // __typename and other meta fields
-  if (!field.selectionSet) return multiplier; // a scalar or enum: 1 point
-  if (field.name.value === "node") return selectionCost(field.selectionSet, type, multiplier, context); // edge.node is free
-  if (!isConnection(type)) return multiplier + selectionCost(field.selectionSet, type, multiplier, context);
-
-  // The connection field is free. Per-node fields are multiplied by the page size; the rest are charged once.
-  const pageSize = requestedPageSize(field, context);
-  let cost = 0;
-  for (const child of collectFields(field.selectionSet, context)) {
-    const childType = fieldType(type, child);
-    cost +=
-      PER_NODE_FIELDS.has(child.name.value) && child.selectionSet && childType
-        ? selectionCost(child.selectionSet, childType, Math.min(multiplier * pageSize, MAX_COST), context)
-        : fieldCost(child, type, multiplier, context);
-  }
-  return Math.min(cost, MAX_COST);
-}
-
-function requestedPageSize(field: FieldNode, context: Context): number {
-  for (const name of ["first", "last"]) {
-    const argument = field.arguments?.find((candidate) => candidate.name.value === name);
-    const size = argument && readInt(argument.value, context.variables);
-    if (size !== undefined) return Math.max(0, size);
-  }
-  return MAX_PAGE_SIZE;
 }
 
 // ---------------------------------------------------------------------------------------------------

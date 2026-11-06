@@ -88,6 +88,62 @@ describe("Jobber twin: errors and ids", () => {
     expect(body.extensions.cost.actualQueryCost).toBe(3);
   });
 
+  it("prices a fragment spread under two aliases at every level at once, though the answer would double at each", async () => {
+    // The answer has 2^24 places, one per path of a: and b:, but they hold the same few selections, priced once each.
+    const chain = (first: number) =>
+      Array.from({ length: 24 }, (_, n) => {
+        const half = (alias: string) => `${alias}: jobs(first: ${first}) { nodes { client { ...F${n + 1} } } }`;
+        return `fragment F${n} on Client { ${half("a")} ${half("b")} }`;
+      }).join("\n");
+    const query = (first: number) =>
+      `{ client(id: "Z2lkOi8vSm9iYmVyL0NsaWVudC8x") { ...F0 } }\n${chain(first)}\nfragment F24 on Client { id }`;
+    const { jobber } = setup();
+    const started = performance.now();
+    const empty = await (await jobber(query(0))).json();
+    const doubling = await (await jobber(query(1))).json();
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(empty.extensions.cost.requestedQueryCost).toBe(1); // nothing under a page of 0 costs anything
+    expect(doubling.extensions.cost.requestedQueryCost).toBe(3 * 2 ** 24 - 1);
+    expect(doubling.errors[0].extensions.code).toBe("THROTTLED");
+  });
+
+  it("prices fragments that nest fields fifteen hundred levels deep at once, without running out of stack", async () => {
+    const { jobber } = setup();
+    const chain = Array.from(
+      { length: 1500 },
+      (_, n) => `fragment F${n} on Client { jobs(first: 2) { nodes { client { ...F${n + 1} } } } }`,
+    );
+    const started = performance.now();
+    const response = await jobber(
+      `{ client(id: "Z2lkOi8vSm9iYmVyL0NsaWVudC8x") { ...F0 } }\n${chain.join("\n")}\nfragment F1500 on Client { id }`,
+    );
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.extensions.cost.requestedQueryCost).toBe(Number.MAX_SAFE_INTEGER); // 2^1500 pages, stopped at the cap
+    expect(body.errors[0].extensions.code).toBe("THROTTLED");
+  });
+
+  it("answers a query whose fragments merge differently down every path with an error at once, not after hours of pricing", async () => {
+    // F's a: branch merges in a fresh G chain at every level, so each path down holds its own mix of G fragments:
+    // 2^16 different selections, each priced separately, with no shortcut that stays exact.
+    const half = (alias: string, inner: string) => `${alias}: jobs(first: 1) { nodes { client { ${inner} } } }`;
+    const fragments = Array.from({ length: 16 }, (_, n) => [
+      `fragment F${n} on Client { ${half("a", `...F${n + 1} ...G0`)} ${half("b", `...F${n + 1}`)} }`,
+      `fragment G${n} on Client { ${half("a", `...G${n + 1}`)} ${half("b", `...G${n + 1}`)} }`,
+    ]).flat();
+    const { jobber } = setup();
+    const started = performance.now();
+    const response = await jobber(
+      `{ client(id: "Z2lkOi8vSm9iYmVyL0NsaWVudC8x") { ...F0 } }\n${fragments.join("\n")}\nfragment F16 on Client { id }\nfragment G16 on Client { name }`,
+    );
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toBeUndefined();
+    expect(body.errors[0].message).toContain("too complex to price");
+  });
+
   it("rejects a variable that is not an EncodedId, in Jobber's documented error shape", async () => {
     const { jobber } = setup();
     const body = await (await jobber("query SampleQuery($id: EncodedId!) { client(id: $id) { id } }", { id: "1" })).json();

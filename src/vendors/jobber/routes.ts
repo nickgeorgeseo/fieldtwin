@@ -7,6 +7,7 @@ import type { Twin } from "../../core/twin.ts";
 import { actualQueryCost, COST_LIMITS, requestedQueryCost } from "./cost.ts";
 import { graphQLRequestFrom, prepare, schema } from "./graphql.ts";
 import { JOBBER_OAUTH_POLICY, jobberOAuthRoutes } from "./oauth.ts";
+import { PRICING_BUDGET } from "./requested-cost.ts";
 import { createResolvers } from "./resolvers/index.ts";
 import type { JobberState } from "./types.ts";
 import { resolveVersion } from "./versions.ts";
@@ -50,6 +51,11 @@ export function jobberRoutes(twin: Twin): Hono {
     // Jobber checks the requested cost against the bucket before running the query,
     // then deducts what the query actually cost once it has resolved.
     const requested = requestedQueryCost(schema, document, request.variables, request.operationName);
+    // A twin limit, not Jobber's (requested-cost.ts says why), answered like a query too deep to validate.
+    if (requested === undefined) {
+      const message = `The query is too complex to price: its fragments merge into more than ${PRICING_BUDGET.toLocaleString("en-US")} selections. Spread fragments under fewer aliases, or merge fewer of them into one field.`;
+      return c.json({ errors: [{ message }] });
+    }
     // Jobber budgets per app and account. The twin has one account, so the budget is the app's: every token
     // the OAuth twin issued to one client_id shares it (in any-token mode, an unknown token is its own app).
     const bucket = twin.rateLimit(`jobber:${auth.app}`, () => new LeakyBucket(COST_LIMITS));
