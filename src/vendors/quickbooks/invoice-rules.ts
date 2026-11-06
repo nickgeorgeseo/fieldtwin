@@ -109,8 +109,11 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
     if (typeof Qty === "object") return Qty;
     const UnitPrice = readOptionalNumber(detail.UnitPrice, "Line.SalesItemLineDetail.UnitPrice", "price", now);
     if (typeof UnitPrice === "object") return UnitPrice;
-    if (Qty !== undefined && UnitPrice !== undefined && !sameMoney(multiplyMoney(Qty, UnitPrice), Amount)) {
-      return qboErrors.amountMismatch(Amount, now);
+    // Multiplied as sent: a numeric string (or a JSON number kept as its text) can hold more digits than Qty and
+    // UnitPrice as numbers, and those digits can decide which side of half a cent the product falls.
+    if (Qty !== undefined && UnitPrice !== undefined) {
+      const product = multiplyMoney(detail.Qty as number | string, detail.UnitPrice as number | string);
+      if (!sameMoney(product, Amount)) return qboErrors.amountMismatch(Amount, now);
     }
 
     // An update keeps the Id of a line it sends back; new lines get new Ids. A second copy of a line (a client

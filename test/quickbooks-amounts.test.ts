@@ -94,6 +94,22 @@ describe("QuickBooks twin: amounts", () => {
     expect((await harness.qboPost("/invoice", priced(0, 0.01, 0.4999999))).status).toBe(200);
     expect(await faultOf(await harness.qboPost("/invoice", priced(10.01, 1, 10.004999999)))).toMatchObject({ code: "6070" });
   });
+
+  it("multiplies a price sent with more digits than a double holds as written: 1 × 10.00499999999999999 is 10.00", async () => {
+    const harness = setup();
+    const priced = (Amount: string, UnitPrice: string) => invoiceWith([line(Amount, { Qty: "1", UnitPrice })]);
+    expect((await harness.qboPost("/invoice", priced("10.00", "10.00499999999999999"))).status).toBe(200);
+    expect(await faultOf(await harness.qboPost("/invoice", priced("10.01", "10.00499999999999999")))).toMatchObject({ code: "6070" });
+    // A JSON number written the same way, which a double would read as 10.005.
+    const raw = `{"CustomerRef": {"value": "1"}, "Line": [{"DetailType": "SalesItemLineDetail", "Amount": 10.00,
+      "SalesItemLineDetail": {"ItemRef": {"value": "1"}, "Qty": 1, "UnitPrice": 10.00499999999999999}}]}`;
+    const response = await harness.app.request("/v3/company/9341000000000001/invoice", {
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      body: raw,
+    });
+    expect(response.status).toBe(200);
+  });
 });
 
 describe("money arithmetic", () => {
@@ -110,5 +126,8 @@ describe("money arithmetic", () => {
   it("multiplies exactly as the numbers were written, so a product just under half a cent rounds down", () => {
     expect([multiplyMoney(1, 10.004999999), multiplyMoney(0.01, 0.4999999), multiplyMoney(1.5, 110)]).toEqual([10, 0, 165]);
     expect([multiplyMoney(-2.5, 33.33), multiplyMoney(1e-7, 1e9), multiplyMoney(3, 0.335)]).toEqual([-83.33, 100, 1.01]);
+    expect([multiplyMoney("1", "10.00499999999999999"), multiplyMoney("-2.5", " 33.33 "), multiplyMoney("1E-7", 1e9)]).toEqual([
+      10, -83.33, 100,
+    ]);
   });
 });

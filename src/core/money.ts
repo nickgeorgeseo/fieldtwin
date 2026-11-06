@@ -24,25 +24,34 @@ export function sumMoney(amounts: readonly number[]): number {
  * quantity × unit price, rounded to the cent (1.5 hours at 110.00 is 165.00, never 164.99999; 400 at 0.0125 is 5.00).
  * Multiplied exactly, as the numbers were written: a floating-point product can land a hair either side of half a
  * cent, and 1 × 10.004999999 is just under it, so it rounds down to 10.00, where snapping the product would make 10.01.
+ * Either may be decimal text, as a client wrote it ("10.00499999999999999", more digits than a double holds).
  */
-export function multiplyMoney(quantity: number, unitPrice: number): number {
-  if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return Number.NaN;
+export function multiplyMoney(quantity: number | string, unitPrice: number | string): number {
   const a = writtenDecimal(quantity);
   const b = writtenDecimal(unitPrice);
+  if (!a || !b) return Number.NaN;
   const product = a.digits * b.digits; // in units of 10^-(a.scale + b.scale)
   const toCent = a.scale + b.scale - 2;
   const divisor = 10n ** BigInt(Math.max(0, toCent));
   const cents = toCent <= 0 ? product * 10n ** BigInt(-toCent) : (product + divisor / 2n) / divisor; // half a cent up
-  return fromCents(Math.sign(quantity) * Math.sign(unitPrice) * Number(cents));
+  return cents === 0n ? 0 : fromCents((a.negative === b.negative ? 1 : -1) * Number(cents));
 }
 
-/** |value| as the shortest decimal that reads back as it (33.33, not 33.3299999...): digits × 10^-scale. */
-function writtenDecimal(value: number): { digits: bigint; scale: number } {
-  const [mantissa = "0", exponent = "0"] = String(Math.abs(value)).split("e"); // 1e-7, 1e+21
+/**
+ * A value as the decimal it was written as: digits × 10^-scale. Text is read digit for digit, up to 40 either side
+ * of the point (past that, or with an exponent, as the number it reads as, so a huge exponent can't make huge
+ * BigInts). A number is read as the shortest decimal that reads back as it (33.33, not 33.3299999...).
+ */
+function writtenDecimal(value: number | string): { negative: boolean; digits: bigint; scale: number } | undefined {
+  if (typeof value === "string" && !/^\s*-?\d{1,40}(\.\d{1,40})?\s*$/.test(value)) return writtenDecimal(Number(value));
+  if (typeof value === "number" && !Number.isFinite(value)) return undefined;
+  const text = String(value).trim();
+  const [mantissa = "0", exponent = "0"] = text.replace(/^-/, "").split("e"); // 1e-7, 1e+21
   const [whole = "0", fraction = ""] = mantissa.split(".");
   const scale = fraction.length - Number(exponent);
   const digits = BigInt(whole + fraction);
-  return scale >= 0 ? { digits, scale } : { digits: digits * 10n ** BigInt(-scale), scale: 0 };
+  const negative = text.startsWith("-");
+  return scale >= 0 ? { negative, digits, scale } : { negative, digits: digits * 10n ** BigInt(-scale), scale: 0 };
 }
 
 /** Whether two amounts are equal to the cent. */
