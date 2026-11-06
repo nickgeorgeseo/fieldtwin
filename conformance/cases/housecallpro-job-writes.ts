@@ -93,17 +93,19 @@ export const housecallproJobWriteCases: ConformanceCase[] = [
         throw new Error("The new job never showed up among its customer's jobs, so this case can't tell how filters read times.");
       }
       // The filters too: the job's own start, written in UTC without an offset, finds it only if they read it as UTC.
-      // An hour later mustn't find it, or they weren't applied at all.
+      // A bound an hour past both readings mustn't find it, or they weren't applied at all. Past both, since a company
+      // ahead of UTC reads a bound just an hour later as hours earlier, which still finds the job.
       const unmarked = (ms: number) => new Date(ms).toISOString().slice(0, 19);
       const atStart = await customersJobsInclude(
         target,
         job.id,
         `&scheduled_start_min=${unmarked(start)}&scheduled_start_max=${unmarked(start)}`,
       );
-      const anHourLater = await customersJobsInclude(target, job.id, `&scheduled_start_min=${unmarked(start + 3_600_000)}`);
+      const pastBoth = unmarked(start + Math.abs(atCompany - asUtc) + 3_600_000);
+      const foundPastBoth = await customersJobsInclude(target, job.id, `&scheduled_start_min=${pastBoth}`);
       return {
         createdAs: start === asUtc ? "UTC" : start === atCompany ? "the company's time zone" : "other",
-        filteredAs: anHourLater ? "not filtered" : atStart ? "UTC" : "not UTC",
+        filteredAs: foundPastBoth ? "not filtered" : atStart ? "UTC" : "not UTC",
       };
     },
   },

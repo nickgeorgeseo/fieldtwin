@@ -27,30 +27,42 @@ describe("cases that make jobs", () => {
     expect(customers).toBe(1);
   });
 
+  /**
+   * A company in `timeZone` that reads times without an offset at `offset` (its clock in January), in writes and
+   * filters alike, unless it `ignoresFilters`.
+   */
+  const readingTimesAt = (timeZone: string, offset: string, ignoresFilters = false) => {
+    const local = (text: string) => Date.parse(`${text}${offset}`);
+    const jobs: { id: string; start: number }[] = [];
+    return account((url, init) => {
+      if (url.pathname === "/company") return { body: { id: "c", time_zone: timeZone } };
+      if (init?.method === "POST" && url.pathname === "/jobs") {
+        jobs.push({ id: `job_${jobs.length + 1}`, start: local(JSON.parse(String(init.body)).schedule.scheduled_start) });
+        return { status: 201, body: { id: jobs.at(-1)!.id, schedule: { scheduled_start: new Date(jobs.at(-1)!.start).toISOString() } } };
+      }
+      if (init?.method === "POST") return made(url);
+      const [min, max] = [url.searchParams.get("scheduled_start_min"), url.searchParams.get("scheduled_start_max")];
+      const within = (job: { start: number }) => (min === null || job.start >= local(min)) && (max === null || job.start <= local(max));
+      return { body: { jobs: ignoresFilters ? jobs : jobs.filter(within) } };
+    });
+  };
+
   it("tell a time without an offset read on the company's clock from one read as UTC, and can't tell in a zone at UTC", async () => {
     const offset = housecallproCase("schedule-without-an-offset");
-    /** A company in `timeZone` that reads times without an offset as Chicago's in January, in writes and filters alike. */
-    const readingChicagoTime = (timeZone: string) => {
-      const chicago = (text: string) => Date.parse(`${text}-06:00`);
-      const jobs: { id: string; start: number }[] = [];
-      return account((url, init) => {
-        if (url.pathname === "/company") return { body: { id: "c", time_zone: timeZone } };
-        if (init?.method === "POST" && url.pathname === "/jobs") {
-          jobs.push({ id: `job_${jobs.length + 1}`, start: chicago(JSON.parse(String(init.body)).schedule.scheduled_start) });
-          return { status: 201, body: { id: jobs.at(-1)!.id, schedule: { scheduled_start: new Date(jobs.at(-1)!.start).toISOString() } } };
-        }
-        if (init?.method === "POST") return made(url);
-        const [min, max] = [url.searchParams.get("scheduled_start_min"), url.searchParams.get("scheduled_start_max")];
-        const within = (job: { start: number }) =>
-          (min === null || job.start >= chicago(min)) && (max === null || job.start <= chicago(max));
-        return { body: { jobs: jobs.filter(within) } };
-      });
-    };
-    await expect(offset.observe(readingChicagoTime("America/Chicago"))).resolves.toEqual({
+    await expect(offset.observe(readingTimesAt("America/Chicago", "-06:00"))).resolves.toEqual({
       createdAs: "the company's time zone",
       filteredAs: "not UTC",
     });
-    await expect(offset.observe(readingChicagoTime("Europe/London"))).rejects.toThrow("can't tell");
+    await expect(offset.observe(readingTimesAt("Europe/London", "-06:00"))).rejects.toThrow("can't tell");
+  });
+
+  it("tell filters that read times on the company's clock from ones never applied, for a company ahead of UTC too", async () => {
+    const offset = housecallproCase("schedule-without-an-offset");
+    await expect(offset.observe(readingTimesAt("Australia/Sydney", "+11:00"))).resolves.toEqual({
+      createdAs: "the company's time zone",
+      filteredAs: "not UTC",
+    });
+    await expect(offset.observe(readingTimesAt("Australia/Sydney", "+11:00", true))).resolves.toMatchObject({ filteredAs: "not filtered" });
   });
 
   it("record nothing about the work_status filter when the new job never shows up among its customer's jobs", async () => {
