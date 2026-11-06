@@ -99,8 +99,17 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
     if (!response.ok) throw new TwinError(refusal(await response.text(), method, path, response.status), response.status);
     return response;
   }
-  const json = async <T>(method: string, path: string, body?: { json: unknown } | { text: string }): Promise<T> =>
-    (await (await request(method, path, body)).json()) as T;
+  // A dev server on the wrong port can answer 200 with a page on every path; say so, not "Unexpected token '<'".
+  async function json<T>(method: string, path: string, body?: { json: unknown } | { text: string }): Promise<T> {
+    const response = await request(method, path, body);
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      const answered = `${method} /_twin${path} answered HTTP ${response.status} with something other than JSON`;
+      throw new TwinError(`${answered}: ${text.slice(0, 200)} (is this a twin's address?)`, response.status);
+    }
+  }
 
   return {
     url: base,

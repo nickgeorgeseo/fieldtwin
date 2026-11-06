@@ -199,6 +199,17 @@ describe("connectTwin()", () => {
     const twin = connectTwin("http://not.a.twin", { fetch: () => new Response("Not Found", { status: 404 }) });
     await expect(twin.status()).rejects.toThrow("GET /_twin answered HTTP 404: Not Found");
   });
+
+  it("says what answered when the address answers 200 with something other than JSON", async () => {
+    const page = "<!doctype html><title>dev server</title>";
+    const twin = connectTwin("http://not.a.twin", { fetch: () => new Response(page, { headers: { "Content-Type": "text/html" } }) });
+    const refusal = await twin.status().catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(TwinError);
+    expect(refusal).toMatchObject({
+      status: 200,
+      message: expect.stringContaining("GET /_twin answered HTTP 200 with something other than JSON: <!doctype"),
+    });
+  });
 });
 
 describe("the client's types", () => {
