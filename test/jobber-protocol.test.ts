@@ -69,6 +69,26 @@ describe("Jobber twin: errors and ids", () => {
     ]);
   });
 
+  it("rejects any value that is not an EncodedId the documented way, even one String() or JSON can't write", async () => {
+    const { app, jobber } = setup();
+    const query = "query ($id: EncodedId!) { client(id: $id) { id } }";
+    for (const id of [{ toString: 1 }, { toString: null }, { toString: "x", valueOf: "y" }, [{ toString: 1 }]]) {
+      const response = await jobber(query, { id });
+      expect(response.status).toBe(200);
+      expect((await response.json()).errors[0].message).toBe("Variable $id of type EncodedId! was provided invalid value");
+    }
+    // Nested deeper than JSON.stringify or Array.join can go: sent as raw JSON, since the client's JSON.stringify can't write it either.
+    for (const id of [`${"[".repeat(5_000)}1${"]".repeat(5_000)}`, `${'{"a":'.repeat(20_000)}1${"}".repeat(20_000)}`]) {
+      const response = await app.request("/api/graphql", {
+        method: "POST",
+        headers: { Authorization: "Bearer t", "Content-Type": "application/json", "X-JOBBER-GRAPHQL-VERSION": "2025-04-16" },
+        body: `{"query": ${JSON.stringify(query)}, "variables": {"id": ${id}}}`,
+      });
+      expect(response.status).toBe(200);
+      expect((await response.json()).errors[0].message).toBe("Variable $id of type EncodedId! was provided invalid value");
+    }
+  });
+
   it("rejects an id written inline in the query that is not an EncodedId", async () => {
     const { jobber } = setup();
     const body = await (await jobber('{ client(id: "1") { id } }')).json();

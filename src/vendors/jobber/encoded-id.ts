@@ -1,3 +1,5 @@
+import { shown } from "../../core/request-body.ts";
+
 /**
  * Jobber's EncodedId: "a base64-encoded string that uniquely identifies that record. For example, a client ID of
  * 'Z2lkOi8vSm9iYmVyL0NsaWVudC8xMTkxOTUzNDA' decodes to gid://Jobber/Client/119195340."
@@ -33,7 +35,20 @@ export function isEncodedId(value: unknown): value is string {
 }
 
 export function invalidEncodedIdMessage(value: unknown): string {
-  return `'${String(value)}' is not a valid EncodedId`;
+  return `'${printable(value)}' is not a valid EncodedId`;
+}
+
+/**
+ * The value as String() writes it, which is how the error reads for a plain value. A client's JSON can hold values
+ * String() throws on (an object whose toString isn't a function, a list nested thousands deep), and those still
+ * deserve the error, not a 500, so they're shown as JSON, or named when they're too deep for that.
+ */
+function printable(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return shown(value);
+  }
 }
 
 /** The next free number for a record type, given the ids already used: one more than the highest. */

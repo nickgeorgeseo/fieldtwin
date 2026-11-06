@@ -13,7 +13,7 @@ import {
   type TypeNode,
   validate,
 } from "graphql";
-import { isObject } from "../../core/request-body.ts";
+import { isObject, shown } from "../../core/request-body.ts";
 import { invalidEncodedIdMessage, isEncodedId } from "./encoded-id.ts";
 
 /**
@@ -124,10 +124,20 @@ function encodedIdVariableErrors(
     errors.push({
       message: `Variable $${name} of type ${print(definition.type)} was provided invalid value`,
       locations: [{ line, column }],
-      extensions: { value, problems },
+      extensions: { value: echoed(value), problems },
     });
   }
   return errors;
+}
+
+/** The value as sent, to echo back in the error, unless it's nested too deeply for the answer's JSON to hold it. */
+function echoed(value: unknown): unknown {
+  try {
+    JSON.stringify(value);
+    return value;
+  } catch {
+    return shown(value);
+  }
 }
 
 function namedType(type: TypeNode): string {
