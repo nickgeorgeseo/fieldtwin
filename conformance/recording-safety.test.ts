@@ -107,12 +107,14 @@ describe("what the conformance command was asked to do", () => {
 });
 
 describe("which QuickBooks company a recording may write to", () => {
-  it.each(["https://quickbooks.api.intuit.com/v3", "https://QuickBooks.api.intuit.com/v3", "https://u@quickbooks.api.intuit.com/v3"])(
-    "never production, however its URL is written: %s",
-    (QBO_API_BASE) => {
-      expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", QBO_REALM_ID: "1", QBO_API_BASE })).toThrow("production QuickBooks");
-    },
-  );
+  it.each([
+    "https://quickbooks.api.intuit.com/v3",
+    "https://QuickBooks.api.intuit.com/v3",
+    "https://u@quickbooks.api.intuit.com/v3",
+    "https://quickbooks.api.intuit.com./v3",
+  ])("never production, however its URL is written: %s", (QBO_API_BASE) => {
+    expect(() => sandboxTarget({ QBO_ACCESS_TOKEN: "t", QBO_REALM_ID: "1", QBO_API_BASE })).toThrow("production QuickBooks");
+  });
 });
 
 describe("what the recorder says before it runs", () => {
