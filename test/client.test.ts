@@ -77,6 +77,19 @@ describe("the twin's client", async () => {
     expect((await twin.status()).checkpoints).toEqual([]);
   });
 
+  it("refuses an empty checkpoint, action, or scenario name before sending, saying a name is needed", async () => {
+    const calls = [
+      () => twin.checkpoint(""),
+      () => twin.changes(""),
+      () => twin.rewind(""),
+      () => twin.runAction("jobber", "", 1),
+      () => twin.loadScenario(""),
+    ];
+    for (const call of calls) {
+      await expect(call()).rejects.toMatchObject({ name: "TwinError", status: 400, message: expect.stringContaining("needs a name") });
+    }
+  });
+
   it("answers a wrongly written scenario name with the twin's name check, not as YAML", async () => {
     for (const name of ["Flaky-APIs", "flaky apis", "flaky_apis"]) {
       await expect(twin.loadScenario(name)).rejects.toMatchObject({

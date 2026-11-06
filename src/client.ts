@@ -113,23 +113,27 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
         ? json("POST", "/scenario", { text: JSON.stringify(scenario) }) // JSON is YAML, so the same route reads it
         : /[:\n]/.test(scenario)
           ? json("POST", "/scenario", { text: scenario })
-          : json("POST", `/scenarios/${segment(scenario)}`),
+          : json("POST", `/scenarios/${segment(scenario, "scenario")}`),
     scenarios: () => json("GET", "/scenarios"),
     advance: ({ minutes = 0, hours = 0, days = 0 }) =>
       json("POST", "/clock/advance", { json: { minutes: minutes + hours * 60 + days * 1440 } }),
-    runAction: async (vendor, action, params) => json("POST", `/actions/${segment(vendor)}/${segment(action)}`, { json: params }),
+    runAction: async (vendor, action, params) =>
+      json("POST", `/actions/${segment(vendor, "vendor")}/${segment(action, "action")}`, { json: params }),
     vendors: () => json("GET", "/vendors"),
-    checkpoint: async (name) => json("POST", `/checkpoints/${segment(name)}`),
+    checkpoint: async (name) => json("POST", `/checkpoints/${segment(name, "checkpoint")}`),
     changes: async (checkpoint, filter = {}) => {
       const query = new URLSearchParams();
       if (filter.source) query.set("source", filter.source);
       if (filter.after) query.set("after", filter.after);
-      const changes = await json<Change[]>("GET", `/checkpoints/${segment(checkpoint)}/changes${query.size ? `?${query}` : ""}`);
+      const changes = await json<Change[]>(
+        "GET",
+        `/checkpoints/${segment(checkpoint, "checkpoint")}/changes${query.size ? `?${query}` : ""}`,
+      );
       return changes.filter(
         (change) => (!filter.vendor || change.vendor === filter.vendor) && (!filter.type || change.type === filter.type),
       ) as never;
     },
-    rewind: async (checkpoint) => json("POST", `/checkpoints/${segment(checkpoint)}/rewind`),
+    rewind: async (checkpoint) => json("POST", `/checkpoints/${segment(checkpoint, "checkpoint")}/rewind`),
     log: async ({ since, after } = {}) => {
       const query = new URLSearchParams();
       if (since) query.set("since", since);
@@ -147,12 +151,16 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
   };
 }
 
+const NAME_EXAMPLES = { checkpoint: "before-sync", vendor: "jobber", action: "payInvoices", scenario: "flaky-apis" };
+
 /**
  * A name in a path, so a checkpoint called "a/b" or "50%" is still one segment. "." and ".." can't be one, even encoded:
- * the URL parser drops them, so rewind(".") would reach POST /_twin/checkpoints/rewind. They are refused here, before
- * anything is sent, as the twin refuses them as checkpoint names.
+ * the URL parser drops them, so rewind(".") would reach POST /_twin/checkpoints/rewind. "" can't be one either: the
+ * path would end in a slash or hold two, match no route, and get a bare 404 instead of the twin's own check. All three
+ * are refused here, before anything is sent, as the twin refuses them as checkpoint names.
  */
-function segment(name: string): string {
+function segment(name: string, kind: keyof typeof NAME_EXAMPLES): string {
+  if (name === "") throw new TwinError(`A ${kind} needs a name, like "${NAME_EXAMPLES[kind]}".`, 400);
   if (name === "." || name === "..") {
     throw new TwinError(`"${name}" can't be sent as a name in a URL: the URL would reach another route. Pick another name.`, 400);
   }
