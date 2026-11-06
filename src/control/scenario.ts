@@ -13,7 +13,8 @@ import type { WebhookSubscription } from "../core/webhooks.ts";
  * See "Scenario timelines" in ARCHITECTURE.md.
  */
 // The longest latencyMs or delayMs. Node cuts a timer over 2^31-1 ms (about 24.8 days) to 1 ms, so a rule meant to
-// hang requests would answer them at once; each matching rule waits on its own timer, so their sum may be longer.
+// hang requests would answer them at once. The latencies of all matching rules add up, and the twin waits that sum
+// in pieces no timer cuts short, so it may be longer.
 const WEEK_MS = 7 * 86_400_000;
 const atMostAWeek = { message: "can be at most a week (604800000)" };
 

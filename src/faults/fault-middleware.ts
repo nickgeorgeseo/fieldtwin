@@ -56,6 +56,11 @@ function matches(rule: FaultRule, vendor: string, method: string, path: string):
   );
 }
 
-function sleep(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+/** Node cuts a timer over 2^31-1 ms to 1 ms, and week-long rules can add up past that, so a long wait goes in pieces. */
+const LONGEST_TIMER_MS = 2 ** 31 - 1;
+
+async function sleep(milliseconds: number): Promise<void> {
+  for (let left = milliseconds; left > 0; left -= LONGEST_TIMER_MS) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(left, LONGEST_TIMER_MS)));
+  }
 }

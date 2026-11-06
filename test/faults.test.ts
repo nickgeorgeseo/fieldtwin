@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadScenario } from "../src/control/operations.ts";
 import type { FaultRule } from "../src/core/types.ts";
 import type { WebhookSender, WebhookSubscription } from "../src/core/webhooks.ts";
@@ -133,6 +133,26 @@ describe("layered fault rules", () => {
     const response = await qboGet("/customer/1");
     expect(performance.now() - started).toBeGreaterThanOrEqual(15);
     expect(response.headers.get("X-Twin-Fault")).toBe("down");
+  });
+
+  it("holds a request for the whole sum of several week-long latencies, longer than one timer can wait", async () => {
+    const { twin, qboGet } = setup();
+    const week = 7 * 86_400_000;
+    twin.faultRules = [1, 2, 3, 4].map((n) => ({ name: `hang${n}`, vendor: "quickbooks", rate: 1, effect: { latencyMs: week } }));
+    vi.useFakeTimers();
+    try {
+      let answered = false;
+      const response = Promise.resolve(qboGet("/customer/1")).then((answer) => {
+        answered = true;
+        return answer;
+      });
+      await vi.advanceTimersByTimeAsync(4 * week - 1000);
+      expect(answered).toBe(false);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await response).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("picks the same requests for an error behind a slow-down rule, however long each request takes to answer", async () => {
