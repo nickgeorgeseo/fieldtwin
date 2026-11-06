@@ -100,7 +100,20 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
 
 /** Parse and validate a scenario. Errors name the exact field that is wrong. */
 export function parseScenario(yamlText: string): Scenario {
-  return validate(ScenarioSchema, parse(yamlText), "Invalid scenario");
+  return validate(ScenarioSchema, readYaml(yamlText), "Invalid scenario");
+}
+
+/**
+ * The YAML as plain values. The yaml library throws a ReferenceError for an alias with no anchor (`jobber: *calls`)
+ * and for one that would expand without end: mistakes in the file, not bugs in the twin, so they are rethrown as
+ * plain errors the control plane answers with a 400.
+ */
+function readYaml(yamlText: string): unknown {
+  try {
+    return parse(yamlText);
+  } catch (error) {
+    throw new Error(`Invalid scenario YAML: ${(error as Error).message}`);
+  }
 }
 
 /** A webhook subscription: what an app would set up in the vendor's developer settings. */

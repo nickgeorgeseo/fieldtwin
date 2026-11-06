@@ -46,6 +46,22 @@ describe("control-plane mistakes", () => {
     expect(error).not.toMatch(/Cannot read properties|Unexpected end of JSON input$/);
   });
 
+  it.each([
+    ["an alias whose anchor is missing", "faults: [*rules]\n", "Unresolved alias"],
+    [
+      "an alias that would expand without end",
+      "a: &a [x, x, x]\nb: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]\nc: [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]\n",
+      "alias",
+    ],
+  ])("refuses scenario YAML with %s as a mistake in the YAML, not a bug in the twin", async (_label, yaml, says) => {
+    const body = `name: Typo\nseed: 7\nstartTime: "2026-07-13T11:00:00Z"\n${yaml}`;
+    const { status, error } = await errorOf(await send(setup().app, "POST", "/_twin/scenario", body));
+    expect(status).toBe(400);
+    expect(error).toMatch(/^Invalid scenario YAML: /);
+    expect(error).toContain(says);
+    expect(logged).not.toHaveBeenCalled();
+  });
+
   it("explains an action's parameters without assuming they came from a scenario file", async () => {
     const { error } = await errorOf(await send(setup().app, "POST", "/_twin/actions/jobber/newClients", '{"newClients": 5}'));
     expect(error).toContain("how many");
