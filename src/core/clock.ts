@@ -4,10 +4,11 @@ export const TWIN_TIME_FORM = 'Write a date, a time, and a UTC offset, like "202
 /**
  * An ISO 8601 time with a UTC offset, in epoch milliseconds; undefined for anything else. A time without an offset is
  * refused: Date.parse would read it in the host's time zone, and the same scenario would start at a different
- * moment on every machine.
+ * moment on every machine. So is a day the calendar doesn't have: Date.parse would quietly start 2026-02-30 in March.
  */
 export function parseTwinTime(text: string): number | undefined {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}:\d{2})$/.test(text)) return undefined;
+  if (!isRealDate(text.slice(0, 10))) return undefined;
   const ms = Date.parse(text);
   return Number.isNaN(ms) ? undefined : ms;
 }

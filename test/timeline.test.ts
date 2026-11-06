@@ -135,6 +135,16 @@ describe("scenario timelines", () => {
     expect(() => loadScenario(harness.twin, scenario(`  - at: "lunchtime"\n    jobber: { newClients: 1 }`))).toThrow(/"lunchtime"/);
     expect(() => loadScenario(harness.twin, scenario(`  - at: "+1h"\n    jobber: { newClients: -2 }`))).toThrow(/newClients/);
   });
+
+  it("refuses a start time or an entry time on a day the calendar doesn't have, rather than rolling it into March", () => {
+    const harness = setup();
+    expect(() => loadScenario(harness.twin, scenario(`  - at: "2026-02-31T09:00:00Z"\n    jobber: { newClients: 1 }`))).toThrow(
+      'Timeline time "2026-02-31T09:00:00Z" isn\'t one the twin understands',
+    );
+    const leapDay = scenario(`  - at: "+1h"\n    jobber: { newClients: 1 }`).replace("2026-07-13T11:00:00Z", "2026-02-29T08:00:00Z");
+    expect(() => loadScenario(harness.twin, leapDay)).toThrow("startTime: isn't a time the twin can start at");
+    expect(harness.twin.clock.nowIso()).toBe("2026-07-13T11:00:00.000Z");
+  });
 });
 
 describe("a scheduled action that throws when it runs, though its check passed", () => {
