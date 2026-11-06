@@ -6,21 +6,24 @@ import { type QboFault, qboErrors } from "./errors.ts";
  * Values as QuickBooks reads them from a request. Numbers: JSON numbers, or numeric strings, which SDKs such as
  * python-quickbooks send for decimals. Amounts: dollars and whole cents; the docs give no limits, so the twin refuses
  * fractions of a cent and amounts too big to add up exactly, with 2140 Invalid Amount (FIDELITY.md marks both
- * "check"). Text: strings, or numbers read as their digits.
+ * "check"). Text: strings, or numbers read as written.
  * https://developer.intuit.com/app/developer/qbo/docs/develop/troubleshooting/error-codes
  */
 const MAX_AMOUNT = 999_999_999_999.99;
 
-/** A number sent as a JSON number or a numeric string; undefined for anything else. */
+/**
+ * A number sent as a JSON number or a numeric string; undefined for anything else. An exponent (1E+2) is read too,
+ * since keepWrittenNumbers hands on a JSON number written that way as its text.
+ */
 export function numberFrom(value: unknown): number | undefined {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (typeof value === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) return numberFrom(Number(value)); // "999...9": Infinity
+  if (typeof value === "string" && /^\s*-?\d+(\.\d+)?([eE][+-]?\d+)?\s*$/.test(value)) return numberFrom(Number(value)); // "9...9": Infinity
   return undefined;
 }
 
 /**
  * An Id or reference (Id, SyncToken, CustomerRef.value, ItemRef.value, TxnId) as QuickBooks reads it: a string as
- * sent, a number as its digits. Undefined for anything else (an object, a list, true), which names no record, so the
+ * sent, a number as written. Undefined for anything else (an object, a list, true), which names no record, so the
  * caller answers a validation Fault instead of turning it into text, which can throw.
  */
 export function refId(value: unknown): string | undefined {
@@ -73,20 +76,20 @@ export function readOptionalNumber(
 }
 
 /**
- * A JSON.parse reviver for write bodies. An integer JavaScript can't write back digit for digit (12345678901234567890
- * comes back as 12345678901234567000, and 1e21 and up as "1e+21") is kept as the digits sent, so a text field reads
- * every digit, as QuickBooks' own reader would. numberFrom reads those digits as the same number as before, so
- * amounts and quantities don't change.
+ * A JSON.parse reviver for write bodies. A number JavaScript can't write back as sent (12345678901234567890 comes back
+ * as 12345678901234567000, 1e21 as "1e+21", 0.0000001 as "1e-7", 1.50 as "1.5") is kept as its text, so a text field
+ * reads what was written, as QuickBooks' own reader would. numberFrom reads that text as the same number as before,
+ * so amounts and quantities don't change.
  */
-export function keepLongIntegers(_key: string, value: unknown, context?: { source?: string }): unknown {
+export function keepWrittenNumbers(_key: string, value: unknown, context?: { source?: string }): unknown {
   const source = context?.source;
-  return typeof value === "number" && source !== undefined && /^-?\d+$/.test(source) && String(value) !== source ? source : value;
+  return typeof value === "number" && source !== undefined && String(value) !== source ? source : value;
 }
 
 /**
  * Text fields as QuickBooks' JSON reader takes them, by path (`PrimaryPhone.FreeFormNumber`): a string as sent, a
- * number as its digits. Anything else (an object, a list) answers 2010 naming the field. Normalizes `fields` in
- * place; the Fault, if any, is returned.
+ * number as written (1.50, not 1.5). Anything else (an object, a list) answers 2010 naming the field. Normalizes
+ * `fields` in place; the Fault, if any, is returned.
  */
 export function readTextFields(fields: object, paths: readonly string[], now: string): QboFault | undefined {
   for (const path of paths) {

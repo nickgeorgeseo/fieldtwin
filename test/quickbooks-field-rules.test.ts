@@ -64,6 +64,24 @@ describe("QuickBooks twin: long numbers in text fields", () => {
     expect((await (await raw(harness, "/payment", paymentBody)).json()).Payment.PaymentRefNum).toBe("12345678901234567890");
   });
 
+  it("keeps a decimal sent to a text field as written, trailing zeros and all, while amounts still read as numbers", async () => {
+    const harness = setup();
+    const refNum = async (written: string) => {
+      const body = `{"CustomerRef": {"value": "1"}, "TotalAmt": 5.50, "PaymentRefNum": ${written}}`;
+      return (await (await raw(harness, "/payment", body)).json()).Payment;
+    };
+    expect(await refNum("1.50")).toMatchObject({ PaymentRefNum: "1.50", TotalAmt: 5.5 });
+    expect((await refNum("0.0000001")).PaymentRefNum).toBe("0.0000001");
+    expect((await refNum("100.0")).PaymentRefNum).toBe("100.0");
+    expect((await refNum("1234567890.1234567890123")).PaymentRefNum).toBe("1234567890.1234567890123");
+    expect((await refNum("1E+2")).PaymentRefNum).toBe("1E+2");
+    const customer = await raw(harness, "/customer", '{"DisplayName": 0.0000001}');
+    expect((await customer.json()).Customer.DisplayName).toBe("0.0000001");
+    const priced = `{"DetailType": "SalesItemLineDetail", "Amount": 3.00, "SalesItemLineDetail": {"ItemRef": {"value": "1"}, "Qty": 2.0, "UnitPrice": 1.50}}`;
+    const invoice = (await (await raw(harness, "/invoice", `{"CustomerRef": {"value": "1"}, "Line": [${priced}]}`)).json()).Invoice;
+    expect(invoice.Line[0]).toMatchObject({ Amount: 3, SalesItemLineDetail: { Qty: 2, UnitPrice: 1.5 } });
+  });
+
   it("refuses a long number it can't read digit for digit, beside a list nested too deeply to read that way (2010)", async () => {
     // Reading a number by its digits recurses, and runs out of stack on nesting a plain JSON.parse still reads. Where
     // depends on the engine's stack, so find the shallowest nesting that does it here.
