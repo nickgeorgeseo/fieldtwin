@@ -65,6 +65,23 @@ export function readTextFields(fields: object, names: readonly string[], now: st
 }
 
 /**
+ * Boolean fields (a customer's `Active`): true or false, as the entity references type them. Null is read as not
+ * sent, as for amounts, and removed from `fields` so a sparse update keeps the stored value. Anything else ("false",
+ * 0) answers 2010 naming the field: stored as sent, payments would read it one way and queries another.
+ */
+export function readBooleanFields(fields: object, names: readonly string[], now: string): QboFault | undefined {
+  const record = fields as Record<string, unknown>;
+  for (const name of names) {
+    const value = record[name];
+    if (value === null) delete record[name];
+    else if (value !== undefined && typeof value !== "boolean") {
+      return qboErrors.invalidProperty(name, `${name} must be true or false, not ${shown(value)}.`, now);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Text fields' documented maximum lengths, by path (`PrimaryPhone.FreeFormNumber`): the Fault for the first one a
  * value exceeds, 2050 Invalid String Length, or undefined. Run after readTextFields, so numbers count as their digits.
  */

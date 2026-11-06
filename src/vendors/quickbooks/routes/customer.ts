@@ -3,7 +3,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { newCustomerRecord } from "../state.ts";
 import { type QboCustomer, type QboState, WRITABLE_CUSTOMER_FIELDS } from "../types.ts";
-import { checkLengths, readTextFields } from "../values.ts";
+import { checkLengths, readBooleanFields, readTextFields } from "../values.ts";
 import {
   asResponse,
   COMPANY,
@@ -47,6 +47,8 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: string | undefined) {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
+  const notBoolean = readBooleanFields(body, ["Active"], now);
+  if (notBoolean) return notBoolean;
   const fields = pickWritable(body, WRITABLE_CUSTOMER_FIELDS);
   const badName = checkNames(fields, now);
   if (badName) return badName;
@@ -72,6 +74,9 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   const conflict = checkSyncToken(existing, body, now);
   if (conflict) return conflict;
 
+  // Before the merge, so an Active of null leaves a sparse update's stored value alone.
+  const notBoolean = readBooleanFields(body, ["Active"], now);
+  if (notBoolean) return notBoolean;
   const fields = mergeUpdate(existing, body, WRITABLE_CUSTOMER_FIELDS);
   const badName = checkNames(fields, now);
   if (badName) return badName;

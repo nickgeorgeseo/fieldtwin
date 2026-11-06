@@ -46,6 +46,35 @@ describe("QuickBooks twin: text fields", () => {
   });
 });
 
+describe("QuickBooks twin: a customer's Active", () => {
+  const everyone = (harness: Harness) =>
+    harness.qboGet(`/query?query=${encodeURIComponent("select * from Customer where Active IN (true, false)")}`);
+
+  it.each([0, "yes", "false", { value: true }])(
+    "refuses an Active of %j on a create or an update (2010), naming Active",
+    async (Active) => {
+      const harness = setup();
+      expect(await faultOf(await harness.qboPost("/customer", { DisplayName: "Ada Maybe", Active }))).toMatchObject({
+        code: "2010",
+        element: "Active",
+      });
+      const update = await harness.qboPost("/customer", { Id: "1", SyncToken: "0", sparse: true, Active });
+      expect(await faultOf(update)).toMatchObject({ code: "2010", element: "Active" });
+    },
+  );
+
+  it("reads an Active of null as not sent, so every customer is still active or inactive", async () => {
+    const harness = setup();
+    const created = (await (await harness.qboPost("/customer", { DisplayName: "Ada Null", Active: null })).json()).Customer;
+    expect(created.Active).toBe(true);
+    await harness.qboPost("/customer", { Id: "1", SyncToken: "0", sparse: true, Active: false });
+    const updated = (await (await harness.qboPost("/customer", { Id: "1", SyncToken: "1", sparse: true, Active: null })).json()).Customer;
+    expect(updated.Active).toBe(false);
+    const ids = (await (await everyone(harness)).json()).QueryResponse.Customer.map((customer: { Id: string }) => customer.Id);
+    expect(ids).toEqual(expect.arrayContaining(["1", created.Id]));
+  });
+});
+
 describe("QuickBooks twin: invoice numbers", () => {
   it("refuses a PrivateNote longer than its documented 4,000 characters on an invoice or a payment (2050)", async () => {
     const harness = setup();
