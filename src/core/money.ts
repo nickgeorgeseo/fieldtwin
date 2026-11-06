@@ -38,6 +38,29 @@ export function multiplyMoney(quantity: number | string, unitPrice: number | str
 }
 
 /**
+ * The unit price to store for a line whose Qty × UnitPrice was checked as written: the nearest double, or the next
+ * one toward the written text when that double's shortest form lands on the other side of half a cent ("10.00499999
+ * 999999999" reads as 10.005, which would make 10.01). A client that sends back the price it read then gets the
+ * Amount it was charged, so the stored line stays updatable.
+ */
+export function storedUnitPrice(quantity: number, unitPrice: number, amount: number): number {
+  let price = unitPrice;
+  for (let step = 0; step < 8 && !sameMoney(multiplyMoney(quantity, price), amount); step++) {
+    const short = multiplyMoney(quantity, price) < amount === quantity > 0; // the product is short: raise the price
+    price = nextDouble(price, short ? 1 : -1);
+  }
+  return sameMoney(multiplyMoney(quantity, price), amount) ? price : unitPrice;
+}
+
+/** The double next to `value`, up (1) or down (-1). */
+function nextDouble(value: number, direction: 1 | -1): number {
+  if (value === 0) return direction * Number.MIN_VALUE;
+  const bits = new BigInt64Array(new Float64Array([value]).buffer);
+  bits[0] = (bits[0] ?? 0n) + (Math.sign(value) === direction ? 1n : -1n); // a larger bit pattern is a larger magnitude
+  return new Float64Array(bits.buffer)[0] ?? value;
+}
+
+/**
  * A value as the decimal it was written as: digits × 10^-scale. Text is read digit for digit, up to 40 either side
  * of the point (past that, or with an exponent, as the number it reads as, so a huge exponent can't make huge
  * BigInts). A number is read as the shortest decimal that reads back as it (33.33, not 33.3299999...).

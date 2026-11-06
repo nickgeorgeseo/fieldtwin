@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { multiplyMoney, sumMoney, toCents } from "../src/core/money.ts";
+import { multiplyMoney, storedUnitPrice, sumMoney, toCents } from "../src/core/money.ts";
 import { setup } from "./helpers.ts";
 
 /**
@@ -110,6 +110,20 @@ describe("QuickBooks twin: amounts", () => {
     });
     expect(response.status).toBe(200);
   });
+
+  it("keeps an invoice priced past a double's digits updatable, sparsely or by sending its lines back as read", async () => {
+    const harness = setup();
+    const created = await harness.qboPost("/invoice", invoiceWith([line("10.00", { Qty: "1", UnitPrice: "10.00499999999999999" })]));
+    const { Id } = (await created.json()).Invoice;
+    const read = async () => (await (await harness.qboGet(`/invoice/${Id}`)).json()).Invoice;
+
+    const note = await harness.qboPost("/invoice", { Id, SyncToken: (await read()).SyncToken, sparse: true, PrivateNote: "called ahead" });
+    expect(note.status).toBe(200);
+    const { SyncToken, Line } = await read();
+    const resent = await harness.qboPost("/invoice", { Id, SyncToken, sparse: true, Line });
+    expect(resent.status).toBe(200);
+    expect((await resent.json()).Invoice).toMatchObject({ TotalAmt: 10, Line: [{ Amount: 10 }, { Amount: 10 }] });
+  });
 });
 
 describe("money arithmetic", () => {
@@ -129,5 +143,10 @@ describe("money arithmetic", () => {
     expect([multiplyMoney("1", "10.00499999999999999"), multiplyMoney("-2.5", " 33.33 "), multiplyMoney("1E-7", 1e9)]).toEqual([
       10, -83.33, 100,
     ]);
+  });
+
+  it("stores a unit price that multiplies to the cent it was checked at, moving off the written double only when it must", () => {
+    expect([storedUnitPrice(2, 46.5, 93), storedUnitPrice(1, 10.005, 10.01)]).toEqual([46.5, 10.005]);
+    expect([multiplyMoney(1, storedUnitPrice(1, 10.005, 10)), multiplyMoney(-1, storedUnitPrice(-1, -10.005, 10))]).toEqual([10, 10]);
   });
 });
