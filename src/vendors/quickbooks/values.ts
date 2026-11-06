@@ -49,6 +49,15 @@ export function readAmount(value: unknown, element: string, now: string): number
   return fromCents(toCents(amount));
 }
 
+/**
+ * The Fault for lines that add up past the largest amount, or undefined. Each line is checked on its own, so without
+ * this enough of them would total more than the twin can add up exactly, and TotalAmt and Balance would be off.
+ */
+export function checkTotal(total: number, now: string): QboFault | undefined {
+  if (total <= MAX_AMOUNT) return undefined;
+  return qboErrors.invalidAmount("TotalAmt", `The lines add up to more than ${MAX_AMOUNT}. Split them across invoices.`, now);
+}
+
 /** An optional unit price (any precision) or quantity: undefined if not sent, or the Fault for one that isn't a number. */
 export function readOptionalNumber(
   value: unknown,

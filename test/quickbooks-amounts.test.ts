@@ -61,6 +61,14 @@ describe("QuickBooks twin: amounts", () => {
     });
   });
 
+  it("refuses an invoice whose lines add up past the largest amount (2140), rather than totalling it inexactly", async () => {
+    const harness = setup();
+    const lines = Array.from({ length: 91 }, () => line(999999999999.99));
+    expect(await faultOf(await harness.qboPost("/invoice", invoiceWith(lines)))).toMatchObject({ code: "2140", element: "TotalAmt" });
+    const twoLargest = invoiceWith([line(999999999999.99), line(0.01)]);
+    expect(await faultOf(await harness.qboPost("/invoice", twoLargest))).toMatchObject({ code: "2140", element: "TotalAmt" });
+  });
+
   it("refuses a quantity that isn't a number (2160)", async () => {
     const response = await setup().qboPost("/invoice", invoiceWith([line(10, { Qty: "a few", UnitPrice: 5 })]));
     expect(await faultOf(response)).toMatchObject({ code: "2160", element: "Line.SalesItemLineDetail.Qty" });

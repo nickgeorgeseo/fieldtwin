@@ -3,7 +3,7 @@ import { isObject } from "../../core/request-body.ts";
 import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
-import { asSent, checkLengths, readAmount, readOptionalNumber, readTextFields, refId } from "./values.ts";
+import { asSent, checkLengths, checkTotal, readAmount, readOptionalNumber, readTextFields, refId } from "./values.ts";
 
 /**
  * How QuickBooks builds an invoice from a request: references, lines, totals, numbers, and dates.
@@ -53,6 +53,8 @@ export function draftInvoice(
   if (!DueDate) return qboErrors.invalidDate("DueDate", asSent(fields.DueDate), now);
 
   const subtotal = sumMoney(lines.map((line) => line.Amount));
+  const tooMuch = checkTotal(subtotal, now);
+  if (tooMuch) return tooMuch;
   const subtotalLine: QboSubTotalLine = { Amount: subtotal, DetailType: "SubTotalLineDetail", SubTotalLineDetail: {} };
 
   return {
