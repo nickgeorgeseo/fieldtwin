@@ -36,4 +36,16 @@ describe("QuickBooks twin: payment lines", () => {
     expect((await response.json()).Fault.Error[0]).toMatchObject({ code: "500", Message: "Unsupported operation" });
     expect((await (await harness.qboGet(`/invoice/${first.Id}`)).json()).Invoice.Balance).toBe(50);
   });
+
+  it("says how much an invoice has left after the payment's earlier lines when two lines together overpay it", async () => {
+    const harness = setup();
+    const invoice = await invoiceFor(harness, 100);
+    const line = { Amount: 60, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] };
+    const response = await harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 120, Line: [line, line] });
+    const error = (await response.json()).Fault.Error[0];
+    expect(error.code).toBe("6000");
+    expect(error.Detail).toContain("40.00 left");
+    expect(error.Detail).toContain("60.00");
+  });
+
 });

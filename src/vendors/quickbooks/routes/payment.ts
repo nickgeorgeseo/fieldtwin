@@ -88,12 +88,15 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
         now,
       );
     }
-    const balance = (balances.get(invoice.Id) ?? toCents(invoice.Balance)) - toCents(Amount);
+    // Name what the line actually exceeds: after earlier lines of this payment, that's what they left.
+    const left = balances.get(invoice.Id);
+    const balance = (left ?? toCents(invoice.Balance)) - toCents(Amount);
     if (balance < 0) {
-      return qboErrors.businessValidation(
-        `Invoice ${invoice.Id} has a balance of ${formatMoney(invoice.Balance)}, less than the ${formatMoney(Amount)} applied to it.`,
-        now,
-      );
+      const has =
+        left === undefined
+          ? `has a balance of ${formatMoney(invoice.Balance)}`
+          : `has ${formatMoney(fromCents(left))} left after this payment's earlier lines`;
+      return qboErrors.businessValidation(`Invoice ${invoice.Id} ${has}, less than the ${formatMoney(Amount)} applied to it.`, now);
     }
     balances.set(invoice.Id, balance);
     lines.push({ Amount, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] });
