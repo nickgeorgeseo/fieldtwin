@@ -1,4 +1,4 @@
-import type { TwinEvent } from "./types.ts";
+import { faultHeaderValue, type TwinEvent } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
 import type { Delivery, DeliveryFaults, DeliveryPolicy, DeliveryRequest, WebhookSender, WebhookSubscription } from "./webhooks.ts";
 
@@ -158,7 +158,7 @@ export class WebhookDispatcher {
     try {
       const response = await this.send(delivery.url, {
         method: "POST",
-        headers: delivery.fault ? { ...headers, "X-Twin-Fault": delivery.fault } : headers,
+        headers: delivery.fault ? { ...headers, "X-Twin-Fault": faultHeaderValue(delivery.fault) } : headers,
         body: delivery.request.body,
         signal: AbortSignal.timeout(answerWithinMs),
       });

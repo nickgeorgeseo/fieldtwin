@@ -44,6 +44,23 @@ describe("webhook delivery faults", () => {
     expect(received.at(-1)).toEqual({ topic: "CLIENT_CREATE", fault: "late" });
   });
 
+  it("deliver the copy even when the rule's name isn't plain ASCII, naming it percent-encoded", async () => {
+    const { twin, received } = subscribedTwin();
+    setFaults(twin, [
+      { name: "Jobber dupes — at-least-once", vendor: "jobber", webhook: "CLIENT_CREATE", rate: 1, effect: { duplicate: true } },
+    ]);
+    await runAction(twin, "jobber", "newClients", 1);
+    expect(received).toEqual([
+      { topic: "CLIENT_CREATE", fault: null },
+      { topic: "CLIENT_CREATE", fault: "Jobber dupes %E2%80%94 at-least-once" },
+    ]);
+    // the delivery list names the rule as written: only the header has to be ASCII
+    expect(twin.webhooks.deliveries().map((delivery) => [delivery.fault, delivery.status])).toEqual([
+      [null, "delivered"],
+      ["Jobber dupes — at-least-once", "delivered"],
+    ]);
+  });
+
   it("leave API requests alone", async () => {
     const { app, twin } = subscribedTwin();
     setFaults(twin, [{ name: "twice", vendor: "jobber", webhook: "*", rate: 1, effect: { duplicate: true } }]);

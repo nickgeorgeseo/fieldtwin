@@ -21,6 +21,26 @@ describe("fault rules", () => {
     expect(failed.headers.get("X-Twin-Fault")).toBe("qbo-down");
   });
 
+  it("answer with their own error even when the rule's name isn't plain ASCII, naming it percent-encoded", async () => {
+    const { app, qboGet, jobber, hcpGet } = setup();
+    const rules = [
+      { name: "QuickBooks throttle — 429s", vendor: "quickbooks", rate: 1, effect: { status: 429 } },
+      { name: "Jobber 502s 🔥 100%", vendor: "jobber", rate: 1, effect: { status: 502 } },
+      { name: "half an emoji \ud83d", vendor: "housecallpro", rate: 1, effect: { status: 503 } },
+    ];
+    expect((await putFaults(app, rules)).status).toBe(200);
+
+    const throttled = await qboGet("/customer/1");
+    expect(throttled.status).toBe(429);
+    expect(throttled.headers.get("X-Twin-Fault")).toBe("QuickBooks throttle %E2%80%94 429s");
+    const down = await jobber("{ account { name } }");
+    expect(down.status).toBe(502);
+    expect(decodeURIComponent(down.headers.get("X-Twin-Fault")!)).toBe("Jobber 502s 🔥 100%");
+    const outage = await hcpGet("/company");
+    expect(outage.status).toBe(503);
+    expect(outage.headers.get("X-Twin-Fault")).toBe("half an emoji %EF%BF%BD");
+  });
+
   it("are validated, with an error that names the exact field that is wrong", async () => {
     const { app, twin } = setup();
     const response = await putFaults(app, [{ name: "not-an-error", vendor: "quickbooks", rate: 1, effect: { status: 200 } }]);

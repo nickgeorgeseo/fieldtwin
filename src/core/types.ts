@@ -80,3 +80,17 @@ const FAULT_STATUSES: readonly FaultStatus[] = [
 export function isFaultStatus(status: number): status is FaultStatus {
   return (FAULT_STATUSES as readonly number[]).includes(status);
 }
+
+/**
+ * A fault rule's name as an X-Twin-Fault header value. A header value must be a ByteString
+ * (https://fetch.spec.whatwg.org/#concept-header-value), and fetch and Response throw on anything else, so a name
+ * with an em dash or an emoji would turn the injected error into a 500 and a faulted delivery into a "network error".
+ * Characters outside printable ASCII, and "%" itself, are percent-encoded: plain names read as written, and
+ * decodeURIComponent gives any name back.
+ */
+export function faultHeaderValue(name: string): string {
+  const utf8 = new TextEncoder(); // not encodeURIComponent, which throws on a lone surrogate that JSON lets through
+  return name.replace(/[^\x20-\x24\x26-\x7E]/gu, (character) =>
+    [...utf8.encode(character)].map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`).join(""),
+  );
+}

@@ -309,7 +309,7 @@ curl -X POST localhost:4010/_twin/actions/housecallpro/payInvoices -H "Content-T
 
 Each URL gets its deliveries one at a time, in order; an app that is slow to answer doesn't hold up deliveries to another. `GET /_twin/webhooks` shows every recent delivery and how your app answered it.
 
-Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, `job.created`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`.
+Fault rules with a `webhook` topic (`INVOICE_UPDATE`, `qbo.invoice.updated.v1`, `job.created`, or `"*"`) make deliveries misbehave instead of requests: sent twice, or late enough that later ones overtake them. Faulted deliveries carry `X-Twin-Fault`, naming the rule the same way API answers do (see [Scenarios and faults](#scenarios-and-faults)).
 
 ```yaml
 faults:
@@ -351,7 +351,7 @@ faults:
     effect: { status: 429, message: "ThrottleExceeded" }
 ```
 
-Injected failures come back in the vendor's own error format, with the headers it sends (a Housecall Pro 429 has `RateLimit-Reset`, in twin time), and carry an `X-Twin-Fault` header, so you can tell them apart from real bugs. An `effect` can also slow a request down (`latencyMs`), or lose its answer: with `lostResponse: true` the twin does the work first and then answers with the error anyway, the way a gateway timeout hides a write that succeeded. That is the failure a retried write has to survive without happening twice (for QuickBooks, send a `requestid`):
+Injected failures come back in the vendor's own error format, with the headers it sends (a Housecall Pro 429 has `RateLimit-Reset`, in twin time), and carry an `X-Twin-Fault` header naming the rule, so you can tell them apart from real bugs. A header value has to be ASCII, so characters outside printable ASCII in a rule's name (an em dash, an emoji), and `%` itself, are percent-encoded there: `decodeURIComponent` gives the name back. An `effect` can also slow a request down (`latencyMs`), or lose its answer: with `lostResponse: true` the twin does the work first and then answers with the error anyway, the way a gateway timeout hides a write that succeeded. That is the failure a retried write has to survive without happening twice (for QuickBooks, send a `requestid`):
 
 ```yaml
   - name: qbo-lost-answers

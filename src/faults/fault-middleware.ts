@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import type { Twin } from "../core/twin.ts";
-import type { FaultRule } from "../core/types.ts";
+import { type FaultRule, faultHeaderValue } from "../core/types.ts";
 import type { VendorTwin } from "../core/vendor-twin.ts";
 
 /**
@@ -37,7 +37,7 @@ export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandl
     const answer = new Response(JSON.stringify(vendor.errorBody(status, message, twin)), {
       status,
       // X-Twin-Fault, so you can tell injected failures from real bugs
-      headers: { ...vendor.errorHeaders?.(status, twin), "Content-Type": "application/json", "X-Twin-Fault": error.name },
+      headers: { ...vendor.errorHeaders?.(status, twin), "Content-Type": "application/json", "X-Twin-Fault": faultHeaderValue(error.name) },
     });
     if (!lostResponse) return answer;
     await next(); // the work happens, events and all
