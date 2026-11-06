@@ -7,8 +7,9 @@ import { scenarioActionOf } from "./vendor-twin.ts";
  * A scenario's schedule: things that happen at set twin times ("at 09:00, 15 new Jobber clients").
  *
  * twin.advance() stops the clock at each entry's time and runs it then, recording the vendor's events with source
- * "scenario". The schedule only remembers which entry is next: after a rewind, every entry later than the
- * checkpoint is due again, and entries at or before it already happened in the kept history.
+ * "scenario". The schedule only remembers which entry is next, and a checkpoint saves that: after a rewind, the
+ * entries that hadn't run at the checkpoint are due again, even one at the checkpoint's own time that was still due
+ * then, and the ones that had run already happened in the kept history.
  */
 export interface TimelineEntry {
   atMs: number;
@@ -80,10 +81,14 @@ export class Timeline {
     };
   }
 
-  /** Make every entry after `ms` due again (after a rewind), or every entry (after a reset). */
-  rearmAfter(ms: number): void {
-    const index = this.entries.findIndex((entry) => entry.atMs > ms);
-    this.next = index === -1 ? this.entries.length : index;
+  /** Which entry is next, for a checkpoint to save. */
+  position(): number {
+    return this.next;
+  }
+
+  /** Make the entries from `position()` on due again: all of them after a reset (0), or those a checkpoint saw ahead. */
+  resumeAt(position: number): void {
+    this.next = position;
   }
 
   upcoming(limit: number): TimelineEntry[] {

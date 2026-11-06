@@ -187,6 +187,21 @@ describe("a scheduled action that throws when it runs, though its check passed",
     ]);
   });
 
+  it("is still due after a rewind to a checkpoint taken while it was stuck, and runs once it can", async () => {
+    const harness = setup();
+    loadScenario(harness.twin, scenario(`  - at: "+1h"\n    jobber: { payInvoices: 1, newClients: 3 }`));
+    createCheckpoint(harness.twin, "loaded");
+    const run = breakNewClients();
+    await expect(advanceClock(harness.twin, 2 * 60)).rejects.toThrow("jobber newClients");
+    createCheckpoint(harness.twin, "stuck"); // at 12:00, with payInvoices run and newClients still due
+
+    run.mockRestore();
+    rewindTo(harness.twin, "stuck");
+    expect(describeTwin(harness.twin).upcoming.map(({ at, action }) => [action, at])).toEqual([["newClients", "2026-07-13T12:00:00.000Z"]]);
+    await advanceClock(harness.twin, 60);
+    expect(listChanges(harness.twin, "loaded").map((change) => change.type)).toEqual(["InvoiceUpdated", ...Array(3).fill("ClientCreated")]);
+  });
+
   it("still sends the webhooks for what happened on the way before it", async () => {
     const topics: string[] = [];
     const harness = setup(42, {

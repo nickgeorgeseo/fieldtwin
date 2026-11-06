@@ -30,7 +30,8 @@ export class Twin {
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
-  private checkpoints = new Checkpoints<FaultRandom>(); // each saves where the fault dice were, to roll the same again
+  // Each saves what a rewind there puts back exactly: where the fault dice were, and which timeline entry was next.
+  private checkpoints = new Checkpoints<{ faultRandom: FaultRandom; timeline: number }>();
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   private readonly bookkeeping = new Bookkeeping((vendor) => streams.oauth(this.options.seed, [...this.vendors.keys()].indexOf(vendor)));
@@ -146,7 +147,7 @@ export class Twin {
       for (const vendor of this.vendors.values()) {
         for (const event of vendor.seed(this.world)) this.record(event, "seed");
       }
-      this.timeline.rearmAfter(Number.NEGATIVE_INFINITY);
+      this.timeline.resumeAt(0);
       this.timeline.runDue(this.clock.nowMs());
     });
   }
@@ -174,7 +175,8 @@ export class Twin {
   }
 
   checkpoint(name: string): Checkpoint {
-    return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), copyFaultRandom(this.faultRandom));
+    const saved = { faultRandom: copyFaultRandom(this.faultRandom), timeline: this.timeline.position() };
+    return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), saved);
   }
 
   checkpointList(): Checkpoint[] {
@@ -189,10 +191,11 @@ export class Twin {
   /** Go back to a checkpoint by replaying the log up to that point. The same requests then meet the same faults. */
   rewind(name: string): void {
     const checkpoint = this.checkpoints.get(name);
-    const faultRandom = copyFaultRandom(this.checkpoints.saved(name)); // a copy, so rewinding there again rolls the same once more
+    const saved = this.checkpoints.saved(name);
+    const faultRandom = copyFaultRandom(saved.faultRandom); // a copy, so rewinding there again rolls the same once more
     this.startOver(() => {
       this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
-      this.timeline.rearmAfter(this.clock.nowMs());
+      this.timeline.resumeAt(saved.timeline);
     });
     this.checkpoints.forgetAfter(name);
   }
