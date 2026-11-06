@@ -146,6 +146,19 @@ describe("the twin's client", async () => {
     expect((await read("/housecallpro/company", housecallpro.accessToken)).status).toBe(200);
   });
 
+  it("throws a TwinError with the OAuth server's own reason when it refuses to connect the app", async () => {
+    const fragment = await twin.connect("jobber", { redirectUri: "http://localhost:3000/callback#x" }).catch((error: unknown) => error);
+    expect(fragment).toBeInstanceOf(TwinError);
+    expect(fragment).toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/^Couldn't connect to jobber: redirect_uri must not include a fragment/),
+    });
+    const secret = await twin.connect("quickbooks", { clientSecret: "" }).catch((error: unknown) => error);
+    expect(secret).toBeInstanceOf(TwinError);
+    expect(secret).toMatchObject({ status: 401 });
+    expect((secret as Error).message).not.toContain("{");
+  });
+
   it("retries connecting when a fault rule fails the OAuth endpoints, since that failure was injected", async () => {
     await twin.setAuth("oauth");
     await twin.setFaults([{ name: "token-flaky", vendor: "jobber", pathIncludes: "/oauth/token", rate: 0.5, effect: { status: 503 } }]);

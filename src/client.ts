@@ -1,3 +1,4 @@
+import { TwinError } from "./client-error.ts";
 import { connectThroughOAuth, type OAuthApp } from "./client-oauth.ts";
 import type {
   AuthMode,
@@ -74,16 +75,7 @@ export interface TwinClient {
   connect(vendor: VendorName, app?: OAuthApp): Promise<Tokens>;
 }
 
-/** A request the twin refused, with its HTTP status and its own explanation as the message. */
-export class TwinError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = "TwinError";
-  }
-}
+export { TwinError };
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response> | Response;
 
