@@ -1,0 +1,25 @@
+# Security advisories in fieldtwin's dependencies (and the MCP SDK's) used to be found and bumped by hand. Dependabot
+# proposes the bumps instead, grouped so a week's worth arrives as one pull request per package, each checked by CI.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dependencies:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /dashboard
+    schedule:
+      interval: weekly
+    groups:
+      dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

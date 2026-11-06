@@ -14,13 +14,18 @@ concurrency:
 
 jobs:
   check:
-    name: Typecheck, lint, test (Node 22)
+    # package.json says Node 22 or newer, so test the oldest it promises and the newer lines people run.
+    name: Typecheck, lint, test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, current]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run typecheck
