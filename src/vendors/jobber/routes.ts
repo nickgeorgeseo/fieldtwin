@@ -60,7 +60,8 @@ export function jobberRoutes(twin: Twin): Hono {
       restoreRate: COST_LIMITS.restorePerSecond,
     });
 
-    if (requested > available) {
+    // Written so that a cost that isn't a number is refused too, never let through.
+    if (!(requested <= available)) {
       // Same code either way, but a query bigger than the whole bucket would wait forever: say so, so no one retries it.
       const message =
         requested > COST_LIMITS.capacity

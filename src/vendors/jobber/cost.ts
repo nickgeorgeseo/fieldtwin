@@ -24,6 +24,13 @@ export const COST_LIMITS = { capacity: 10_000, restorePerSecond: 500 };
 
 const PER_NODE_FIELDS = new Set(["nodes", "edges"]);
 
+/**
+ * Nested page sizes multiply, and a few dozen levels of `first: 2147483647` overflow a double to Infinity, which
+ * JSON writes as null and which a page size of 0 below it turns into NaN, a cost no throttle check refuses. Costs
+ * stop at the largest whole number a double holds exactly: any query that reaches it costs more than the bucket.
+ */
+const MAX_COST = Number.MAX_SAFE_INTEGER;
+
 export function requestedQueryCost(
   schema: GraphQLSchema,
   document: DocumentNode,
@@ -51,7 +58,7 @@ export function actualQueryCost(
 function selectionCost(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, multiplier: number, context: Context): number {
   let cost = 0;
   for (const field of collectFields(selectionSet, parentType, context)) cost += fieldCost(field, parentType, multiplier, context);
-  return cost;
+  return Math.min(cost, MAX_COST);
 }
 
 function fieldCost(field: FieldNode, parentType: GraphQLNamedType, multiplier: number, context: Context): number {
@@ -68,10 +75,10 @@ function fieldCost(field: FieldNode, parentType: GraphQLNamedType, multiplier: n
     const childType = fieldType(type, child);
     cost +=
       PER_NODE_FIELDS.has(child.name.value) && child.selectionSet && childType
-        ? selectionCost(child.selectionSet, childType, multiplier * pageSize, context)
+        ? selectionCost(child.selectionSet, childType, Math.min(multiplier * pageSize, MAX_COST), context)
         : fieldCost(child, type, multiplier, context);
   }
-  return cost;
+  return Math.min(cost, MAX_COST);
 }
 
 function requestedPageSize(field: FieldNode, context: Context): number {

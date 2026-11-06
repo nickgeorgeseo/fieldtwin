@@ -40,6 +40,20 @@ describe("Jobber connections: page sizes at the edges", () => {
     expect(body.extensions.cost.requestedQueryCost).toBe(20_100);
   });
 
+  it("can't be used to sneak an expensive query past the throttle by nesting page sizes until the cost overflows", async () => {
+    const tooExpensive = "a: clients(first: 100) { nodes { id jobs(first: 100) { nodes { id title } } } }"; // 20,100 points
+    // 40 levels of first: 2147483647 overflow a double; a page size of 0 below that once made the cost NaN.
+    const chain = (last: number) =>
+      `${"visits(first: 2147483647) { nodes { job { ".repeat(40)}visits(first: ${last}) { nodes { id } }${" } } }".repeat(40)}`;
+    for (const last of [1, 0, -1]) {
+      const query = `{ ${tooExpensive} job(id: "${Buffer.from("gid://Jobber/Job/1").toString("base64")}") { ${chain(last)} } }`;
+      const body = await (await setup().jobber(query)).json();
+      expect(body.errors?.[0]?.extensions?.code).toBe("THROTTLED");
+      expect(body.errors[0].message).toContain("can never run");
+      expect(Number.isSafeInteger(body.extensions.cost.requestedQueryCost)).toBe(true);
+    }
+  });
+
   it("pages through all 120 clients 100 at a time", async () => {
     const harness = setup();
     loadScenarioByName(harness.twin, "heat-wave-monday");
