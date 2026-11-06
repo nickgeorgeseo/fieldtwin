@@ -35,14 +35,26 @@ describe("the server", () => {
 
   it("says what a port looks like when FIELDTWIN_PORT isn't one", () => {
     expect(() => listenOn({ FIELDTWIN_PORT: "four thousand" })).toThrow(
-      'FIELDTWIN_PORT must be a port number like 4010, not "four thousand"',
+      'FIELDTWIN_PORT must be a port number from 0 to 65,535, like 4010, not "four thousand"',
     );
+  });
+
+  it("names the setting when FIELDTWIN_PORT or FIELDTWIN_SEED is a number too large to use", () => {
+    expect(() => listenOn({ FIELDTWIN_PORT: "65536" })).toThrow(
+      'FIELDTWIN_PORT must be a port number from 0 to 65,535, like 4010, not "65536"',
+    );
+    expect(() => settingsFrom({ FIELDTWIN_SEED: "100000000000000000000" })).toThrow(
+      'FIELDTWIN_SEED must be a whole number from 0 to 9,007,199,254,740,991, like 42, not "100000000000000000000"',
+    );
+    expect(listenOn({ FIELDTWIN_PORT: "65535" }).port).toBe(65535);
   });
 
   it("takes its seed and auth mode from FIELDTWIN_SEED and FIELDTWIN_AUTH, and explains bad values", () => {
     expect(settingsFrom({})).toEqual({ seed: 42, auth: "any-token" });
     expect(settingsFrom({ FIELDTWIN_SEED: "7", FIELDTWIN_AUTH: "oauth" })).toEqual({ seed: 7, auth: "oauth" });
-    expect(() => settingsFrom({ FIELDTWIN_SEED: "abc" })).toThrow('FIELDTWIN_SEED must be a whole number like 42, not "abc"');
+    expect(() => settingsFrom({ FIELDTWIN_SEED: "abc" })).toThrow(
+      'FIELDTWIN_SEED must be a whole number from 0 to 9,007,199,254,740,991, like 42, not "abc"',
+    );
   });
 });
 

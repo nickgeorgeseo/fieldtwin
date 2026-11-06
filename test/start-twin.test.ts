@@ -79,6 +79,10 @@ describe("startTwin()", () => {
     }
   });
 
+  it("refuses an empty hostname, which would listen on every address instead of only this machine", async () => {
+    for (const hostname of ["", "  "]) await expect(startTwin({ hostname })).rejects.toThrow("hostname must be an address to listen on");
+  });
+
   it("names the port option, not an environment variable, when its port is taken", async () => {
     const first = await start();
     const refusal = startTwin({ port: first.port });

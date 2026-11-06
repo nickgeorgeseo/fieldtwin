@@ -34,6 +34,8 @@ export interface RunningTwin extends TwinClient {
  */
 export async function startTwin(options: StartOptions = {}): Promise<RunningTwin> {
   const { port = 0, hostname = "127.0.0.1", scenario, seed, auth, ...appOptions } = options;
+  // An empty hostname would make Node listen on every address, the opposite of the loopback-only default (SECURITY.md).
+  if (!hostname.trim()) throw new Error('hostname must be an address to listen on, like "127.0.0.1", not an empty string');
   // Checked as the command checks FIELDTWIN_SEED and FIELDTWIN_AUTH: a typo shouldn't quietly make another twin.
   if (seed !== undefined && !(Number.isSafeInteger(seed) && seed >= 0)) throw new Error(`seed must be a whole number like 42, not ${seed}`);
   const { app, twin } = createApp({ ...appOptions, seed, auth: auth === undefined ? undefined : parseAuthMode(auth) });

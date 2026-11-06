@@ -10,13 +10,16 @@ type Env = Record<string, string | undefined>;
  * any URL, so it should only be reachable from the network when someone asks for that.
  */
 export function listenOn(env: Env) {
-  return { hostname: setting(env, "FIELDTWIN_HOST") ?? "127.0.0.1", port: wholeNumber(env, "FIELDTWIN_PORT", "a port number", 4010) };
+  return {
+    hostname: setting(env, "FIELDTWIN_HOST") ?? "127.0.0.1",
+    port: wholeNumber(env, "FIELDTWIN_PORT", "a port number", 4010, MAX_PORT),
+  };
 }
 
 /** The twin's seed (the same seed builds the same world) and auth mode, from the environment. */
 export function settingsFrom(env: Env) {
   return {
-    seed: wholeNumber(env, "FIELDTWIN_SEED", "a whole number", 42),
+    seed: wholeNumber(env, "FIELDTWIN_SEED", "a whole number", 42, Number.MAX_SAFE_INTEGER),
     auth: parseAuthMode(setting(env, "FIELDTWIN_AUTH") ?? "any-token"),
   };
 }
@@ -26,10 +29,15 @@ function setting(env: Env, name: string): string | undefined {
   return env[name]?.trim() || undefined;
 }
 
-function wholeNumber(env: Env, name: string, description: string, fallback: number): number {
+const MAX_PORT = 65_535;
+
+/** A setting that must be a whole number from 0 to `most`, explained by name when it isn't. */
+function wholeNumber(env: Env, name: string, description: string, fallback: number, most: number): number {
   const text = setting(env, name);
   if (text === undefined) return fallback;
-  if (!/^\d+$/.test(text)) throw new Error(`${name} must be ${description} like ${fallback}, not "${text}"`);
+  if (!/^\d+$/.test(text) || Number(text) > most) {
+    throw new Error(`${name} must be ${description} from 0 to ${most.toLocaleString("en-US")}, like ${fallback}, not "${text}"`);
+  }
   return Number(text);
 }
 
