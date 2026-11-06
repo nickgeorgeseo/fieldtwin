@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { hcpId } from "../src/vendors/housecallpro/ids.ts";
+import type { HcpState } from "../src/vendors/housecallpro/types/index.ts";
 import { jobCast, SCHEDULE } from "./hcp-helpers.ts";
 import { setup } from "./helpers.ts";
 
@@ -123,6 +125,26 @@ describe("Housecall Pro twin: creating jobs", () => {
     const taken = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number: 1 });
     expect(taken.status).toBe(422);
     expect((await taken.json()).error.message).toMatch(/invoice_number 1 is taken/i);
+  });
+
+  it("numbers a job after the highest however many jobs the company has, past the most arguments a call can take", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await jobCast(harness);
+    const post = () => harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId });
+    expect((await post()).status).toBe(201);
+    const { job } = harness.twin.log.all().at(-1)!.data as { job: Record<string, unknown> };
+    // Recorded as POST /jobs records them, the same JobCreated with the next id and number, since 200,000 requests are slow.
+    const state = () => harness.twin.state<HcpState>("housecallpro");
+    while (state().jobs.size < 200_000) {
+      const n = state().counts.jobs + 1;
+      harness.twin.record(
+        { vendor: "housecallpro", type: "JobCreated", data: { job: { ...job, id: hcpId("job", n), invoice_number: String(n) } } },
+        "api",
+      );
+    }
+    const response = await post();
+    expect(response.status).toBe(201);
+    expect((await response.json()).invoice_number).toBe("200001");
   });
 
   it("reads null on an optional field as not sent, as clients generated from the OpenAPI spec send it", async () => {

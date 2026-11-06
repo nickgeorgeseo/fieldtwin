@@ -67,7 +67,12 @@ export function jobWriteRoutes(app: Hono, twin: Twin): void {
  * past the largest whole number it can count to exactly.
  */
 function nextInvoiceNumber(state: HcpState): string | undefined {
-  const numbers = [...state.jobs.values()].map((job) => Number(job.invoice_number)).filter(Number.isInteger);
-  const next = Math.max(0, ...numbers) + 1;
+  // A loop, not Math.max(...numbers): spreading one argument per job overflows the stack past about 130,000 jobs.
+  let highest = 0;
+  for (const job of state.jobs.values()) {
+    const number = Number(job.invoice_number);
+    if (Number.isInteger(number) && number > highest) highest = number;
+  }
+  const next = highest + 1;
   return Number.isSafeInteger(next) ? String(next) : undefined;
 }
