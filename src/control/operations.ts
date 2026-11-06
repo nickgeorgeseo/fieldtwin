@@ -94,7 +94,12 @@ export async function runAction(twin: Twin, vendorName: string, action: string, 
   return { events: recorded.map((event) => summarize(twin, event)) };
 }
 
+/**
+ * Mark this moment, to list or rewind what happens after it. An empty name is refused: the log export over HTTP reads
+ * `?since=` as no checkpoint at all, so every adapter does, and a checkpoint named "" could never be exported from.
+ */
 export function createCheckpoint(twin: Twin, name: string) {
+  if (name === "") throw new Error('A checkpoint needs a name, like "before-sync".');
   return twin.checkpoint(name);
 }
 

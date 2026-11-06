@@ -155,6 +155,14 @@ describe("MCP server: scenarios, faults, auth, and the log", () => {
     expect(JSON.parse(since[0]!)).toMatchObject({ type: "CustomerCreated", source: "api" });
   });
 
+  it("refuses a checkpoint with an empty name, which an export since it would read as no checkpoint at all", async () => {
+    const { client, twin } = await connectAgent();
+    const result = await client.callTool({ name: "twin_checkpoint", arguments: { name: "" } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("needs a name");
+    expect(twin.checkpointList()).toEqual([]);
+  });
+
   it("subscribes to webhooks, makes customers pay, and shows the deliveries", async () => {
     const { call, twin } = await connectAgent();
     const subscription = {

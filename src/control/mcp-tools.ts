@@ -47,7 +47,7 @@ export function createMcpServer(twin: Twin, version: string): McpServer {
 
   server.registerTool(
     "twin_checkpoint",
-    { ...text.twin_checkpoint, inputSchema: { name: z.string().describe("Any name, like before-sync") }, annotations: REPLACES },
+    { ...text.twin_checkpoint, inputSchema: { name: z.string().describe("A name, not empty, like before-sync") }, annotations: REPLACES },
     ({ name }) => asText(ops.createCheckpoint(twin, name)),
   );
 
