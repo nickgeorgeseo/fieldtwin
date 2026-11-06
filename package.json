@@ -54,9 +54,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "tsx src/server.ts",
-    "dev": "tsx watch src/server.ts",
-    "mcp": "tsx src/mcp.ts",
+    "start": "tsx src/cli.ts",
+    "dev": "tsx watch src/cli.ts",
+    "mcp": "tsx src/cli.ts mcp",
     "build": "tsx scripts/build.ts",
     "prepack": "npm run build",
     "example:sync": "tsx examples/sync-jobber-invoice-to-quickbooks/src/main.ts",

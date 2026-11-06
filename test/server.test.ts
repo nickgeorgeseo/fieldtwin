@@ -74,9 +74,9 @@ describe("npm start", () => {
     for (const child of children.splice(0)) child.kill();
   });
 
-  /** Runs src/server.ts the way `npm start` does, collecting what it prints. */
+  /** Runs src/cli.ts the way `npm start` does, collecting what it prints. */
   function start(port: number, args: string[] = [], checkout = join(import.meta.dirname, ".."), env: Record<string, string> = {}) {
-    const child = spawn(process.execPath, ["--import", "tsx", join(checkout, "src", "server.ts"), ...args], {
+    const child = spawn(process.execPath, ["--import", "tsx", join(checkout, "src", "cli.ts"), ...args], {
       env: { ...process.env, FIELDTWIN_PORT: String(port), ...env },
     });
     children.push(child);

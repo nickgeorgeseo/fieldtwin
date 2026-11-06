@@ -1,5 +1,3 @@
-import { realpathSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import { parseAuthMode } from "./control/operations.ts";
 import type { Twin } from "./core/twin.ts";
 import { addressOf, type RunningTwin, startTwin } from "./start.ts";
@@ -71,18 +69,3 @@ function exitWith(message: string): never {
   console.error(`fieldtwin: ${message}`);
   process.exit(1);
 }
-
-/**
- * Whether this file is the one node was asked to run. Node resolves symlinks in the module's URL, so compare it with
- * the real path of what was run, as a URL: the path may hold spaces (percent-encoded in a URL) or be a Windows path.
- */
-export function isEntryPoint(moduleUrl: string, scriptPath = process.argv[1]): boolean {
-  if (!scriptPath) return false;
-  try {
-    return moduleUrl === pathToFileURL(realpathSync(scriptPath)).href;
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint(import.meta.url)) void startServer();

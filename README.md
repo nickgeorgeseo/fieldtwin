@@ -476,9 +476,9 @@ src/
   start.ts     startTwin(): a twin on its own port, from code
   index.ts     what `import { startTwin } from "fieldtwin"` gets
   client.ts    the typed control-plane client startTwin() and connectTwin() return
-  cli.ts       the fieldtwin command
-  server.ts    entry point for `npm start`
-  mcp.ts       entry point for `npm run mcp` and `fieldtwin mcp`
+  cli.ts       the fieldtwin command, which npm start and npm run mcp run too
+  server.ts    startServer(): settings from the environment, printed, exiting on trouble
+  mcp.ts       startMcp(): the same, plus MCP over stdio
 scenarios/     ready-made situations (heat-wave-monday, mismatched-books, flaky-apis)
 examples/      code that uses the twins the way yours will: over HTTP, never importing src/
   sync-jobber-invoice-to-quickbooks/   the reference integration, its demo, and its tests
