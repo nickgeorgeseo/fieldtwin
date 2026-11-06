@@ -145,6 +145,18 @@ describe("answers that are never evidence", () => {
   });
 });
 
+describe("a QuickBooks error whose body isn't an object", () => {
+  it.each(['"Not Found"', "404", "null"])("is observed as a status with no fault, rather than stopping the case: %s", async (text) => {
+    const sandbox = fakeTarget(async () => new Response(text, { status: 404, headers: { "Content-Type": "application/json" } }));
+    await expect(caseNamed("quickbooks/read-missing-entity").observe(sandbox)).resolves.toEqual({
+      status: 404,
+      faultKey: null,
+      faultType: null,
+      code: null,
+    });
+  });
+});
+
 describe("a recording run's results", () => {
   const quickbooksCases = CASES.filter((testCase) => testCase.vendor === "quickbooks").slice(0, 3);
   const [first, second, third] = quickbooksCases.map((testCase) => testCase.name);

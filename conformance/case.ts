@@ -176,7 +176,8 @@ export function expectOk(answer: Answer, doing: string): Answer["body"] {
  * Documented errors are { Fault: { Error: [...], type } }; 401s are reported to arrive as { fault: { error: [...] } }.
  */
 export function faultOf(answer: Answer): Observations {
-  const body = answer.body ?? {};
+  // An answer whose JSON is a string, a number, or null has no fault to observe, only its status.
+  const body = typeof answer.body === "object" && answer.body !== null ? answer.body : {};
   const key = "Fault" in body ? "Fault" : "fault" in body ? "fault" : null;
   const fault = key ? body[key] : {};
   const error = (fault.Error ?? fault.error ?? [])[0] ?? {};
