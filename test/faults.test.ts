@@ -85,6 +85,14 @@ describe("fault rules", () => {
     expect((await badVendor.json()).error).toContain("0.vendor");
   });
 
+  it("refuse a rule with an empty name, which X-Twin-Fault could never name", async () => {
+    const { app, twin } = setup();
+    const response = await putFaults(app, [{ name: "", vendor: "jobber", webhook: "*", rate: 1, effect: { duplicate: true } }]);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("0.name: give the rule a name");
+    expect(twin.faultRules).toEqual([]);
+  });
+
   it("refuse a latency over a week, which a timer can't wait and would cut to a millisecond", async () => {
     const { app, twin } = setup();
     const response = await putFaults(app, [{ name: "slow", vendor: "quickbooks", rate: 1, effect: { latencyMs: 2_200_000_000 } }]);

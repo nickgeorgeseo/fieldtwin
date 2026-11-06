@@ -19,7 +19,8 @@ const atMostAWeek = { message: "can be at most a week (604800000)" };
 
 const FaultRuleSchema = z
   .object({
-    name: z.string(),
+    // X-Twin-Fault carries the name, and the twin reads an empty one as no fault: a duplicate rule would never fire.
+    name: z.string().min(1, { message: 'give the rule a name, like "qbo-throttled"; X-Twin-Fault carries it' }),
     vendor: z.enum(VENDOR_NAMES),
     method: z.string().optional(),
     pathIncludes: z.string().optional(),
