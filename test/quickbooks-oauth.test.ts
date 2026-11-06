@@ -88,6 +88,30 @@ describe("QuickBooks OAuth twin", () => {
     expect(await noCode.json()).toEqual({ error: "invalid_request", error_description: expect.stringMatching(/^code is required/) });
   });
 
+  it("refuses a parameter sent twice, as OAuth forbids: 400 for a second redirect_uri, an invalid_request redirect otherwise", async () => {
+    const harness = setup();
+    const query = new URLSearchParams({ client_id: CLIENT.id, response_type: "code", redirect_uri: CLIENT.redirectUri, scope: "openid" });
+    const twoRedirects = await harness.app.request(`/connect/oauth2?${query}&redirect_uri=https%3A%2F%2Fevil.example.com%2Fcb`);
+    expect(twoRedirects.status).toBe(400);
+    expect(await twoRedirects.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/redirect_uri/) });
+    const twoScopes = await harness.app.request(`/connect/oauth2?${query}&scope=com.intuit.quickbooks.accounting`);
+    expect(new URL(twoScopes.headers.get("Location")!).searchParams.get("error")).toBe("invalid_request");
+
+    const code = new URL((await authorize(harness)).headers.get("Location")!).searchParams.get("code")!;
+    const form = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: CLIENT.redirectUri });
+    form.append("code", "another-code");
+    const twoCodes = await harness.app.request("/oauth2/v1/tokens/bearer", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: basic() },
+      body: form.toString(),
+    });
+    expect(twoCodes.status).toBe(400);
+    expect(await twoCodes.json()).toEqual({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^code was sent more than once/),
+    });
+  });
+
   it("exchanges the code for tokens in the documented response shape", async () => {
     const tokens = await connect(setup());
     expect(tokens).toEqual({

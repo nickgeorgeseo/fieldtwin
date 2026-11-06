@@ -40,13 +40,28 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
   if (!/application\/x-www-form-urlencoded|multipart\/form-data/i.test(c.req.header("Content-Type") ?? "")) {
     return { problem: `Send the request body as ${formEncoded}, as OAuth 2.0 requires.` };
   }
+  let body: Record<string, unknown>;
   try {
-    const fields = Object.entries(await c.req.parseBody()).filter((entry): entry is [string, string] => typeof entry[1] === "string");
-    return { form: Object.fromEntries(fields) };
+    body = await c.req.parseBody({ all: true }); // a field sent twice comes back as an array
   } catch {
     return { problem: `The request body isn't a form the twin can read. Send it as ${formEncoded}.` };
   }
+  const repeated = Object.keys(body).find((name) => Array.isArray(body[name]));
+  if (repeated) return { problem: repeatedProblem(repeated) };
+  const fields = Object.entries(body).filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  return { form: Object.fromEntries(fields) };
 }
+
+/**
+ * A query parameter sent more than once, if any. RFC 6749 3.1 says request parameters "MUST NOT be included more
+ * than once", and a request that does is invalid_request (4.1.2.1): otherwise which value counts is up to the server.
+ */
+export function repeatedQueryParameter(c: Context): { name: string; problem: string } | undefined {
+  const name = Object.entries(c.req.queries()).find(([, values]) => values.length > 1)?.[0];
+  return name === undefined ? undefined : { name, problem: repeatedProblem(name) };
+}
+
+const repeatedProblem = (name: string) => `${name} was sent more than once. Send each parameter once, as OAuth 2.0 requires.`;
 
 /**
  * The token request parameter its grant needs but didn't get, if any. RFC 6749 5.2 answers a missing parameter

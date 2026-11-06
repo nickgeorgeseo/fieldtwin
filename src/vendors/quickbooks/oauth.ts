@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
-import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
+import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem, repeatedQueryParameter } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import type { QboState } from "./types.ts";
 
@@ -31,12 +31,18 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     if (!clientId || !redirectUri) {
       return c.json({ error: "invalid_request", error_description: "client_id and redirect_uri are required" }, 400);
     }
+    // A repeated parameter redirects with invalid_request, like the other errors here, unless it leaves the
+    // client or the redirect URI in doubt: then there's no one to safely send the browser back to (RFC 6749 4.1.2.1).
+    const repeated = repeatedQueryParameter(c);
+    if (repeated?.name === "client_id" || repeated?.name === "redirect_uri") {
+      return c.json({ error: "invalid_request", error_description: repeated.problem }, 400);
+    }
     const redirectProblem = redirectUriProblem(redirectUri);
     if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const back = new URL(redirectUri);
     if (state !== undefined) back.searchParams.set("state", state);
     // A missing response_type is invalid_request, not unsupported (RFC 6749 4.1.2.1).
-    if (!response_type) back.searchParams.set("error", "invalid_request");
+    if (repeated || !response_type) back.searchParams.set("error", "invalid_request");
     else if (response_type !== "code") back.searchParams.set("error", "unsupported_response_type");
     else if (!scope?.split(" ").includes(ACCOUNTING_SCOPE)) back.searchParams.set("error", "invalid_scope");
     else {

@@ -146,6 +146,29 @@ describe("Jobber OAuth twin", () => {
     });
   });
 
+  it("refuses an authorization or token request that sends a parameter twice, as OAuth forbids (400 invalid_request)", async () => {
+    const harness = setup();
+    const query = new URLSearchParams({ response_type: "code", client_id: CLIENT.id, redirect_uri: CLIENT.redirectUri });
+    const twoClients = await harness.app.request(`/api/oauth/authorize?${query}&client_id=another-app`);
+    expect(twoClients.status).toBe(400);
+    expect(await twoClients.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^client_id/) });
+
+    const form = new URLSearchParams({
+      client_id: CLIENT.id,
+      client_secret: CLIENT.secret,
+      grant_type: "refresh_token",
+      refresh_token: "x",
+    });
+    form.append("grant_type", "authorization_code");
+    const twoGrantTypes = await harness.app.request("/api/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    expect(twoGrantTypes.status).toBe(400);
+    expect(await twoGrantTypes.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^grant_type/) });
+  });
+
   it("needs the client secret", async () => {
     const harness = setup();
     const response = await harness.app.request("/api/oauth/token", {

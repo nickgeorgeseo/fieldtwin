@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
-import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
+import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem, repeatedQueryParameter } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import { HCP } from "./routes/base.ts";
 
@@ -39,6 +39,8 @@ export function housecallproOAuthRoutes(app: Hono, twin: Twin): void {
     if (!clientId || !redirectUri || c.req.query("response_type") !== "code") {
       return c.json({ error: "invalid_request", error_description: "response_type=code, client_id, and redirect_uri are required." }, 400);
     }
+    const repeated = repeatedQueryParameter(c); // RFC 6749 3.1: no parameter twice
+    if (repeated) return c.json({ error: "invalid_request", error_description: repeated.problem }, 400);
     const redirectProblem = redirectUriProblem(redirectUri);
     if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const code = oauth().authorize(
