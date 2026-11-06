@@ -53,8 +53,13 @@ export const quickbooksCases: ConformanceCase[] = [
     vendor: "quickbooks",
     endpoint: "GET /query",
     fidelity: "Wrong realm: 403 AuthorizationFault 3100",
-    observe: async (target) =>
-      faultOf(await quickbooks(target, "GET", "query?query=SELECT%20COUNT(*)%20FROM%20Customer", undefined, { realmId: "1" })),
+    async observe(target) {
+      const count = "query?query=SELECT%20COUNT(*)%20FROM%20Customer";
+      const observed = faultOf(await quickbooks(target, "GET", count, undefined, { realmId: "1" }));
+      // The other company may answer 401: unless the token is still let into its own, that isn't evidence.
+      await quickbooks(target, "GET", count);
+      return observed;
+    },
   },
   {
     name: "entity-name-case",

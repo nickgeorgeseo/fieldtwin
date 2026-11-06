@@ -3,7 +3,7 @@ import { caseId, housecallpro } from "./case.ts";
 import { CASES } from "./cases/index.ts";
 import { nextRecording } from "./recordings.ts";
 import { observeAll, type Results } from "./run.ts";
-import { caseNamed, fakeTarget, sandboxAnswering } from "./test-support.ts";
+import { answering, caseNamed, fakeTarget, sandboxAnswering } from "./test-support.ts";
 
 /**
  * What reaches a recording from a sandbox's answers, and what never does: the run's own token or key, however an
@@ -120,6 +120,22 @@ describe("answers that are never evidence", () => {
     }
     const badToken = caseNamed("quickbooks/unknown-access-token");
     await expect(badToken.observe(sandboxAnswering(401))).resolves.toMatchObject({ status: 401 });
+  });
+
+  it("record a 401 for a token used on another QuickBooks company, unless the token stopped working on its own company too", async () => {
+    const anotherCompany = caseNamed("quickbooks/another-company");
+    const refusingOthers = answering((url) =>
+      url.pathname.includes("/company/1/")
+        ? { status: 401, body: { fault: { error: [{ code: "3100" }], type: "AUTHENTICATION" } } }
+        : { body: { QueryResponse: { totalCount: 1 } } },
+    );
+    await expect(anotherCompany.observe(refusingOthers)).resolves.toEqual({
+      status: 401,
+      faultKey: "fault",
+      faultType: "AUTHENTICATION",
+      code: "3100",
+    });
+    await expect(anotherCompany.observe(sandboxAnswering(401))).rejects.toThrow("get a fresh one");
   });
 
   it("stop a case when Housecall Pro stops taking the run's API key, but not when a case sends another on purpose", async () => {

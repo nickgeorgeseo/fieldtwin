@@ -91,7 +91,10 @@ export async function quickbooks(
     body: sent,
   });
   const answer = await answerOf(response, accessToken, "(the access token)");
-  if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, options.token === undefined);
+  // A 401 is about the token only when it went to its own company: another company may be refusing the token there, so
+  // a case that names one asks its own again afterwards.
+  const ownCompany = options.token === undefined && options.realmId === undefined;
+  if (!options.anyAnswer) refuseUnrecordable("QuickBooks", answer, ownCompany);
   return answer;
 }
 
