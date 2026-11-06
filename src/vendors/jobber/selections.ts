@@ -51,16 +51,39 @@ export function rootType(schema: GraphQLSchema, operation: OperationDefinitionNo
   return root;
 }
 
-/** The fields of a selection set, with fragments and inline fragments flattened in and skipped selections left out. */
+/**
+ * The fields of a selection set, with fragments and inline fragments flattened in and skipped selections left out,
+ * one per response key (alias or name). Execution merges fields that share a key, so `id` selected directly and
+ * again in a fragment comes back once, and is priced once; the sub-selections of a repeated field are merged too.
+ */
 export function collectFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
+  const byKey = new Map<string, FieldNode[]>();
+  for (const field of allFields(selectionSet, parentType, context)) {
+    const key = field.alias?.value ?? field.name.value;
+    const sameKey = byKey.get(key);
+    if (sameKey) sameKey.push(field);
+    else byKey.set(key, [field]);
+  }
+  // Validation guarantees fields sharing a key have the same name and arguments, so only their selections differ.
+  return [...byKey.values()].map((fields) => {
+    const first = fields[0]!;
+    if (!first.selectionSet || fields.length === 1) return first;
+    return {
+      ...first,
+      selectionSet: { ...first.selectionSet, selections: fields.flatMap((field) => field.selectionSet?.selections ?? []) },
+    };
+  });
+}
+
+function allFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
   const fields: FieldNode[] = [];
   for (const selection of selectionSet.selections) {
     if (!included(selection, context)) continue;
     if (selection.kind === Kind.FIELD) fields.push(selection);
-    else if (selection.kind === Kind.INLINE_FRAGMENT) fields.push(...collectFields(selection.selectionSet, parentType, context));
+    else if (selection.kind === Kind.INLINE_FRAGMENT) fields.push(...allFields(selection.selectionSet, parentType, context));
     else {
       const fragment = context.fragments.get(selection.name.value);
-      if (fragment) fields.push(...collectFields(fragment.selectionSet, parentType, context));
+      if (fragment) fields.push(...allFields(fragment.selectionSet, parentType, context));
     }
   }
   return fields;

@@ -107,6 +107,28 @@ describe("Jobber twin: the cost bucket", () => {
   });
 });
 
+describe("Jobber twin: fields selected more than once", () => {
+  it("charges a field once however many times it's selected, since the data holds it once", async () => {
+    const { jobber } = setup();
+    const plain = await (await jobber("{ clients(first: 10) { nodes { id name } } }")).json();
+    const repeated = await (
+      await jobber("{ clients(first: 10) { nodes { id name ...Basics } } } fragment Basics on Client { id name }")
+    ).json();
+    expect(repeated.data).toEqual(plain.data);
+    expect(repeated.extensions.cost.requestedQueryCost).toBe(20);
+    expect(repeated.extensions.cost.actualQueryCost).toBe(20);
+    expect(repeated.extensions.cost.throttleStatus.currentlyAvailable).toBe(10_000 - 20 - 20); // the plain query spent 20 too
+  });
+
+  it("merges the selections under a repeated field before pricing them", async () => {
+    const { jobber } = setup();
+    const body = await (await jobber("{ a: account { id } a: account { id name } }")).json();
+    expect(Object.keys(body.data.a)).toEqual(["id", "name"]);
+    expect(body.extensions.cost.requestedQueryCost).toBe(3);
+    expect(body.extensions.cost.actualQueryCost).toBe(3);
+  });
+});
+
 describe("Jobber twin: whose budget is it", () => {
   const expensive = `{ clients(first: 1000) { nodes { emails { address } phones { number } } } }`;
   const available = async (response: Response) => (await response.json()).extensions.cost.throttleStatus.currentlyAvailable;
