@@ -86,11 +86,15 @@ export function isFaultStatus(status: number): status is FaultStatus {
  * (https://fetch.spec.whatwg.org/#concept-header-value), and fetch and Response throw on anything else, so a name
  * with an em dash or an emoji would turn the injected error into a 500 and a faulted delivery into a "network error".
  * Characters outside printable ASCII, and "%" itself, are percent-encoded: plain names read as written, and
- * decodeURIComponent gives any name back.
+ * decodeURIComponent gives any name back. So is a space at either end, which fetch strips from a header value
+ * (https://fetch.spec.whatwg.org/#concept-header-value-normalize): "  padded  " would arrive as "padded", and " " as
+ * the empty header the twin reads as no fault.
  */
 export function faultHeaderValue(name: string): string {
   const utf8 = new TextEncoder(); // not encodeURIComponent, which throws on a lone surrogate that JSON lets through
-  return name.replace(/[^\x20-\x24\x26-\x7E]/gu, (character) =>
-    [...utf8.encode(character)].map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`).join(""),
-  );
+  return name
+    .replace(/[^\x20-\x24\x26-\x7E]/gu, (character) =>
+      [...utf8.encode(character)].map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`).join(""),
+    )
+    .replace(/^ | $/g, "%20");
 }

@@ -41,6 +41,20 @@ describe("fault rules", () => {
     expect(outage.headers.get("X-Twin-Fault")).toBe("half an emoji %EF%BF%BD");
   });
 
+  it("name a rule with spaces at either end in full, though a header value loses its outer spaces", async () => {
+    const { app, qboGet, hcpGet } = setup();
+    const rules = [
+      { name: "  padded  ", vendor: "quickbooks", rate: 1, effect: { status: 503 } },
+      { name: " ", vendor: "housecallpro", rate: 1, effect: { status: 503 } },
+    ];
+    expect((await putFaults(app, rules)).status).toBe(200);
+
+    const padded = (await qboGet("/customer/1")).headers.get("X-Twin-Fault")!;
+    expect(padded).toBe("%20 padded %20");
+    expect(decodeURIComponent(padded)).toBe("  padded  ");
+    expect(decodeURIComponent((await hcpGet("/company")).headers.get("X-Twin-Fault")!)).toBe(" ");
+  });
+
   it("are validated, with an error that names the exact field that is wrong", async () => {
     const { app, twin } = setup();
     const response = await putFaults(app, [{ name: "not-an-error", vendor: "quickbooks", rate: 1, effect: { status: 200 } }]);
