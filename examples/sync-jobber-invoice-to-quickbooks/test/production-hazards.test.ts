@@ -105,6 +105,22 @@ describe("the webhook queue when the connection is lost", () => {
     expect(queue.totals.invoices).toBe(10_002);
   });
 
+  it("counts an invoice synced again as the latest, so it isn't forgotten first and counted twice", async () => {
+    const queue = new InvoiceQueue(
+      async () => ({ ...emptyStats(), invoices: 1 }),
+      () => {},
+    );
+    for (let n = 1; n <= 10_000; n++) queue.add(update(`invoice-${n}`));
+    await queue.idle();
+    queue.add(update("invoice-1")); // synced again: now the latest
+    await queue.idle();
+    queue.add(update("invoice-10001")); // forgets the oldest, invoice-2
+    await queue.idle();
+    queue.add(update("invoice-1")); // still among the latest 10,000: not a new invoice
+    await queue.idle();
+    expect(queue.totals.invoices).toBe(10_001);
+  });
+
   it("keeps the invoice it was syncing first in line, so news is still synced in the order it came", async () => {
     let connected = false;
     const tried: string[] = [];

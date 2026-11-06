@@ -76,8 +76,9 @@ export class InvoiceQueue {
         this.log(`Invoice ${invoiceId} from a webhook: ${error instanceof Error ? error.message : String(error)}`);
       }
       for (const key of Object.keys(this.totals) as (keyof SyncStats)[]) if (key !== "invoices") this.totals[key] += stats[key];
-      if (stats.invoices > 0 && !this.synced.has(invoiceId)) {
-        this.totals.invoices++;
+      if (stats.invoices > 0) {
+        // A Set keeps first-insertion order, so one synced again is taken out and put back, as the latest.
+        if (!this.synced.delete(invoiceId)) this.totals.invoices++;
         this.synced.add(invoiceId);
         if (this.synced.size > REMEMBERED) this.synced.delete(this.synced.values().next().value!);
       }
