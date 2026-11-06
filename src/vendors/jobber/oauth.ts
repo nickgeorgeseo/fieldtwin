@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { Hono } from "hono";
 import type { AccessTokenClaims, OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
-import { readForm, redirectUriProblem } from "../../core/request-body.ts";
+import { missingGrantParameter, readForm, redirectUriProblem } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 
 /**
@@ -52,6 +52,8 @@ export function jobberOAuthRoutes(app: Hono, twin: Twin): void {
     if (!field("client_id") || !field("client_secret")) {
       return c.json({ error: "invalid_client", error_description: "client_id and client_secret are required" }, 401);
     }
+    const missing = missingGrantParameter(field);
+    if (missing) return c.json({ error: "invalid_request", error_description: missing }, 400);
 
     let result: TokenSet | OAuthError;
     if (field("grant_type") === "authorization_code") {

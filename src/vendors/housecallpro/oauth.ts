@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
-import { readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
+import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import { HCP } from "./routes/base.ts";
 
@@ -61,6 +61,8 @@ export function housecallproOAuthRoutes(app: Hono, twin: Twin): void {
     if (!field("client_id") || !field("client_secret")) {
       return c.json({ error: "invalid_client", error_description: "client_id and client_secret are required in the request body." }, 401);
     }
+    const missing = missingGrantParameter(field);
+    if (missing) return c.json({ error: "invalid_request", error_description: missing }, 400);
 
     let result: TokenSet | OAuthError;
     if (field("grant_type") === "authorization_code") {

@@ -49,6 +49,17 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
 }
 
 /**
+ * The token request parameter its grant needs but didn't get, if any. RFC 6749 5.2 answers a missing parameter
+ * with invalid_request, keeping unsupported_grant_type and invalid_grant for values that were sent.
+ */
+export function missingGrantParameter(field: (name: string) => string): string | undefined {
+  const grantType = field("grant_type");
+  if (!grantType) return "grant_type is required: send authorization_code or refresh_token.";
+  const needs = grantType === "authorization_code" ? "code" : grantType === "refresh_token" ? "refresh_token" : undefined;
+  return needs && !field(needs) ? `${needs} is required with grant_type=${grantType}.` : undefined;
+}
+
+/**
  * What's wrong with an OAuth redirect_uri, if anything: it must be an absolute URL to send the browser back to, and
  * "MUST NOT include a fragment component" (RFC 6749 3.1.2), since the code goes in the query.
  */

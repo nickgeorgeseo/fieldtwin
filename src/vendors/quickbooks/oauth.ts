@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
-import { readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
+import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import type { QboState } from "./types.ts";
 
@@ -35,7 +35,9 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const back = new URL(redirectUri);
     if (state !== undefined) back.searchParams.set("state", state);
-    if (response_type !== "code") back.searchParams.set("error", "unsupported_response_type");
+    // A missing response_type is invalid_request, not unsupported (RFC 6749 4.1.2.1).
+    if (!response_type) back.searchParams.set("error", "invalid_request");
+    else if (response_type !== "code") back.searchParams.set("error", "unsupported_response_type");
     else if (!scope?.split(" ").includes(ACCOUNTING_SCOPE)) back.searchParams.set("error", "invalid_scope");
     else {
       const code = oauth().authorize({ clientId, redirectUri }, nowMs());
@@ -54,6 +56,8 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     const read = await readForm(c);
     if ("problem" in read) return c.json({ error: "invalid_request", error_description: read.problem }, 400);
     const field = (name: string) => read.form[name] ?? "";
+    const missing = missingGrantParameter(field);
+    if (missing) return c.json({ error: "invalid_request", error_description: missing }, 400);
 
     let result: TokenSet | OAuthError;
     if (field("grant_type") === "authorization_code") {

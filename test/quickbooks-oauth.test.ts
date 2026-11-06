@@ -68,6 +68,26 @@ describe("QuickBooks OAuth twin", () => {
     expect(await response.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/fragment/) });
   });
 
+  it("redirects with invalid_request when response_type is missing, keeping unsupported_response_type for another value", async () => {
+    const harness = setup();
+    const missing = new URL((await authorize(harness, { response_type: "" })).headers.get("Location")!);
+    expect(missing.searchParams.get("error")).toBe("invalid_request");
+    const token = new URL((await authorize(harness, { response_type: "token" })).headers.get("Location")!);
+    expect(token.searchParams.get("error")).toBe("unsupported_response_type");
+  });
+
+  it("answers a token request missing grant_type, or a code grant missing its code, with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const noGrantType = await tokenRequest(harness, { code: "x", redirect_uri: CLIENT.redirectUri });
+    expect(await noGrantType.json()).toEqual({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^grant_type is required/),
+    });
+    const noCode = await tokenRequest(harness, { grant_type: "authorization_code", redirect_uri: CLIENT.redirectUri });
+    expect(noCode.status).toBe(400);
+    expect(await noCode.json()).toEqual({ error: "invalid_request", error_description: expect.stringMatching(/^code is required/) });
+  });
+
   it("exchanges the code for tokens in the documented response shape", async () => {
     const tokens = await connect(setup());
     expect(tokens).toEqual({

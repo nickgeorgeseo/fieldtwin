@@ -134,6 +134,18 @@ describe("Jobber OAuth twin", () => {
     expect((await reused.json()).error_description).toBe("The provided refresh token is not valid.");
   });
 
+  it("answers a token request missing grant_type, or a refresh missing its refresh_token, with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const noGrantType = await token(harness, { refresh_token: "x" });
+    expect(noGrantType.status).toBe(400);
+    expect(await noGrantType.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^grant_type/) });
+    const noRefreshToken = await token(harness, { grant_type: "refresh_token" });
+    expect(await noRefreshToken.json()).toMatchObject({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^refresh_token/),
+    });
+  });
+
   it("needs the client secret", async () => {
     const harness = setup();
     const response = await harness.app.request("/api/oauth/token", {

@@ -129,6 +129,15 @@ describe("Housecall Pro OAuth twin", () => {
     expect((await password.json()).error).toBe("unsupported_grant_type");
   });
 
+  it("answers a token request missing grant_type, or a code grant missing its code, with 400 invalid_request naming it", async () => {
+    const harness = setup();
+    const noGrantType = await token(harness, { code: "x" });
+    expect(noGrantType.status).toBe(400);
+    expect(await noGrantType.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^grant_type/) });
+    const noCode = await token(harness, { grant_type: "authorization_code" });
+    expect(await noCode.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^code/) });
+  });
+
   it("refuses an authorization request without a code response type, client, or redirect URI", async () => {
     const harness = setup();
     const response = await authorize(harness, { redirect_uri: "" });
