@@ -33,8 +33,11 @@ const VENDOR_OAUTH: Record<VendorName, { authorize: string; token: string; scope
 const ATTEMPTS = 5;
 
 export async function connectThroughOAuth(base: string, send: Fetch, vendor: VendorName, app: OAuthApp = {}): Promise<Tokens> {
+  // Object.hasOwn, not a lookup: "toString" or "constructor" would find Object.prototype's and pass the check.
+  if (!Object.hasOwn(VENDOR_OAUTH, vendor)) {
+    throw new TwinError(`No vendor named "${vendor}". Vendors: ${Object.keys(VENDOR_OAUTH).join(", ")}`, 400);
+  }
   const oauth = VENDOR_OAUTH[vendor];
-  if (!oauth) throw new Error(`No vendor named "${vendor}". Vendors: ${Object.keys(VENDOR_OAUTH).join(", ")}`);
   const { clientId = "fieldtwin-test", clientSecret = "fieldtwin-test-secret", redirectUri = "http://localhost:3000/callback" } = app;
   let refused = new TwinError("", 0);
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {

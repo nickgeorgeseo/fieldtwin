@@ -172,6 +172,14 @@ describe("the twin's client", async () => {
     expect((secret as Error).message).not.toContain("{");
   });
 
+  it("refuses a vendor it doesn't serve with a TwinError, even one named like an object's own method", async () => {
+    for (const vendor of ["Jobber", "toString", "constructor", "hasOwnProperty"]) {
+      const refusal = await twin.connect(vendor as "jobber").catch((error: unknown) => error);
+      expect(refusal).toBeInstanceOf(TwinError);
+      expect(refusal).toMatchObject({ status: 400, message: expect.stringContaining(`No vendor named "${vendor}"`) });
+    }
+  });
+
   it("retries connecting when a fault rule fails the OAuth endpoints, since that failure was injected", async () => {
     await twin.setAuth("oauth");
     await twin.setFaults([{ name: "token-flaky", vendor: "jobber", pathIncludes: "/oauth/token", rate: 0.5, effect: { status: 503 } }]);
