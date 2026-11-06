@@ -36,7 +36,7 @@ export interface SyncStats {
   paymentsCreated: number;
   invoicesStamped: number;
   staleRetries: number; // 5010 Stale Object, recovered by reading the invoice again
-  conflicts: number; // the invoice number is already another customer's invoice in QuickBooks
+  conflicts: number; // the invoice number is already another customer's invoice in QuickBooks, and none of theirs
   failed: number;
 }
 
@@ -100,7 +100,7 @@ async function syncInvoice(invoice: JobberInvoice, context: SyncContext): Promis
 
 async function ensureInvoice(invoice: JobberInvoice, customer: books.Customer, context: SyncContext): Promise<books.Invoice | undefined> {
   const { quickbooks, stats, log } = context;
-  const existing = await books.findInvoiceByDocNumber(quickbooks, invoice.invoiceNumber);
+  const existing = await books.findInvoiceByDocNumber(quickbooks, invoice.invoiceNumber, customer.Id);
   if (existing) {
     if (existing.CustomerRef.value === customer.Id) return existing;
     stats.conflicts++;

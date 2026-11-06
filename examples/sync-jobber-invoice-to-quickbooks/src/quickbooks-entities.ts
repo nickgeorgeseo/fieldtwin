@@ -129,9 +129,14 @@ export async function itemForLine(qbo: QuickBooksClient, name: string, warn: (li
   return service;
 }
 
-export async function findInvoiceByDocNumber(qbo: QuickBooksClient, docNumber: string): Promise<Invoice | undefined> {
-  const [invoice] = await qbo.query<Invoice>("Invoice", `WHERE DocNumber = ${quoted(docNumber)}`);
-  return invoice;
+/**
+ * The invoice with this DocNumber, the customer's own if there is one. QuickBooks can accept the same DocNumber
+ * twice ("depending on settings", https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions),
+ * so after a conflict a bookkeeper may book the right invoice beside another customer's, and that one is ours.
+ */
+export async function findInvoiceByDocNumber(qbo: QuickBooksClient, docNumber: string, customerId?: string): Promise<Invoice | undefined> {
+  const invoices = await qbo.query<Invoice>("Invoice", `WHERE DocNumber = ${quoted(docNumber)}`);
+  return invoices.find((invoice) => invoice.CustomerRef.value === customerId) ?? invoices[0];
 }
 
 export function createInvoice(qbo: QuickBooksClient, invoice: NewInvoice): Promise<Invoice> {

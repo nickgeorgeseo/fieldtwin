@@ -36,6 +36,35 @@ describe("syncing, where the books need a person's judgment", () => {
     expect(warning).toContain("check it by hand");
   });
 
+  it("uses the invoice the bookkeeper booked by hand for the right customer, though another customer's has the same number", async () => {
+    const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
+    const harness = await syncHarness(target);
+    const invoice = firstPaidMissingFromBooks();
+    const ownerEmail = jobber().clients.get(invoice.clientId)!.emails[0]!.address;
+    const owner = [...qbo().customers.values()].find((customer) => customer.PrimaryEmailAddr?.Address === ownerEmail)!;
+    const someoneElse = [...qbo().customers.values()].find((customer) => customer.PrimaryEmailAddr?.Address !== ownerEmail)!;
+    const item = [...qbo().items.values()][0]!;
+    const line = (Amount: number) => [
+      { DetailType: "SalesItemLineDetail" as const, Amount, SalesItemLineDetail: { ItemRef: { value: item.Id } } },
+    ];
+    const theirs = await books.createInvoice(harness.quickbooks, {
+      CustomerRef: { value: someoneElse.Id },
+      DocNumber: invoice.invoiceNumber,
+      Line: line(50),
+    });
+    const ours = await books.createInvoice(harness.quickbooks, {
+      CustomerRef: { value: owner.Id },
+      DocNumber: invoice.invoiceNumber,
+      Line: line(invoice.lineItems.reduce((total, lineItem) => total + lineItem.totalPrice, 0)),
+    });
+
+    const stats = await harness.sync(EVER);
+    expect(stats).toMatchObject({ conflicts: 0, failed: 0 });
+    expect(qbo().invoices.get(ours.Id)).toMatchObject({ Balance: 0, PrivateNote: `Synced from Jobber invoice #${invoice.invoiceNumber}` });
+    expect(qbo().invoices.get(theirs.Id)).toMatchObject({ Balance: 50, SyncToken: theirs.SyncToken });
+    expect(booked(invoice.invoiceNumber)).toHaveLength(2); // not booked a third time
+  });
+
   it("books new work for a customer the bookkeeper made inactive by making them active again, not by creating a duplicate", async () => {
     const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
     const harness = await syncHarness(target);
