@@ -47,6 +47,15 @@ describe("QuickBooks twin: request bodies it can't use", () => {
   });
 
   it.each([
+    ["an object", { Amount: 5 }],
+    ["text", "one line"],
+  ])("answers an invoice whose Line is %s, not a list, with 2010 naming Line", async (_label, Line) => {
+    const response = await setup().qboPost("/invoice", { CustomerRef: { value: "1" }, Line });
+    expect(response.status).toBe(400);
+    expect((await response.json()).Fault.Error[0]).toMatchObject({ code: "2010", element: "Line" });
+  });
+
+  it.each([
     ["Line as an object", { Line: { Amount: 5 } }, "Line"],
     ["a line that is null", { Line: [null] }, "Line"],
     ["LinkedTxn as an object", { Line: [{ Amount: 5, LinkedTxn: { TxnId: "1", TxnType: "Invoice" } }] }, "Line.LinkedTxn"],

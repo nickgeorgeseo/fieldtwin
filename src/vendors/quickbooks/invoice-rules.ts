@@ -69,7 +69,10 @@ export function draftInvoice(
 
 /** The sales lines of a request, validated, with Ids and LineNums assigned. */
 function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[], now: string): QboSalesItemLine[] | QboFault {
-  if (!Array.isArray(input)) return qboErrors.missingField("Line", now);
+  if (input === undefined || input === null) return qboErrors.missingField("Line", now);
+  // A Line that is there but isn't a list is malformed, not missing: 2010, as a payment's Line gets.
+  if (!Array.isArray(input))
+    return qboErrors.invalidProperty("Line", 'Line must be a list of lines, like [{"DetailType": "SalesItemLineDetail", ...}].', now);
   if (!input.every(isObject))
     return qboErrors.invalidProperty("Line", 'Each line must be an object, like {"DetailType": "SalesItemLineDetail", ...}.', now);
 
