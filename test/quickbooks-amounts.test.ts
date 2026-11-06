@@ -86,6 +86,14 @@ describe("QuickBooks twin: amounts", () => {
       code: "6070",
     });
   });
+
+  it("rounds Qty × UnitPrice down when it falls just short of half a cent: 1 × 10.004999999 is 10.00", async () => {
+    const harness = setup();
+    const priced = (Amount: number, Qty: number, UnitPrice: number) => invoiceWith([line(Amount, { Qty, UnitPrice })]);
+    expect((await harness.qboPost("/invoice", priced(10, 1, 10.004999999))).status).toBe(200);
+    expect((await harness.qboPost("/invoice", priced(0, 0.01, 0.4999999))).status).toBe(200);
+    expect(await faultOf(await harness.qboPost("/invoice", priced(10.01, 1, 10.004999999)))).toMatchObject({ code: "6070" });
+  });
 });
 
 describe("money arithmetic", () => {
@@ -97,5 +105,10 @@ describe("money arithmetic", () => {
 
   it("multiplies by an exact unit price, even one finer than a cent", () => {
     expect(multiplyMoney(400, 0.0125)).toBe(5);
+  });
+
+  it("multiplies exactly as the numbers were written, so a product just under half a cent rounds down", () => {
+    expect([multiplyMoney(1, 10.004999999), multiplyMoney(0.01, 0.4999999), multiplyMoney(1.5, 110)]).toEqual([10, 0, 165]);
+    expect([multiplyMoney(-2.5, 33.33), multiplyMoney(1e-7, 1e9), multiplyMoney(3, 0.335)]).toEqual([-83.33, 100, 1.01]);
   });
 });
