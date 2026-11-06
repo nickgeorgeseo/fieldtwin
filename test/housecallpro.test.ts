@@ -156,6 +156,20 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
     expect((await served.json()).error.message).toMatch(/no trailing slash: try \/jobs\/job_x\/appointments\./);
   });
 
+  it("suggests dropping a trailing slash on the OAuth endpoints too, and lists them among what it serves", async () => {
+    const { app } = setup();
+    for (const [method, path, trimmed] of [
+      ["GET", "/oauth/authorize/?client_id=x", "/oauth/authorize"],
+      ["POST", "/oauth/token/", "/oauth/token"],
+    ]) {
+      const response = await app.request(`/housecallpro${path}`, { method, headers: { Authorization: "Token test-key" } });
+      expect(response.status, `${method} ${path}`).toBe(501);
+      const { message } = (await response.json()).error;
+      expect(message).toContain(`no trailing slash: try ${trimmed}.`);
+      expect(message).toContain("GET /oauth/authorize; POST /oauth/token");
+    }
+  });
+
   it("lists exactly the operations it serves when it answers 501, so a write it doesn't model isn't claimed", async () => {
     const { hcpPost } = setup();
     const response = await hcpPost("/jobs/job_x/line_items", { name: "Extra" });

@@ -55,8 +55,11 @@ export function housecallproRoutes(twin: Twin): Hono {
 }
 
 // Every operation the twin serves, so a client can tell at once whether the one it called is coming. A new operation
-// is added here and asserted in test/housecallpro.test.ts's 501 test, which checks what this list claims.
+// is added here and asserted in test/housecallpro.test.ts's 501 test, which checks what this list claims. The OAuth
+// endpoints (oauth.ts) are listed too, so a stray trailing slash on them gets the hint as well.
 const SERVED: [methods: string, path: string][] = [
+  ["GET", "/oauth/authorize"],
+  ["POST", "/oauth/token"],
   ["GET", "/company"],
   ["GET, POST", "/customers"],
   ["GET, PUT", "/customers/{id}"],
