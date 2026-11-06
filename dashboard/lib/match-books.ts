@@ -161,7 +161,7 @@ function pairUp<F, B>(
   const take = (record: F, fits: (candidate: B) => boolean) => {
     const queue = waiting.get(serviceKey(record)) ?? [];
     const at = queue.findIndex(fits);
-    if (at >= 0) pairs.set(record, ...queue.splice(at, 1));
+    if (at >= 0) pairs.set(record, queue.splice(at, 1)[0]!);
   };
   if (belongs) for (const record of fromService) take(record, (candidate) => belongs(record, candidate));
   for (const record of fromService) if (!pairs.has(record)) take(record, () => true);
