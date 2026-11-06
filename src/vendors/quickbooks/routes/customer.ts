@@ -95,7 +95,8 @@ const MAX_LENGTHS = { DisplayName: 500, GivenName: 100, FamilyName: 100, Company
 
 /** The Customer reference's rules for names, or the Fault for the first one broken. */
 function checkNames(fields: Partial<QboCustomer>, now: string): QboFault | undefined {
-  const notText = readTextFields(fields, [...PERSON_NAME_FIELDS, "CompanyName"], now);
+  const textFields = [...PERSON_NAME_FIELDS, "CompanyName", "PrimaryPhone.FreeFormNumber", "PrimaryEmailAddr.Address"];
+  const notText = readTextFields(fields, textFields, now);
   if (notText) return notText;
   // "The DisplayName, Title, GivenName, MiddleName, FamilyName, Suffix, and PrintOnCheckName attributes must not contain
   // colon (:), tab (\t), or newline (\n) characters."

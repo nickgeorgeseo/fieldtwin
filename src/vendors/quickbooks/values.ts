@@ -60,16 +60,16 @@ export function keepLongIntegers(_key: string, value: unknown, context?: { sourc
 }
 
 /**
- * Text fields as QuickBooks' JSON reader takes them: a string as sent, a number as its digits. Anything else (an
- * object, a list) answers 2010 naming the field. Normalizes `fields` in place; the Fault, if any, is returned.
+ * Text fields as QuickBooks' JSON reader takes them, by path (`PrimaryPhone.FreeFormNumber`): a string as sent, a
+ * number as its digits. Anything else (an object, a list) answers 2010 naming the field. Normalizes `fields` in
+ * place; the Fault, if any, is returned.
  */
-export function readTextFields(fields: object, names: readonly string[], now: string): QboFault | undefined {
-  const record = fields as Record<string, unknown>;
-  for (const name of names) {
-    const value = record[name];
-    if (typeof value === "number" && Number.isFinite(value)) record[name] = String(value);
+export function readTextFields(fields: object, paths: readonly string[], now: string): QboFault | undefined {
+  for (const path of paths) {
+    const value = valueAt(fields, path);
+    if (typeof value === "number" && Number.isFinite(value)) setAt(fields, path, String(value));
     else if (value !== undefined && value !== null && typeof value !== "string") {
-      return qboErrors.invalidProperty(name, `${name} must be text, not ${shown(value)}.`, now);
+      return qboErrors.invalidProperty(path, `${path} must be text, not ${shown(value)}.`, now);
     }
   }
   return undefined;
@@ -98,9 +98,30 @@ export function readBooleanFields(fields: object, names: readonly string[], now:
  */
 export function checkLengths(fields: object, maxima: Readonly<Record<string, number>>, now: string): QboFault | undefined {
   for (const [path, max] of Object.entries(maxima)) {
-    let value: unknown = fields;
-    for (const key of path.split(".")) value = (value as Record<string, unknown> | undefined)?.[key];
+    const value = valueAt(fields, path);
     if (typeof value === "string" && value.length > max) return qboErrors.stringTooLong(path, max, value.length, now);
   }
   return undefined;
+}
+
+/** The value at a path like `PrimaryPhone.FreeFormNumber`, or undefined where the path runs out. */
+function valueAt(fields: object, path: string): unknown {
+  let value: unknown = fields;
+  for (const key of path.split(".")) value = (value as Record<string, unknown> | undefined)?.[key];
+  return value;
+}
+
+/**
+ * Sets the value at a path valueAt found. Each object on the way is copied first: a sparse update's fields share
+ * their nested objects with the stored record, which only apply() may change.
+ */
+function setAt(fields: object, path: string, value: unknown): void {
+  const keys = path.split(".");
+  const last = keys.pop() ?? path;
+  let parent = fields as Record<string, unknown>;
+  for (const key of keys) {
+    parent[key] = { ...(parent[key] as object) };
+    parent = parent[key] as Record<string, unknown>;
+  }
+  parent[last] = value;
 }

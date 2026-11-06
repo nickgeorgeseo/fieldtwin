@@ -38,6 +38,33 @@ describe("QuickBooks twin: customer names", () => {
     expect((await harness.qboPost("/customer", body("5".repeat(max)))).status).toBe(200);
   });
 
+  it("reads a phone number sent as a number as its digits, so its 30-character limit still holds (2050)", async () => {
+    const harness = setup();
+    const created = (
+      await (await harness.qboPost("/customer", { DisplayName: "Ada Phone", PrimaryPhone: { FreeFormNumber: 5551234 } })).json()
+    ).Customer;
+    expect(created.PrimaryPhone.FreeFormNumber).toBe("5551234");
+    // Written by hand: JSON.stringify would send 40 digits as 5.555555555555555e+39.
+    const response = await harness.app.request("/v3/company/9341000000000001/customer", {
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      body: `{"DisplayName": "Ada Long Phone", "PrimaryPhone": {"FreeFormNumber": ${"5".repeat(40)}}}`,
+    });
+    expect(await faultOf(response)).toMatchObject({ code: "2050", element: "PrimaryPhone.FreeFormNumber" });
+  });
+
+  it("refuses an object where a phone number or email address belongs (2010), naming the field", async () => {
+    for (const [fields, element] of [
+      [{ PrimaryPhone: { FreeFormNumber: { digits: "555" } } }, "PrimaryPhone.FreeFormNumber"],
+      [{ PrimaryEmailAddr: { Address: ["ada@example.com"] } }, "PrimaryEmailAddr.Address"],
+    ] as const) {
+      expect(await faultOf(await setup().qboPost("/customer", { DisplayName: "Ada Object", ...fields }))).toMatchObject({
+        code: "2010",
+        element,
+      });
+    }
+  });
+
   it("refuses a colon, tab, or newline in a name (2040), as the business rules say", async () => {
     for (const DisplayName of ["Smith: Kitchen job", "Tab\there", "Two\nlines"]) {
       expect(await faultOf(await setup().qboPost("/customer", { DisplayName }))).toMatchObject({ code: "2040", element: "DisplayName" });
