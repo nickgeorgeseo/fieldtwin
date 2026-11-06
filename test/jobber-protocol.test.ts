@@ -166,6 +166,17 @@ describe("Jobber twin: errors and ids", () => {
       expect(body, number).toMatchObject({ data: { client: null } });
     }
   });
+
+  it("returns null for an id whose last base64 character carries bits the twin's own id doesn't", async () => {
+    // Base64 decoding ignores the unused low bits of the last character, so ...xMB== decodes like Client 10's ...xMA==.
+    const { jobber } = setup();
+    const query = "query ($id: EncodedId!) { client(id: $id) { id } }";
+    const own = Buffer.from("gid://Jobber/Client/10").toString("base64");
+    expect(own).toBe("Z2lkOi8vSm9iYmVyL0NsaWVudC8xMA==");
+    for (const id of ["Z2lkOi8vSm9iYmVyL0NsaWVudC8xMB==", "Z2lkOi8vSm9iYmVyL0NsaWVudC8xMB"]) {
+      expect(await (await jobber(query, { id })).json(), id).toMatchObject({ data: { client: null } });
+    }
+  });
 });
 
 describe("Jobber twin: ids with and without padding", () => {

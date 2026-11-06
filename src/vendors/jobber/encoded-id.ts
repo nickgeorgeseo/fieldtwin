@@ -16,11 +16,19 @@ export function encodeId(type: string, n: number): string {
 /**
  * The record type and number inside an id the twin made, or undefined for anything else. The number must be
  * written the way the twin writes it: `Client/01` is no id the twin made, so it resolves to null like any unknown
- * id rather than finding Client 1 and answering with an id the caller never sent.
+ * id rather than finding Client 1 and answering with an id the caller never sent. So must the base64: decoding
+ * ignores the unused low bits of the last character, so `...xMB==` reads as Client 10, whose id is `...xMA==`. An id
+ * counts only if encoding what it decodes to spells it again, padding aside.
  */
 export function decodeId(id: string): { type: string; n: number } | undefined {
   const match = /^gid:\/\/Jobber\/(\w+)\/(0|[1-9]\d*)$/.exec(Buffer.from(id, "base64").toString());
-  return match ? { type: match[1]!, n: Number(match[2]) } : undefined;
+  if (!match) return undefined;
+  const decoded = { type: match[1]!, n: Number(match[2]) };
+  return unpadded(encodeId(decoded.type, decoded.n)) === unpadded(id) ? decoded : undefined;
+}
+
+function unpadded(id: string): string {
+  return id.replace(/=+$/, "");
 }
 
 /** The id in the twin's own spelling, so a lookup finds the record whether the caller kept the base64 padding or not. */
