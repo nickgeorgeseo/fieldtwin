@@ -98,6 +98,30 @@ describe("layered fault rules", () => {
     expect(performance.now() - started).toBeGreaterThanOrEqual(15);
     expect(response.headers.get("X-Twin-Fault")).toBe("down");
   });
+
+  it("picks the same requests for an error behind a slow-down rule, however long each request takes to answer", async () => {
+    const rules: FaultRule[] = [
+      { name: "slow", vendor: "quickbooks", rate: 1, effect: { latencyMs: 30 } },
+      { name: "coin", vendor: "quickbooks", rate: 0.5, effect: { status: 503 } },
+    ];
+    /** Pairs of requests, the second always made after the first: once it has been answered, or while it is held up. */
+    async function pairs(overlapping: boolean) {
+      const { twin, qboGet } = setup();
+      twin.faultRules = rules;
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        const first = qboGet("/customer/1");
+        if (!overlapping) await first;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        const second = qboGet("/customer/2");
+        statuses.push((await first).status, (await second).status);
+      }
+      return statuses;
+    }
+    const oneAtATime = await pairs(false);
+    expect(oneAtATime).toContain(503);
+    expect(await pairs(true)).toEqual(oneAtATime);
+  });
 });
 
 describe("lost responses", () => {

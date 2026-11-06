@@ -19,24 +19,30 @@ import type { VendorTwin } from "../core/vendor-twin.ts";
  */
 export function faultMiddleware(twin: Twin, vendor: VendorTwin): MiddlewareHandler {
   return async (c, next) => {
+    // Every roll happens as the request arrives, before any wait, so which requests meet which faults depends only on
+    // the order they arrive in, not on how long another request is held up (ARCHITECTURE.md rule 2).
+    let latencyMs = 0;
+    let error: FaultRule | undefined;
     for (const rule of twin.faultRules) {
       if (!matches(rule, vendor.name, c.req.method, c.req.path) || !twin.faultRandom.requests.chance(rule.rate)) continue;
-      if (rule.effect.latencyMs) await sleep(rule.effect.latencyMs);
+      latencyMs += rule.effect.latencyMs ?? 0;
       if (rule.effect.status) {
-        const message = rule.effect.message ?? `Injected by fault rule "${rule.name}"`;
-        const answer = new Response(JSON.stringify(vendor.errorBody(rule.effect.status, message, twin)), {
-          status: rule.effect.status,
-          // X-Twin-Fault, so you can tell injected failures from real bugs
-          headers: { ...vendor.errorHeaders?.(rule.effect.status, twin), "Content-Type": "application/json", "X-Twin-Fault": rule.name },
-        });
-        if (!rule.effect.lostResponse) return answer;
-        await next(); // the work happens, events and all
-        c.res = undefined; // then the real answer is dropped (assigning undefined first stops Hono merging its headers in)
-        c.res = answer;
-        return;
+        error = rule;
+        break;
       }
     }
-    return next();
+    if (latencyMs) await sleep(latencyMs);
+    if (!error?.effect.status) return next();
+    const { status, message = `Injected by fault rule "${error.name}"`, lostResponse } = error.effect;
+    const answer = new Response(JSON.stringify(vendor.errorBody(status, message, twin)), {
+      status,
+      // X-Twin-Fault, so you can tell injected failures from real bugs
+      headers: { ...vendor.errorHeaders?.(status, twin), "Content-Type": "application/json", "X-Twin-Fault": error.name },
+    });
+    if (!lostResponse) return answer;
+    await next(); // the work happens, events and all
+    c.res = undefined; // then the real answer is dropped (assigning undefined first stops Hono merging its headers in)
+    c.res = answer;
   };
 }
 
