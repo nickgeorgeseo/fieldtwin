@@ -1,4 +1,4 @@
-import { isRealDate } from "../../core/clock.ts";
+import { isRealDate, twinIso } from "../../core/clock.ts";
 
 /**
  * QuickBooks transaction dates (TxnDate, DueDate) are plain dates, YYYY-MM-DD in every documented sample.
@@ -21,7 +21,8 @@ export function qboDate(value: unknown): string | undefined {
 /**
  * "If the date is not supplied, the current date on the server is used": today in twin time, at the company. A
  * company keeps its books in its own time zone, so at 8 p.m. in Texas it is still today there, though tomorrow in UTC.
+ * Floored by twinIso, as MetaData.CreateTime is, so half a millisecond before a pre-1970 midnight isn't the next day.
  */
 export function qboToday(nowMs: number, utcOffsetHours: number): string {
-  return new Date(nowMs + utcOffsetHours * 3_600_000).toISOString().slice(0, 10);
+  return twinIso(nowMs + utcOffsetHours * 3_600_000).slice(0, 10);
 }

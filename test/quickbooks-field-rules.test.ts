@@ -231,6 +231,14 @@ describe("QuickBooks twin: today's date", () => {
     const payment = await (await harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 5 })).json();
     expect(payment.Payment.TxnDate).toBe("2026-07-13");
   });
+
+  it("dates an invoice by the same floored moment as its CreateTime, even half a millisecond before a 1960s midnight", async () => {
+    const harness = setup(42, { startTime: "1969-12-30T12:00:00Z" }); // UTC-5, so local midnight is 05:00Z
+    harness.twin.clock.advance(17 * 3_600_000 - 0.5); // 1969-12-31T04:59:59.9995Z, still the 30th in Texas
+    const created = await invoice(harness);
+    expect(created.MetaData.CreateTime).toBe("1969-12-31T04:59:59.999Z");
+    expect(created.TxnDate).toBe("1969-12-30");
+  });
 });
 
 describe("QuickBooks twin: ids and references", () => {
