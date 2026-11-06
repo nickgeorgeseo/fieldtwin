@@ -49,8 +49,19 @@ export class TwinClock {
     this.currentMs = startMs;
   }
 
+  /**
+   * A clock at an exact moment, fractions of a millisecond included: where a checkpoint left it. Read back from the
+   * checkpoint's ISO time it could land a millisecond off before 1970, or not parse at all after year 9999.
+   */
+  static at(ms: number): TwinClock {
+    const clock = new TwinClock("1970-01-01T00:00:00Z");
+    clock.currentMs = ms;
+    return clock;
+  }
+
+  /** Floored, since Date drops a fraction toward zero: before 1970 that would read the next millisecond, ahead of the clock. */
   now(): Date {
-    return new Date(this.currentMs);
+    return new Date(Math.floor(this.currentMs));
   }
 
   nowMs(): number {

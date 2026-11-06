@@ -109,6 +109,29 @@ describe("rewinding to a checkpoint", () => {
     expect(await createdAt()).toBe(first);
   });
 
+  it.each([
+    ["before 1970, a fraction of a millisecond in", "1969-12-31T00:00:00Z", 0.00001],
+    ["after year 9999", "9999-12-31T00:00:00Z", 2 * 24 * 60],
+  ])("puts the clock back exactly at a checkpoint taken %s", async (_when, startTime, minutes) => {
+    const { app, twin } = setup(42, { startTime });
+    const post = (path: string, body?: unknown) => app.request(path, { method: "POST", body: JSON.stringify(body ?? {}) });
+    await post("/_twin/clock/advance", { minutes });
+    const nowMs = twin.clock.nowMs();
+    const checkpoint = await (await post("/_twin/checkpoints/cp")).json();
+    await post("/_twin/clock/advance", { minutes: 60 });
+
+    const rewound = await post("/_twin/checkpoints/cp/rewind");
+    expect(rewound.status).toBe(200);
+    expect(twin.clock.nowMs()).toBe(nowMs);
+    expect((await rewound.json()).twinTime).toBe(checkpoint.time);
+  });
+
+  it("reads a time before 1970 with a fraction of a millisecond as the millisecond it falls in, never the next one", async () => {
+    const { app } = setup(42, { startTime: "1969-12-31T00:00:00Z" });
+    const advanced = await app.request("/_twin/clock/advance", { method: "POST", body: JSON.stringify({ minutes: 0.00001 }) });
+    expect((await advanced.json()).twinTime).toBe("1969-12-31T00:00:00.000Z");
+  });
+
   it("is the only way back: the clock itself refuses to move backwards", () => {
     const { twin } = setup();
     expect(() => twin.clock.advance(-1)).toThrow("Rewind to a checkpoint");

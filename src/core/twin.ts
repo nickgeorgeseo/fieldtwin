@@ -195,8 +195,7 @@ export class Twin {
     const saved = this.checkpoints.saved(name);
     const faultRandom = copyFaultRandom(saved.faultRandom); // a copy, so rewinding there again rolls the same once more
     this.startOver(() => {
-      this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
-      this.clock.advance(saved.nowMs - this.clock.nowMs()); // the fraction of a millisecond the ISO time leaves out
+      this.restart(TwinClock.at(saved.nowMs), faultRandom, this.log.all().slice(0, checkpoint.seq));
       this.timeline.resumeAt(saved.timeline);
     });
     this.checkpoints.forgetAfter(name);
