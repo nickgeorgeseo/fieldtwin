@@ -18,6 +18,21 @@ export function numberFrom(value: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * An Id or reference (Id, SyncToken, CustomerRef.value, ItemRef.value, TxnId) as QuickBooks reads it: a string as
+ * sent, a number as its digits. Undefined for anything else (an object, a list, true), which names no record, so the
+ * caller answers a validation Fault instead of turning it into text, which can throw.
+ */
+export function refId(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
+}
+
+/** A value as a Fault's Detail shows it: text as sent, anything else as JSON. */
+export function asSent(value: unknown): string {
+  return typeof value === "string" ? value : shown(value);
+}
+
 /** A required amount, or the Fault for one that is missing, negative, or not dollars and cents. */
 export function readAmount(value: unknown, element: string, now: string): number | QboFault {
   if (value === undefined || value === null) return qboErrors.missingField(element, now);

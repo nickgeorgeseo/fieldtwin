@@ -5,6 +5,7 @@ import { qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { draftInvoice, type InvoiceFields } from "../invoice-rules.ts";
 import { type QboInvoice, type QboState, WRITABLE_INVOICE_FIELDS } from "../types.ts";
+import { refId } from "../values.ts";
 import {
   asResponse,
   COMPANY,
@@ -14,6 +15,7 @@ import {
   pickWritable,
   readEntityBody,
   type UpdateBody,
+  updateId,
   writeKind,
 } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
@@ -69,7 +71,9 @@ function createInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: stri
 function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: string | undefined): QboInvoice | QboFault {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
-  const existing = state.invoices.get(String(body.Id));
+  const id = updateId(body, now);
+  if (typeof id !== "string") return id;
+  const existing = state.invoices.get(id);
   if (!existing) return qboErrors.notFound(now);
 
   const conflict = checkSyncToken(existing, body, now);
@@ -77,7 +81,8 @@ function updateInvoice(twin: Twin, body: UpdateBody<QboInvoice>, requestId: stri
 
   const fields: InvoiceFields = mergeUpdate(existing, body, WRITABLE_INVOICE_FIELDS);
   // Payments applied to an invoice belong to the customer who paid them, so it can't move to someone else.
-  const movesCustomer = fields.CustomerRef?.value !== undefined && String(fields.CustomerRef.value) !== existing.CustomerRef.value;
+  const customerId = refId(fields.CustomerRef?.value);
+  const movesCustomer = customerId !== undefined && customerId !== existing.CustomerRef.value;
   if (movesCustomer && existing.LinkedTxn.length) {
     return qboErrors.businessValidation(`Invoice ${existing.Id} has payments applied, so it can't move to another customer.`, now);
   }

@@ -3,7 +3,7 @@ import { readJsonObject } from "../../../core/request-body.ts";
 import type { QboFault } from "../errors.ts";
 import { qboErrors } from "../errors.ts";
 import type { QboEntityName, QboState } from "../types.ts";
-import { keepLongIntegers } from "../values.ts";
+import { asSent, keepLongIntegers, refId } from "../values.ts";
 
 /**
  * What every QuickBooks entity route shares: the company path, the SyncToken rule, and sparse vs full updates.
@@ -49,6 +49,12 @@ export async function readEntityBody<T>(c: Context, example: string, now: string
   return "problem" in read ? { fault: qboErrors.invalidProperty(undefined, read.problem, now) } : { body: read.body as UpdateBody<T> };
 }
 
+/** The Id an update names, or 2010 for one that isn't text or a number (an object or a list names no record). */
+export function updateId(body: UpdateBody<unknown>, now: string): string | QboFault {
+  const id = refId(body.Id);
+  return id ?? qboErrors.invalidProperty("Id", `Id must be the Id you read, like "5", not ${asSent(body.Id)}.`, now);
+}
+
 /**
  * The quirk that breaks real integrations: you must send the SyncToken you last read.
  * If anyone changed the record since then, QuickBooks rejects the update with 5010. A null SyncToken (Python's None)
@@ -56,7 +62,11 @@ export async function readEntityBody<T>(c: Context, example: string, now: string
  */
 export function checkSyncToken(existing: Versioned, body: UpdateBody<unknown>, now: string): QboFault | undefined {
   if (body.SyncToken === undefined || body.SyncToken === null) return qboErrors.missingField("SyncToken", now);
-  if (String(body.SyncToken) !== existing.SyncToken) return qboErrors.staleObject(now);
+  const syncToken = refId(body.SyncToken);
+  if (syncToken === undefined) {
+    return qboErrors.invalidProperty("SyncToken", `SyncToken must be the one you last read, like "0", not ${asSent(body.SyncToken)}.`, now);
+  }
+  if (syncToken !== existing.SyncToken) return qboErrors.staleObject(now);
   return undefined;
 }
 

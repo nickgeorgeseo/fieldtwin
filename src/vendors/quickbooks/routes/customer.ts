@@ -13,6 +13,7 @@ import {
   pickWritable,
   readEntityBody,
   type UpdateBody,
+  updateId,
   writeKind,
 } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
@@ -68,7 +69,9 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: strin
 function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: string | undefined) {
   const state = twin.state<QboState>("quickbooks");
   const now = twin.clock.nowIso();
-  const existing = state.customers.get(String(body.Id));
+  const id = updateId(body, now);
+  if (typeof id !== "string") return id;
+  const existing = state.customers.get(id);
   if (!existing) return qboErrors.notFound(now);
 
   const conflict = checkSyncToken(existing, body, now);

@@ -3,7 +3,7 @@ import { isObject } from "../../core/request-body.ts";
 import { qboDate } from "./dates.ts";
 import { type QboFault, qboErrors } from "./errors.ts";
 import type { QboInvoice, QboInvoiceLine, QboRef, QboSalesItemLine, QboState, QboSubTotalLine, WRITABLE_INVOICE_FIELDS } from "./types.ts";
-import { checkLengths, readAmount, readOptionalNumber, readTextFields } from "./values.ts";
+import { asSent, checkLengths, readAmount, readOptionalNumber, readTextFields, refId } from "./values.ts";
 
 /**
  * How QuickBooks builds an invoice from a request: references, lines, totals, numbers, and dates.
@@ -30,8 +30,9 @@ export function draftInvoice(
 
   // "An invoice must have CustomerRef populated."
   if (!fields.CustomerRef?.value) return qboErrors.missingField("CustomerRef", now);
-  const customer = state.customers.get(String(fields.CustomerRef.value));
-  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  const customerId = refId(fields.CustomerRef.value);
+  const customer = customerId === undefined ? undefined : state.customers.get(customerId);
+  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${asSent(fields.CustomerRef.value)}`, now);
   // An inactive customer gets no new invoices, but the invoices it already has can still be updated.
   if (!customer.Active && customer.Id !== options.existingCustomerId) {
     return qboErrors.invalidReference("CustomerRef", `Customer ${customer.Id}, which is inactive`, now);
@@ -47,9 +48,9 @@ export function draftInvoice(
   // "If the date is not supplied, the current date on the server is used." DueDate is TxnDate plus the
   // sales terms' days; the twin has no sales terms, so that is TxnDate itself.
   const TxnDate = fields.TxnDate === undefined ? options.today : qboDate(fields.TxnDate);
-  if (!TxnDate) return qboErrors.invalidDate("TxnDate", String(fields.TxnDate), now);
+  if (!TxnDate) return qboErrors.invalidDate("TxnDate", asSent(fields.TxnDate), now);
   const DueDate = fields.DueDate === undefined ? TxnDate : qboDate(fields.DueDate);
-  if (!DueDate) return qboErrors.invalidDate("DueDate", String(fields.DueDate), now);
+  if (!DueDate) return qboErrors.invalidDate("DueDate", asSent(fields.DueDate), now);
 
   const subtotal = sumMoney(lines.map((line) => line.Amount));
   const subtotalLine: QboSubTotalLine = { Amount: subtotal, DetailType: "SubTotalLineDetail", SubTotalLineDetail: {} };
@@ -87,8 +88,9 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 
   for (const [index, line] of requested.entries()) {
     if (line.DetailType !== "SalesItemLineDetail") {
+      const sent = line.DetailType === undefined ? "(missing)" : asSent(line.DetailType);
       return qboErrors.unsupportedOperation(
-        `The twin models SalesItemLineDetail lines only. Line ${index + 1} has DetailType ${line.DetailType ?? "(missing)"}.`,
+        `The twin models SalesItemLineDetail lines only. Line ${index + 1} has DetailType ${sent}.`,
         now,
       );
     }
@@ -97,8 +99,9 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 
     const detail = line.SalesItemLineDetail ?? {};
     if (!detail.ItemRef?.value) return qboErrors.missingField("Line.SalesItemLineDetail.ItemRef", now);
-    const item = state.items.get(String(detail.ItemRef.value));
-    if (!item?.Active) return qboErrors.invalidReference("Line.SalesItemLineDetail.ItemRef", `Item ${detail.ItemRef.value}`, now);
+    const itemId = refId(detail.ItemRef.value);
+    const item = itemId === undefined ? undefined : state.items.get(itemId);
+    if (!item?.Active) return qboErrors.invalidReference("Line.SalesItemLineDetail.ItemRef", `Item ${asSent(detail.ItemRef.value)}`, now);
 
     const Qty = readOptionalNumber(detail.Qty, "Line.SalesItemLineDetail.Qty", "quantity", now);
     if (typeof Qty === "object") return Qty;
@@ -110,7 +113,14 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 
     // An update keeps the Id of a line it sends back; new lines get new Ids. A second copy of a line (a client
     // that cloned a line it read, Id and all) is a new line, so two lines never share an Id.
-    const sentId = line.Id === undefined ? undefined : String(line.Id);
+    const sentId = refId(line.Id);
+    if (line.Id !== undefined && sentId === undefined) {
+      return qboErrors.invalidProperty(
+        "Line.Id",
+        `Line ${index + 1} has Id ${asSent(line.Id)}. Send the Id you read, or none for a new line.`,
+        now,
+      );
+    }
     const Id = sentId !== undefined && keptIds.has(sentId) && !givenIds.has(sentId) ? sentId : String(nextLineId++);
     givenIds.add(Id);
     lines.push({
@@ -131,10 +141,10 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 }
 
 interface LineInput {
-  Id?: string;
+  Id?: unknown; // the line's Id as text or a number, checked by refId
   Description?: string;
   Amount?: unknown; // a number or a numeric string, checked by readAmount
-  DetailType?: string;
+  DetailType?: unknown;
   SalesItemLineDetail?: { ItemRef?: QboRef; Qty?: unknown; UnitPrice?: unknown; ServiceDate?: string };
 }
 

@@ -189,3 +189,58 @@ describe("QuickBooks twin: today's date", () => {
     expect(payment.Payment.TxnDate).toBe("2026-07-13");
   });
 });
+
+describe("QuickBooks twin: ids and references", () => {
+  // An object no JSON reader can turn into text: String() of it throws, which once answered 500 SystemFault.
+  const unreadable = { toString: 1 };
+
+  it("refuses an Id or SyncToken that isn't text or a number (2010), naming it", async () => {
+    const harness = setup();
+    const customer = (fields: object) => harness.qboPost("/customer", { Id: "1", SyncToken: "0", DisplayName: "X", ...fields });
+    expect(await faultOf(await customer({ Id: unreadable }))).toMatchObject({ code: "2010", element: "Id" });
+    expect(await faultOf(await customer({ SyncToken: unreadable }))).toMatchObject({ code: "2010", element: "SyncToken" });
+    const update = { Id: ["1"], SyncToken: "0", CustomerRef: { value: "1" }, Line: [sale(40)] };
+    expect(await faultOf(await harness.qboPost("/invoice", update))).toMatchObject({ code: "2010", element: "Id" });
+  });
+
+  it("answers a reference that isn't text or a number with 2500 Invalid Reference Id, naming it", async () => {
+    const harness = setup();
+    const invoiceWith = (fields: object) => harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(40)], ...fields });
+    expect(await faultOf(await invoiceWith({ CustomerRef: { value: unreadable } }))).toMatchObject({
+      code: "2500",
+      element: "CustomerRef",
+    });
+    const unreadableItem = { ...sale(40), SalesItemLineDetail: { ItemRef: { value: unreadable } } };
+    expect(await faultOf(await invoiceWith({ Line: [unreadableItem] }))).toMatchObject({
+      code: "2500",
+      element: "Line.SalesItemLineDetail.ItemRef",
+    });
+
+    const payment = (fields: object) => harness.qboPost("/payment", { CustomerRef: { value: "1" }, TotalAmt: 1, ...fields });
+    const applied = { Line: [{ Amount: 1, LinkedTxn: [{ TxnId: unreadable, TxnType: "Invoice" }] }] };
+    expect(await faultOf(await payment({ CustomerRef: { value: unreadable } }))).toMatchObject({ code: "2500", element: "CustomerRef" });
+    expect(await faultOf(await payment(applied))).toMatchObject({ code: "2500", element: "Line.LinkedTxn.TxnId" });
+  });
+
+  it("refuses an unreadable line Id, DetailType, TxnType, or TxnDate with a validation Fault, not a system fault", async () => {
+    const harness = setup();
+    const invoiceWith = (fields: object) => harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(40)], ...fields });
+    expect(await faultOf(await invoiceWith({ Line: [{ ...sale(40), Id: unreadable }] }))).toMatchObject({
+      code: "2010",
+      element: "Line.Id",
+    });
+    expect(await faultOf(await invoiceWith({ Line: [{ ...sale(40), DetailType: unreadable }] }))).toMatchObject({ code: "500" });
+    expect(await faultOf(await invoiceWith({ TxnDate: unreadable }))).toMatchObject({ code: "2070", element: "TxnDate" });
+    const payment = { CustomerRef: { value: "1" }, TotalAmt: 1, Line: [{ Amount: 1, LinkedTxn: [{ TxnId: "1", TxnType: unreadable }] }] };
+    expect(await faultOf(await harness.qboPost("/payment", payment))).toMatchObject({ code: "500" });
+    expect(await faultOf(await harness.qboPost("/payment", { ...payment, Line: [], TxnDate: unreadable }))).toMatchObject({ code: "2070" });
+  });
+
+  it("still reads an Id or reference sent as a number as its digits", async () => {
+    const harness = setup();
+    const created = await invoice(harness, { CustomerRef: { value: 2 } });
+    expect(created.CustomerRef.value).toBe("2");
+    const updated = await harness.qboPost("/invoice", { Id: Number(created.Id), SyncToken: 0, sparse: true, PrivateNote: "Numbers" });
+    expect((await updated.json()).Invoice).toMatchObject({ Id: created.Id, SyncToken: "1", PrivateNote: "Numbers" });
+  });
+});

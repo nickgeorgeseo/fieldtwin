@@ -5,7 +5,7 @@ import type { Twin } from "../../../core/twin.ts";
 import { qboDate, qboToday } from "../dates.ts";
 import { type QboFault, qboErrors } from "../errors.ts";
 import { type QboInvoice, type QboPayment, type QboPaymentLine, type QboState, WRITABLE_PAYMENT_FIELDS } from "../types.ts";
-import { checkLengths, readAmount, readTextFields } from "../values.ts";
+import { asSent, checkLengths, readAmount, readTextFields, refId } from "../values.ts";
 import { asResponse, COMPANY, nextVersion, pickWritable, readEntityBody, type UpdateBody, writeKind } from "./entity.ts";
 import { checkRequestId } from "./request-id.ts";
 
@@ -51,11 +51,12 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
   const TotalAmt = readAmount(fields.TotalAmt, "TotalAmt", now);
   if (typeof TotalAmt !== "number") return TotalAmt;
   if (!fields.CustomerRef?.value) return qboErrors.missingField("CustomerRef", now);
-  const customer = state.customers.get(String(fields.CustomerRef.value));
-  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${fields.CustomerRef.value}`, now);
+  const customerId = refId(fields.CustomerRef.value);
+  const customer = customerId === undefined ? undefined : state.customers.get(customerId);
+  if (!customer) return qboErrors.invalidReference("CustomerRef", `Customer ${asSent(fields.CustomerRef.value)}`, now);
   if (!customer.Active) return qboErrors.invalidReference("CustomerRef", `Customer ${customer.Id}, which is inactive`, now);
   const TxnDate = fields.TxnDate === undefined ? qboToday(twin.clock.nowMs(), state.utcOffsetHours) : qboDate(fields.TxnDate);
-  if (!TxnDate) return qboErrors.invalidDate("TxnDate", String(fields.TxnDate), now);
+  if (!TxnDate) return qboErrors.invalidDate("TxnDate", asSent(fields.TxnDate), now);
 
   // Check every line before changing anything, so a bad line never leaves a payment half-applied.
   const lines: QboPaymentLine[] = [];
@@ -81,11 +82,12 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
       return qboErrors.invalidProperty("Line.LinkedTxn.TxnType", `TxnType must be "Invoice", not "${link.TxnType}".`, now);
     }
     if (link.TxnType !== "Invoice") {
-      return qboErrors.unsupportedOperation(`The twin applies payments to invoices only, not to ${link.TxnType}.`, now);
+      return qboErrors.unsupportedOperation(`The twin applies payments to invoices only, not to ${asSent(link.TxnType)}.`, now);
     }
 
-    const invoice = state.invoices.get(String(link.TxnId));
-    if (!invoice) return qboErrors.invalidReference("Line.LinkedTxn.TxnId", `Invoice ${link.TxnId}`, now);
+    const invoiceId = refId(link.TxnId);
+    const invoice = invoiceId === undefined ? undefined : state.invoices.get(invoiceId);
+    if (!invoice) return qboErrors.invalidReference("Line.LinkedTxn.TxnId", `Invoice ${asSent(link.TxnId)}`, now);
     if (invoice.CustomerRef.value !== customer.Id) {
       return qboErrors.businessValidation(
         `Invoice ${invoice.Id} belongs to another customer, so this payment can't be applied to it.`,
