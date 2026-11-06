@@ -18,9 +18,9 @@ npm run format      # let Biome fix formatting and import order for you
 
 `npm run build` compiles `src/` to `dist/`, which is what the npm package ships; `npm pack` runs it first. `test/package.test.ts` builds and packs the package on every test run, and checks that the compiled command starts on plain Node.
 
-CI runs typecheck, lint, and tests on Node 22 for every push and pull request. All three must pass before you open a pull request.
+CI runs typecheck, lint, and tests on Node 22 (the oldest `package.json` promises), 24, and the current release for every push and pull request. All three must pass before you open a pull request.
 
-The dashboard is a package of its own. If you change it, also run `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` in `dashboard/` ([dashboard/README.md](dashboard/README.md)); CI does.
+The dashboard is a package of its own. If you change it, also run `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` in `dashboard/` ([dashboard/README.md](dashboard/README.md)); CI does, on Node 22.
 
 ## Ground rules
 
