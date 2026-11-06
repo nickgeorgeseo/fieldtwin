@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
 import { parseTwinTime, TWIN_TIME_FORM } from "../core/clock.ts";
+import { isObject } from "../core/request-body.ts";
 import { type FaultRule, isFaultStatus, VENDOR_NAMES, type VendorName } from "../core/types.ts";
 import type { WebhookSubscription } from "../core/webhooks.ts";
 
@@ -53,7 +54,11 @@ const FaultRuleSchema = z
   });
 
 /** One timeline entry: when, and what each vendor should do then ({ jobber: { newClients: 15 } }). */
-const vendorActions = z.record(z.string(), z.unknown()).optional();
+// Kept as YAML gave it, not rebuilt as z.record would: a rebuilt object drops an own "__proto__" key, so an action of
+// that name vanished instead of being refused as unknown.
+const vendorActions = z
+  .custom<Record<string, unknown>>(isObject, { message: "must be the vendor's actions, like { newClients: 15 }" })
+  .optional();
 const TimelineEntrySchema = z
   .object({ at: z.string() })
   .extend(Object.fromEntries(VENDOR_NAMES.map((vendor) => [vendor, vendorActions])) as Record<VendorName, typeof vendorActions>)
