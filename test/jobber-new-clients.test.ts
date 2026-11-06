@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadScenario, loadScenarioByName, runAction } from "../src/control/operations.ts";
-import type { JobberState } from "../src/vendors/jobber/types.ts";
+import { clientName, type JobberState } from "../src/vendors/jobber/types.ts";
 import { FIRST_NAMES, LAST_NAMES } from "../src/world/word-lists.ts";
 import { setup } from "./helpers.ts";
 
@@ -34,6 +34,24 @@ describe("Jobber newClients", () => {
     }
     await runAction(harness.twin, "jobber", "newClients", 5);
     const names = clients(harness).map((client) => `${client.firstName} ${client.lastName}`);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("doesn't give a new client the name of a company already on file, when the company is named after a person", async () => {
+    const harness = setup();
+    loadScenario(harness.twin, 'name: One\nseed: 42\nstartTime: "2026-07-13T11:00:00Z"\nworld: { customers: 1 }\n');
+    // Every other name the word lists hold is a business trading under it ("Avery Brooks" plumbing), its contact the office.
+    const create = "mutation ($input: ClientCreateInput!) { clientCreate(input: $input) { userErrors { message } } }";
+    const taken = new Set(clients(harness).map(clientName));
+    for (const firstName of FIRST_NAMES) {
+      for (const lastName of LAST_NAMES) {
+        if (taken.has(`${firstName} ${lastName}`)) continue;
+        const input = { firstName: "Front", lastName: "Office", companyName: `${firstName} ${lastName}` };
+        expect((await (await harness.jobber(create, { input })).json()).data.clientCreate.userErrors).toEqual([]);
+      }
+    }
+    await runAction(harness.twin, "jobber", "newClients", 5);
+    const names = clients(harness).map(clientName);
     expect(new Set(names).size).toBe(names.length);
   });
 

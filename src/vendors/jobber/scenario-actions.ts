@@ -1,7 +1,7 @@
 import { checkCount, type ScenarioAction } from "../../core/vendor-twin.ts";
 import { MOST_NEW_CUSTOMERS, newCustomers } from "../../world/generate-world.ts";
 import { encodeId, nextIdNumber } from "./encoded-id.ts";
-import type { JobberClient, JobberState } from "./types.ts";
+import { clientName, type JobberClient, type JobberState } from "./types.ts";
 
 /**
  * What a scenario timeline can make happen in Jobber. Each returns complete events; the twin records them
@@ -15,9 +15,9 @@ export const jobberScenarioActions: Record<string, ScenarioAction<JobberState>> 
     check: (count) => checkCount("jobber", "newClients", count, MOST_NEW_CUSTOMERS),
     run: (count, { state, world, random, nowIso }) => {
       const firstNumber = nextIdNumber(state.clients.keys(), "Client");
-      // The person's own name, not Client.name: a business client's name is its company, and the person who works
-      // there still shouldn't share a name with a newcomer.
-      const takenNames = [...state.clients.values()].map((client) => `${client.firstName} ${client.lastName}`);
+      // Client.name and the person's own name: a business client's name is its company, which can be a person's name
+      // ("Avery Brooks" plumbing), and the person who works there still shouldn't share a name with a newcomer.
+      const takenNames = [...state.clients.values()].flatMap((client) => [clientName(client), `${client.firstName} ${client.lastName}`]);
       const people = newCustomers(random, world, { firstNumber, count: count as number }, takenNames);
       return people.map((person, index) => {
         const client: JobberClient = {
