@@ -21,8 +21,10 @@ export async function ensureCustomer(client: JobberInvoiceClient, context: SyncC
 
 async function findCustomer(client: JobberInvoiceClient, { quickbooks, stats, log }: SyncContext) {
   const email = client.email?.trim();
-  const found = email ? await books.findCustomerByEmail(quickbooks, email) : await books.findCustomerByName(quickbooks, client.name);
-  if (found && found.DisplayName !== client.name) {
+  const name = bookName(client.name, MAX_LENGTHS.DisplayName);
+  const found = email ? await books.findCustomerByEmail(quickbooks, email) : await books.findCustomerByName(quickbooks, name);
+  // A name the sync gave the customer itself, when createCustomer found the plain one taken, is not drift.
+  if (found && found.DisplayName !== name && !(email && found.DisplayName === books.nameWithEmail(name, email))) {
     stats.customersSpelledDifferently++;
     log(`Customer "${client.name}" is "${found.DisplayName}" in QuickBooks (same email). Matched, and left as the books have it.`);
   }
@@ -45,13 +47,31 @@ export async function ensureActive(client: JobberInvoiceClient, invoiceNumber: s
 async function createCustomer(client: JobberInvoiceClient, { quickbooks, stats, log }: SyncContext) {
   const email = client.email?.trim();
   const customer = await books.createCustomer(quickbooks, {
-    DisplayName: client.name,
-    ...(client.firstName && { GivenName: client.firstName }),
-    ...(client.lastName && { FamilyName: client.lastName }),
-    ...(client.companyName && { CompanyName: client.companyName }),
+    DisplayName: bookName(client.name, MAX_LENGTHS.DisplayName),
+    ...(client.firstName && { GivenName: bookName(client.firstName, MAX_LENGTHS.GivenName) }),
+    ...(client.lastName && { FamilyName: bookName(client.lastName, MAX_LENGTHS.FamilyName) }),
+    ...(client.companyName && { CompanyName: bookName(client.companyName, MAX_LENGTHS.CompanyName) }),
     ...(email && { PrimaryEmailAddr: { Address: email } }),
   });
   stats.customersCreated++;
   log(`Created customer "${customer.DisplayName}" in QuickBooks.`);
   return customer;
+}
+
+// Each name's "max character" in the Customer reference:
+// https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
+const MAX_LENGTHS = { DisplayName: 500, GivenName: 100, FamilyName: 100, CompanyName: 100 };
+
+/**
+ * A Jobber name as QuickBooks will take it. Customer names "must not contain colon (:), tab (\t), or newline (\n)
+ * characters" (2040, Invalid String), and Jobber allows all three, so a client named "Northside Plumbing: Commercial"
+ * would fail every run. A colon becomes a dash and a line break a space, which keeps the name recognizable.
+ */
+function bookName(name: string, maxLength: number): string {
+  return name
+    .replace(/\s*:\s*/g, " - ")
+    .replace(/\s*[\t\r\n]\s*/g, " ")
+    .trim()
+    .slice(0, maxLength)
+    .trim();
 }

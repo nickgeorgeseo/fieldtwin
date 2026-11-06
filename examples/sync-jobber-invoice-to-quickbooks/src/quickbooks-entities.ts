@@ -107,8 +107,13 @@ export async function createCustomer(qbo: QuickBooksClient, customer: NewCustome
   } catch (error) {
     const email = customer.PrimaryEmailAddr?.Address;
     if (!(error instanceof QuickBooksError && error.code === "6240" && email)) throw error;
-    return qbo.write<Customer>("Customer", { ...customer, DisplayName: `${customer.DisplayName} (${email})` });
+    return qbo.write<Customer>("Customer", { ...customer, DisplayName: nameWithEmail(customer.DisplayName, email) });
   }
+}
+
+/** The name createCustomer gives a customer whose name was taken. */
+export function nameWithEmail(displayName: string, email: string): string {
+  return `${displayName} (${email})`;
 }
 
 /**

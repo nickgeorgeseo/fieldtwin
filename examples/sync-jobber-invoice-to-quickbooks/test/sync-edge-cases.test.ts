@@ -74,6 +74,39 @@ describe("syncing, where the books need a person's judgment", () => {
     expect(qbo().customers.get(customer.Id)!.Active).toBe(false);
   });
 
+  it("creates a client whose name has a colon or newline under a name QuickBooks accepts, and finds them again next run", async () => {
+    const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
+    const invoice = firstPaidMissingFromBooks();
+    const client = jobber().clients.get(invoice.clientId)!;
+    const renamed = {
+      ...client,
+      companyName: "Northside Plumbing: Commercial",
+      lastName: "Line1\nLine2",
+      emails: [{ address: "new-owner@example.com", primary: true }],
+    };
+    target.twin.record({ vendor: "jobber", type: "ClientCreated", data: { client: renamed } }, "control");
+    const harness = await syncHarness(target);
+
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 1, failed: 0 });
+    const customer = qbo().customers.get(booked(invoice.invoiceNumber)[0]!.CustomerRef.value)!;
+    expect(customer).toMatchObject({ DisplayName: "Northside Plumbing - Commercial", FamilyName: "Line1 Line2" });
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 0, customersSpelledDifferently: 0, failed: 0 });
+  });
+
+  it("does not report a customer it created as 'Name (email)' as spelled differently on later runs", async () => {
+    const { target, jobber, qbo, firstPaidMissingFromBooks } = twinWithBooks();
+    const client = jobber().clients.get(firstPaidMissingFromBooks().clientId)!;
+    const namesake = [...qbo().customers.values()][0]!;
+    const sameName = { ...client, companyName: namesake.DisplayName, emails: [{ address: "second-ada@example.com", primary: true }] };
+    target.twin.record({ vendor: "jobber", type: "ClientCreated", data: { client: sameName } }, "control");
+    const harness = await syncHarness(target);
+
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 1, failed: 0 });
+    expect(harness.lines).toContain(`Created customer "${namesake.DisplayName} (second-ada@example.com)" in QuickBooks.`);
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 0, customersSpelledDifferently: 0, failed: 0 });
+    expect(harness.lines.filter((line) => line.includes("Matched, and left as the books have it"))).toEqual([]);
+  });
+
   it("matches a client Jobber has no email for by exact name", async () => {
     const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
     const invoice = firstPaidMissingFromBooks();
