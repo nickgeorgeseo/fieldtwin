@@ -136,6 +136,25 @@ describe("syncing, where the books need a person's judgment", () => {
     expect(harness.lines.filter((line) => line.includes("Matched, and left as the books have it"))).toEqual([]);
   });
 
+  it("keeps a 'Name (email)' name within QuickBooks' 500 characters when a long name is taken, and finds it again next run", async () => {
+    const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
+    const invoice = firstPaidMissingFromBooks();
+    const longName = "L".repeat(495);
+    const sameName = {
+      ...jobber().clients.get(invoice.clientId)!,
+      companyName: longName,
+      emails: [{ address: "long@example.com", primary: true }],
+    };
+    target.twin.record({ vendor: "jobber", type: "ClientCreated", data: { client: sameName } }, "control");
+    const harness = await syncHarness(target);
+    await books.createCustomer(harness.quickbooks, { DisplayName: longName }); // someone else already has the name
+
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 1, failed: 0 });
+    const customer = qbo().customers.get(booked(invoice.invoiceNumber)[0]!.CustomerRef.value)!;
+    expect(customer.DisplayName).toBe(`${"L".repeat(500 - " (long@example.com)".length)} (long@example.com)`);
+    expect(await harness.sync(EVER)).toMatchObject({ customersCreated: 0, customersSpelledDifferently: 0, failed: 0 });
+  });
+
   it("matches a client Jobber has no email for by exact name", async () => {
     const { target, jobber, qbo, booked, firstPaidMissingFromBooks } = twinWithBooks();
     const invoice = firstPaidMissingFromBooks();

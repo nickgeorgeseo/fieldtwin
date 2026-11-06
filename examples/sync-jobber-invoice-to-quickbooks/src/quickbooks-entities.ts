@@ -111,10 +111,17 @@ export async function createCustomer(qbo: QuickBooksClient, customer: NewCustome
   }
 }
 
-/** The name createCustomer gives a customer whose name was taken. */
+/**
+ * The name createCustomer gives a customer whose name was taken. DisplayName holds at most 500 characters (2050,
+ * Invalid String Length, https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer),
+ * so a long name gives up its end to make room for the email, which is the part that tells the two apart.
+ */
 export function nameWithEmail(displayName: string, email: string): string {
-  return `${displayName} (${email})`;
+  const suffix = ` (${email})`;
+  return `${displayName.slice(0, DISPLAY_NAME_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
+
+const DISPLAY_NAME_MAX_LENGTH = 500;
 
 /**
  * The Item to book a line to: the one with the line's name, or, if the books have none, the first Service item,
