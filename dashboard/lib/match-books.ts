@@ -7,7 +7,8 @@ import type { FieldService } from "./vendors.ts";
  * keeps the business in two field-service systems, Jobber and Housecall Pro, so each is compared with the books on its
  * own. Customers match by email, as the reference integration matches them (names drift between systems; emails
  * don't). Invoices match by number, one to one: the integration books the field-service system's invoice number as
- * QuickBooks' DocNumber, as the seeded books do (Jobber and Housecall Pro number each invoice as the world does).
+ * QuickBooks' DocNumber, as the seeded books do (Jobber and Housecall Pro number each invoice as the world does), and a
+ * number booked for two customers pairs with the invoice's own customer's, as the integration finds it.
  */
 
 export type CustomerStatus = "only-in-field-service" | "only-in-quickbooks" | "inactive-in-quickbooks" | "spelled-differently" | "same";
@@ -89,11 +90,16 @@ const INVOICE_ORDER: InvoiceStatus[] = [
 export function matchInvoices(books: Books, service: FieldService): InvoiceRow[] {
   const records = fieldServiceRecords(books, service);
   const customers = new Map(records.customers.map((customer) => [customer.id, customer.name]));
+  // QuickBooks takes one DocNumber for two customers, and the sync then books against the customer's own invoice
+  // (findInvoiceByDocNumber), so an invoice prefers the one whose customer is its customer's match by email.
+  const customerPairs = pairUp(records.customers, (customer) => customer.email, books.quickbooks.customers, customerEmail);
+  const bookedCustomer = new Map(records.customers.map((customer) => [customer.id, customerPairs.get(customer)?.Id]));
   const pairs = pairUp(
     records.invoices,
     (invoice) => invoice.number,
     books.quickbooks.invoices,
     (invoice) => invoice.DocNumber ?? "",
+    (invoice, booked) => booked.CustomerRef.value === bookedCustomer.get(invoice.customerId),
   );
   const rows: InvoiceRow[] = records.invoices.map((invoice) => {
     const row: InvoiceRow = {
@@ -132,8 +138,17 @@ function byText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** Pairs each field-service record with the first record in the books that has the same key and isn't paired yet. */
-function pairUp<F, B>(fromService: F[], serviceKey: (record: F) => string, booked: B[], bookedKey: (record: B) => string): Map<F, B> {
+/**
+ * Pairs each field-service record with the first record in the books that has the same key and isn't paired yet. With
+ * `belongs`, every record first takes one that belongs to it, so one falling back to the first can't take another's.
+ */
+function pairUp<F, B>(
+  fromService: F[],
+  serviceKey: (record: F) => string,
+  booked: B[],
+  bookedKey: (record: B) => string,
+  belongs?: (record: F, candidate: B) => boolean,
+): Map<F, B> {
   const waiting = new Map<string, B[]>();
   for (const record of booked) {
     const key = bookedKey(record);
@@ -143,10 +158,13 @@ function pairUp<F, B>(fromService: F[], serviceKey: (record: F) => string, booke
     waiting.set(key, queue);
   }
   const pairs = new Map<F, B>();
-  for (const record of fromService) {
-    const match = waiting.get(serviceKey(record))?.shift();
-    if (match) pairs.set(record, match);
-  }
+  const take = (record: F, fits: (candidate: B) => boolean) => {
+    const queue = waiting.get(serviceKey(record)) ?? [];
+    const at = queue.findIndex(fits);
+    if (at >= 0) pairs.set(record, ...queue.splice(at, 1));
+  };
+  if (belongs) for (const record of fromService) take(record, (candidate) => belongs(record, candidate));
+  for (const record of fromService) if (!pairs.has(record)) take(record, () => true);
   return pairs;
 }
 

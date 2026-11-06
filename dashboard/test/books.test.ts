@@ -281,6 +281,28 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
       ],
     );
   });
+
+  it("pairs an invoice with its own customer's when QuickBooks holds its number for two customers, as the sync books it", () => {
+    const books = readBooks([
+      event("jobber", "ClientCreated", { client: client(1, "Elliot", "Lindqvist", "elliot@example.com") }),
+      event("jobber", "InvoiceCreated", { invoice: jobberInvoice("29", "client-1", [389], paid) }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("7", "Kendall Dunmore", "kendall@example.com") }),
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("8", "Elliot Lindqvist", "elliot@example.com") }),
+      event("quickbooks", "InvoiceCreated", {
+        invoice: { ...qboInvoice("29", "29", "Kendall Dunmore", 50, 50), CustomerRef: { value: "7" } },
+      }),
+      event("quickbooks", "InvoiceCreated", {
+        invoice: { ...qboInvoice("30", "29", "Elliot Lindqvist", 389, 0), CustomerRef: { value: "8" } },
+      }),
+    ]);
+    assert.deepEqual(
+      matchInvoices(books, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      [
+        ["29", "29", "only-in-quickbooks"],
+        ["29", "30", "in-sync"],
+      ],
+    );
+  });
 });
 
 describe("comparing Housecall Pro with the books instead of Jobber", () => {
