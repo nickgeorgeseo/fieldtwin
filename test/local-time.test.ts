@@ -17,3 +17,13 @@ describe("localTime", () => {
     expect(localTime(ms, 0)).toBe("2026-07-16T22:31:31+00:00");
   });
 });
+
+describe("the business's date in Jobber's statuses", () => {
+  it("reads half a millisecond before a pre-1970 local midnight as the earlier day, as QuickBooks' today does", async () => {
+    const { localDate } = await import("../src/vendors/jobber/resolvers/statuses.ts");
+    const { qboToday } = await import("../src/vendors/quickbooks/dates.ts");
+    const nowMs = Date.parse("1969-12-31T05:00:00Z") - 0.5; // local midnight at UTC-5, less half a millisecond
+    expect(localDate(nowMs, -5)).toBe("1969-12-30");
+    expect(localDate(nowMs, -5)).toBe(qboToday(nowMs, -5));
+  });
+});

@@ -8,14 +8,21 @@ import type { FieldService } from "./vendors.ts";
  * (match-books.ts compares them).
  */
 export interface FieldServiceRecords {
-  customers: { id: string; name: string; email: string }[];
+  /** lookupName: the name the vendor's own API gives the customer, which the sync looks it up by when it has no email. */
+  customers: { id: string; name: string; email: string; lookupName?: string }[];
   invoices: { number: string; customerId: string; cents: number; paid: boolean }[];
 }
 
 export function fieldServiceRecords(books: Books, service: FieldService): FieldServiceRecords {
   if (service === "jobber") {
     return {
-      customers: books.jobber.clients.map((client) => ({ id: client.id, name: clientName(client), email: clientEmail(client) })),
+      customers: books.jobber.clients.map((client) => ({
+        id: client.id,
+        name: clientName(client),
+        email: clientEmail(client),
+        // Jobber's Client.name is the company for a business client, then the person: what the sync reads and looks up.
+        lookupName: client.companyName || [client.firstName, client.lastName].filter(Boolean).join(" "),
+      })),
       invoices: books.jobber.invoices.map((invoice) => ({
         number: invoice.invoiceNumber,
         customerId: invoice.clientId,

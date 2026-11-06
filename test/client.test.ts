@@ -193,6 +193,14 @@ describe("the twin's client", async () => {
 });
 
 describe("connectTwin()", () => {
+  it("says what answered when connect() is redirected somewhere that isn't the app, rather than throwing a bare TypeError", async () => {
+    const twin = connectTwin("http://wrong.port", { fetch: () => new Response(null, { status: 302, headers: { Location: "/login" } }) });
+    await expect(twin.connect("jobber")).rejects.toMatchObject({
+      name: "TwinError",
+      message: expect.stringContaining("redirected to /login"),
+    });
+  });
+
   it("drives an in-process twin through a fetch you pass, with no port at all", async () => {
     const { app } = createApp({ seed: 3 });
     const twin = connectTwin("http://twin.test/", { fetch: (url, init) => app.request(url, init) });

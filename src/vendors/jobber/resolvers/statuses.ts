@@ -1,3 +1,4 @@
+import { twinIso } from "../../../core/clock.ts";
 import type { JobberInvoice, JobberVisit } from "../types.ts";
 
 /**
@@ -15,7 +16,8 @@ const HOUR = 3_600_000;
 
 /** The calendar date at the business, which is what "today" and "late" mean to a dispatcher. */
 export function localDate(ms: number, utcOffsetHours: number): string {
-  return new Date(ms + utcOffsetHours * HOUR).toISOString().slice(0, 10);
+  // Floored, as the clock's own times are: before 1970 a Date truncates a fraction of a millisecond up to the next one.
+  return twinIso(ms + utcOffsetHours * HOUR).slice(0, 10);
 }
 
 /** A visit is late once its day has passed without it being completed, and on today's board until then. */

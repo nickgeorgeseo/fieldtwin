@@ -50,6 +50,12 @@ export async function connectThroughOAuth(base: string, send: Fetch, vendor: Ven
       if (approval.headers.has("X-Twin-Fault")) continue;
       break;
     }
+    // A relative Location (a dev server sending a browser to /login) isn't the vendor's redirect back to the app.
+    if (!URL.canParse(location))
+      throw new TwinError(
+        `${vendor}'s authorize endpoint redirected to ${location}, not back to the app: is this a twin?`,
+        approval.status,
+      );
     const callback = new URL(location).searchParams;
     const code = callback.get("code");
     // A refusal after the client is known comes back on the redirect, as ?error= and ?error_description= (RFC 6749 4.1.2.1).

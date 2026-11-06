@@ -7,9 +7,12 @@ import type { QboCustomer } from "./books.ts";
  * one wins, as the sync's activeFirst picks. One customer can be found for two field-service customers, since the
  * sync finds the same one for two clients under one email.
  */
-export function bookedCustomer(customer: { name: string; email: string }, books: QboCustomer[]): QboCustomer | undefined {
+export function bookedCustomer(
+  customer: { name: string; email: string; lookupName?: string },
+  books: QboCustomer[],
+): QboCustomer | undefined {
   const email = customer.email.trim().toLowerCase();
-  const name = bookName(customer.name).toLowerCase();
+  const name = bookName(customer.lookupName ?? customer.name).toLowerCase();
   const found = books.filter((booked) =>
     email ? booked.PrimaryEmailAddr?.Address?.trim().toLowerCase() === email : booked.DisplayName.trim().toLowerCase() === name,
   );

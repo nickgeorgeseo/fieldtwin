@@ -334,6 +334,15 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
     );
   });
 
+  it("finds a business client with no email under its company name, as Jobber names it and the sync looks it up", () => {
+    const acme = { ...client(1, "Elliot", "Lindqvist", ""), emails: [], companyName: "Lindqvist Heating" };
+    const books = elliotsTwentyNine([qboCustomer("8", "Lindqvist Heating")], [acme], "client-1", "8");
+    assert.deepEqual(
+      matchInvoices(books, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      pairedAsTheSyncBooks,
+    );
+  });
+
   it("finds the active customer when the books hold an email twice, as the sync does, to pair a number booked twice", () => {
     const customers = [
       qboCustomer("8", "Elliot Lindqvist (old)", "elliot@example.com", false),
