@@ -121,11 +121,17 @@ function encodedIdVariableErrors(
     const value = request.variables[name];
     if (value === undefined || value === null || namedType(definition.type) !== "EncodedId") continue;
 
-    const values = Array.isArray(value) ? value : [value];
+    // Only a variable declared as a list holds items to check one by one. A list sent for a single EncodedId is wrong
+    // for being a list, even when it holds a valid id, so the problem says that rather than calling the id invalid.
+    const isList = listType(definition.type);
+    const values = isList && Array.isArray(value) ? value : [value];
     const problems = values.flatMap((item, index) => {
       if (isEncodedId(item)) return [];
-      const message = invalidEncodedIdMessage(item);
-      return [{ path: Array.isArray(value) ? [index] : [], explanation: message, message }];
+      const message =
+        !isList && Array.isArray(item)
+          ? `Expected one EncodedId, not a list. Send the id itself, like "Z2lkOi8vSm9iYmVyL0NsaWVudC8x".`
+          : invalidEncodedIdMessage(item);
+      return [{ path: isList && Array.isArray(value) ? [index] : [], explanation: message, message }];
     });
     if (!problems.length) continue;
 
@@ -151,6 +157,11 @@ function echoed(value: unknown): unknown {
 
 function namedType(type: TypeNode): string {
   return type.kind === Kind.NAMED_TYPE ? type.name.value : namedType(type.type);
+}
+
+/** Whether a declared type is a list, like `[EncodedId!]!`, rather than a single value. */
+function listType(type: TypeNode): boolean {
+  return type.kind === Kind.NON_NULL_TYPE ? type.type.kind === Kind.LIST_TYPE : type.kind === Kind.LIST_TYPE;
 }
 
 function formatted(error: unknown): GraphQLFormattedError {

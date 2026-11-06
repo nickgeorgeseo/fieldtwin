@@ -113,6 +113,19 @@ describe("Jobber twin: errors and ids", () => {
     }
   });
 
+  it("says a list was sent, not that the id is invalid, when an EncodedId variable gets a list holding one", async () => {
+    const { jobber } = setup();
+    const query = "query ($id: EncodedId!) { client(id: $id) { id } }";
+    const id = Buffer.from("gid://Jobber/Client/1").toString("base64");
+    const body = await (await jobber(query, { id: [id] })).json();
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0].message).toBe("Variable $id of type EncodedId! was provided invalid value");
+    const [problem] = body.errors[0].extensions.problems;
+    expect(problem.path).toEqual([]);
+    expect(problem.explanation).toContain("not a list");
+    expect(problem.explanation).not.toContain("is not a valid EncodedId");
+  });
+
   it("rejects an id written inline in the query that is not an EncodedId", async () => {
     const { jobber } = setup();
     const body = await (await jobber('{ client(id: "1") { id } }')).json();
