@@ -59,9 +59,14 @@ export function createApp(options: AppOptions = {}) {
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
-/** 413 for a body over the limit: in the vendor's own error format on its paths, so its SDKs can read it. */
+/**
+ * 413 for a body over the limit: in the vendor's own error format on its paths, so its SDKs can read it. Every vendor's
+ * OAuth endpoints answer in OAuth's own format instead, as their other errors do, for the OAuth library calling them
+ * (https://datatracker.ietf.org/doc/html/rfc6749#section-5.2).
+ */
 function answerTooLarge(twin: Twin, c: Context) {
   const message = "The request body is over the twin's 10 MB limit. No real request is that big: check what is being sent.";
+  if (/\/oauth2?(\/|$)/.test(c.req.path)) return c.json({ error: "invalid_request", error_description: message }, 413);
   const vendor = vendorAt(c.req.path);
   return c.json((vendor ? vendor.errorBody(413, message, twin) : { error: message }) as object, 413);
 }

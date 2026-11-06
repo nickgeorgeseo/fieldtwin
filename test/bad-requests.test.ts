@@ -171,6 +171,17 @@ describe("request bodies too big to be real", () => {
     expect((await housecallpro.json()).error.message).toContain("10 MB");
   });
 
+  it.each(["/api/oauth/token", "/housecallpro/oauth/token", "/oauth2/v1/tokens/bearer", "/v2/oauth2/tokens/revoke"])(
+    "answer 413 on %s as OAuth errors are answered, so an OAuth client can read it",
+    async (path) => {
+      const response = await setup().app.request(path, { method: "POST", body: `code=${"x".repeat(11 * 1024 * 1024)}` });
+      expect(response.status).toBe(413);
+      const body = await response.json();
+      expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("10 MB");
+    },
+  );
+
   it("answer 413 on the control plane too", async () => {
     const response = await setup().app.request("/_twin/scenario", { method: "POST", body: huge });
     expect(response.status).toBe(413);
