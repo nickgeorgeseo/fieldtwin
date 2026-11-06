@@ -17,7 +17,8 @@
 
 import { type Token, tokenize } from "./query-tokens.ts";
 
-export type QueryValue = string | number | boolean;
+/** A number keeps the digits it was written with, so a text property compares them as written (DocNumber = 007). */
+export type QueryValue = string | boolean;
 
 export type QueryOperator = "=" | "<" | ">" | "<=" | ">=" | "like" | "in";
 
@@ -118,9 +119,9 @@ class Parser {
       this.expectSymbol(")");
       return { property, operator, values };
     }
-    const value = this.value();
-    if (operator === "like" && typeof value !== "string") throw new ParseFailure("syntax", "LIKE needs a quoted pattern, like 'Palm%'");
-    return { property, operator, values: [value] };
+    if (operator === "like" && this.tokens[this.position]?.kind !== "string")
+      throw new ParseFailure("syntax", "LIKE needs a quoted pattern, like 'Palm%'");
+    return { property, operator, values: [this.value()] };
   }
 
   private operator(property: string): QueryOperator {
@@ -145,7 +146,8 @@ class Parser {
   private value(): QueryValue {
     const token = this.tokens[this.position++];
     if (token?.kind === "string") return token.text;
-    if (token?.kind === "number") return Number(token.text);
+    // Only TotalAmt and Balance read a number as a number (query-values.ts); everything else compares the digits.
+    if (token?.kind === "number") return token.text;
     if (token?.kind === "word" && /^(true|false)$/i.test(token.text)) return token.text.toLowerCase() === "true";
     if (token?.kind === "word" && token.text.toUpperCase() === "CURRENT_DATE") {
       throw new ParseFailure("unsupported", "The twin doesn't support CURRENT_DATE yet. Send the date instead, like '2026-07-13'");

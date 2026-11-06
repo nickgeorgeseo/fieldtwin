@@ -44,6 +44,17 @@ describe("QuickBooks query values", () => {
     expect([near.body.QueryResponse.totalCount, exact.body.QueryResponse.totalCount]).toEqual([0, 1]);
   });
 
+  it("match an unquoted number against text digit for digit, as written: DocNumber = 007 is not DocNumber '7'", async () => {
+    const harness = setup();
+    for (const number of ["007", "100.50", "9007199254740993"]) await invoiceNumbered(harness, number);
+    const found: string[][] = [];
+    for (const number of ["007", "100.50", "9007199254740993"]) {
+      const { body } = await query(harness, `SELECT * FROM Invoice WHERE DocNumber = ${number}`);
+      found.push((body.QueryResponse.Invoice ?? []).map((invoice: { DocNumber: string }) => invoice.DocNumber));
+    }
+    expect(found).toEqual([["007"], ["100.50"], ["9007199254740993"]]);
+  });
+
   it("sort Ids as numbers", async () => {
     const { body } = await query(setup(), "SELECT * FROM Customer WHERE Id IN ('2', '10', '9') ORDERBY Id");
     expect(body.QueryResponse.Customer.map((customer: { Id: string }) => customer.Id)).toEqual(["2", "9", "10"]);
