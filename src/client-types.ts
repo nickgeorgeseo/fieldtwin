@@ -7,7 +7,9 @@ import type { WorldCompany } from "./world/generate-world.ts";
 
 /**
  * What the control plane answers, as plain types for code that drives a twin: `import type { Change } from "fieldtwin"`.
- * test/client-types.test.ts checks each one against what control/operations.ts really returns.
+ * test/client.test.ts ("the client's types") checks the answers against what control/operations.ts really returns. The
+ * log stores an event's type as a plain string, so the event types (TwinLogEvent, Change) are built from each vendor's
+ * events.ts instead, and the same test checks that they narrow by vendor and type.
  */
 
 export type { AuthMode, Checkpoint, Delivery, EventSource, FaultRule, VendorName, WebhookSubscription };

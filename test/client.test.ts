@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, expectTypeOf, it } from "vitest";
 import { createApp } from "../src/app.ts";
 import { connectTwin, TwinError } from "../src/client.ts";
-import type { EventOf, Scenario, TwinStatus, VendorInfo, WebhookReport } from "../src/client-types.ts";
+import type { AuthMode, Checkpoint, EventOf, Scenario, ScenarioInfo, TwinStatus, VendorInfo, WebhookReport } from "../src/client-types.ts";
 import type * as ops from "../src/control/operations.ts";
 import { startTwin } from "../src/start.ts";
 import { TWIN_REALM_ID } from "../src/vendors/quickbooks/seed.ts";
@@ -185,6 +185,10 @@ describe("the client's types", () => {
     expectTypeOf<ReturnType<typeof ops.describeTwin>>().toExtend<TwinStatus>();
     expectTypeOf<ReturnType<typeof ops.describeVendors>[number]>().toExtend<VendorInfo>();
     expectTypeOf<ReturnType<typeof ops.describeWebhooks>>().toExtend<WebhookReport>();
+    expectTypeOf<ReturnType<typeof ops.createCheckpoint>>().toExtend<Checkpoint>();
+    expectTypeOf<ReturnType<typeof ops.listScenarios>[number]>().toExtend<ScenarioInfo>();
+    expectTypeOf<ReturnType<typeof ops.setFaults>>().toExtend<{ activeFaults: string[] }>();
+    expectTypeOf<ReturnType<typeof ops.setAuthMode>>().toExtend<{ authMode: AuthMode }>();
   });
 
   it("narrow an event's data by vendor and type", () => {
