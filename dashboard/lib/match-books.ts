@@ -1,3 +1,4 @@
+import { bookedCustomer } from "./booked-customer.ts";
 import type { Books, QboCustomer, QboInvoice } from "./books.ts";
 import { fieldServiceRecords } from "./field-service.ts";
 import type { FieldService } from "./vendors.ts";
@@ -91,15 +92,14 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
   const records = fieldServiceRecords(books, service);
   const customers = new Map(records.customers.map((customer) => [customer.id, customer.name]));
   // QuickBooks takes one DocNumber for two customers, and the sync then books against the customer's own invoice
-  // (findInvoiceByDocNumber), so an invoice prefers the one whose customer is its customer's match by email.
-  const customerPairs = pairUp(records.customers, (customer) => customer.email, books.quickbooks.customers, customerEmail);
-  const bookedCustomer = new Map(records.customers.map((customer) => [customer.id, customerPairs.get(customer)?.Id]));
+  // (findInvoiceByDocNumber), so an invoice prefers the one booked for the customer the sync finds for its customer.
+  const bookedFor = new Map(records.customers.map((customer) => [customer.id, bookedCustomer(customer, books.quickbooks.customers)?.Id]));
   const pairs = pairUp(
     records.invoices,
     (invoice) => invoice.number,
     books.quickbooks.invoices,
     (invoice) => invoice.DocNumber ?? "",
-    (invoice, booked) => booked.CustomerRef.value === bookedCustomer.get(invoice.customerId),
+    (invoice, booked) => booked.CustomerRef.value === bookedFor.get(invoice.customerId),
   );
   const rows: InvoiceRow[] = records.invoices.map((invoice) => {
     const row: InvoiceRow = {

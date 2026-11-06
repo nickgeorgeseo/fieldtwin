@@ -303,6 +303,57 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
       ],
     );
   });
+
+  // Each pairs Elliot's #29 with the books' #30, booked for the customer the sync finds for him (sync-customers.ts),
+  // beside Kendall's #29 that was there first.
+  const elliotsTwentyNine = (customers: unknown[], clients: unknown[], clientId: string, customerId: string) =>
+    readBooks([
+      ...clients.map((client) => event("jobber", "ClientCreated", { client })),
+      event("jobber", "InvoiceCreated", { invoice: jobberInvoice("29", clientId, [389], paid) }),
+      ...[qboCustomer("7", "Kendall Dunmore", "kendall@example.com"), ...customers].map((customer) =>
+        event("quickbooks", "CustomerCreated", { customer }),
+      ),
+      event("quickbooks", "InvoiceCreated", {
+        invoice: { ...qboInvoice("29", "29", "Kendall Dunmore", 50, 50), CustomerRef: { value: "7" } },
+      }),
+      event("quickbooks", "InvoiceCreated", {
+        invoice: { ...qboInvoice("30", "29", "Elliot Lindqvist", 389, 0), CustomerRef: { value: customerId } },
+      }),
+    ]);
+  const pairedAsTheSyncBooks = [
+    ["29", "29", "only-in-quickbooks"],
+    ["29", "30", "in-sync"],
+  ];
+
+  it("finds the customer of a client with no email by name, as the sync does, to pair a number booked twice", () => {
+    const elliot = { ...client(1, "Elliot", "Lindqvist", ""), emails: [] };
+    const books = elliotsTwentyNine([qboCustomer("8", "elliot lindqvist")], [elliot], "client-1", "8");
+    assert.deepEqual(
+      matchInvoices(books, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      pairedAsTheSyncBooks,
+    );
+  });
+
+  it("finds the active customer when the books hold an email twice, as the sync does, to pair a number booked twice", () => {
+    const customers = [
+      qboCustomer("8", "Elliot Lindqvist (old)", "elliot@example.com", false),
+      qboCustomer("9", "Elliot Lindqvist", "elliot@example.com"),
+    ];
+    const books = elliotsTwentyNine(customers, [client(1, "Elliot", "Lindqvist", "elliot@example.com")], "client-1", "9");
+    assert.deepEqual(
+      matchInvoices(books, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      pairedAsTheSyncBooks,
+    );
+  });
+
+  it("finds one customer for two clients under one email, as the sync does, to pair a number booked twice", () => {
+    const clients = [client(1, "Elliot", "Lindqvist", "elliot@example.com"), client(2, "Elliot", "Lindqvist", "elliot@example.com")];
+    const books = elliotsTwentyNine([qboCustomer("8", "Elliot Lindqvist", "elliot@example.com")], clients, "client-2", "8");
+    assert.deepEqual(
+      matchInvoices(books, "jobber").map((row) => [row.number, row.quickbooks?.id, row.status]),
+      pairedAsTheSyncBooks,
+    );
+  });
 });
 
 describe("comparing Housecall Pro with the books instead of Jobber", () => {
