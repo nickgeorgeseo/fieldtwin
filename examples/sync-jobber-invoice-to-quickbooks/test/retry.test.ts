@@ -124,4 +124,15 @@ describe("parseRetryAfter", () => {
     expect(parseRetryAfter(null, NOW)).toBeUndefined();
     expect(parseRetryAfter("soon", NOW)).toBeUndefined();
   });
+
+  it("ignores a fractional or negative number, which is neither delay-seconds nor a date, rather than reading it as a past date", () => {
+    for (const value of ["1.5", "-5", "3e2"]) expect(parseRetryAfter(value, NOW), value).toBeUndefined();
+  });
+
+  it("leaves withRetries to back off as usual after a Retry-After it can't read", async () => {
+    const runtime = fakeRuntime(0.5);
+    const { send } = scripted(new Response(null, { status: 503, headers: { "Retry-After": "1.5" } }), 200);
+    await withRetries(send, POLICY, runtime, "test");
+    expect(runtime.waits).toEqual([500]); // half of the first ceiling, 1 second
+  });
 });

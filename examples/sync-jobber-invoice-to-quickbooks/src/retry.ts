@@ -83,6 +83,9 @@ export function backoffDelayMs(attempt: number, policy: RetryPolicy, random: () 
 export function parseRetryAfter(value: string | null, nowMs: number): number | undefined {
   if (!value) return undefined;
   if (/^\d+$/.test(value.trim())) return Number(value.trim()) * 1000;
+  // Every HTTP-date names its day and month (https://www.rfc-editor.org/rfc/rfc9110#section-5.6.7). Date.parse reads
+  // "1.5" or "-5" as a date in 2001, which would retry at once, with no wait at all.
+  if (!/[a-z]/i.test(value)) return undefined;
   const at = Date.parse(value);
   return Number.isNaN(at) ? undefined : Math.max(0, at - nowMs);
 }
