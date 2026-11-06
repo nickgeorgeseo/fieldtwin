@@ -57,7 +57,7 @@ export function actualQueryCost(
 
 function selectionCost(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, multiplier: number, context: Context): number {
   let cost = 0;
-  for (const field of collectFields(selectionSet, parentType, context)) cost += fieldCost(field, parentType, multiplier, context);
+  for (const field of collectFields(selectionSet, context)) cost += fieldCost(field, parentType, multiplier, context);
   return Math.min(cost, MAX_COST);
 }
 
@@ -71,7 +71,7 @@ function fieldCost(field: FieldNode, parentType: GraphQLNamedType, multiplier: n
   // The connection field is free. Per-node fields are multiplied by the page size; the rest are charged once.
   const pageSize = requestedPageSize(field, context);
   let cost = 0;
-  for (const child of collectFields(field.selectionSet, type, context)) {
+  for (const child of collectFields(field.selectionSet, context)) {
     const childType = fieldType(type, child);
     cost +=
       PER_NODE_FIELDS.has(child.name.value) && child.selectionSet && childType
@@ -95,7 +95,7 @@ function requestedPageSize(field: FieldNode, context: Context): number {
 
 function actualSelectionCost(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, data: unknown, context: Context): number {
   let cost = 0;
-  for (const field of collectFields(selectionSet, parentType, context)) {
+  for (const field of collectFields(selectionSet, context)) {
     const key = field.alias?.value ?? field.name.value;
     const value = (data as Record<string, unknown>)[key];
     if (value !== undefined) cost += actualFieldCost(field, parentType, value, context);
@@ -112,7 +112,7 @@ function actualFieldCost(field: FieldNode, parentType: GraphQLNamedType, value: 
   if (value === null) return 0;
 
   let cost = 0;
-  for (const child of collectFields(field.selectionSet, type, context)) {
+  for (const child of collectFields(field.selectionSet, context)) {
     const childValue = (value as Record<string, unknown>)[child.alias?.value ?? child.name.value];
     const childType = fieldType(type, child);
     if (PER_NODE_FIELDS.has(child.name.value) && child.selectionSet && childType && Array.isArray(childValue)) {

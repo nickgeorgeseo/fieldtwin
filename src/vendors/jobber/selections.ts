@@ -15,6 +15,7 @@ import {
   isObjectType,
   Kind,
   type OperationDefinitionNode,
+  type SelectionNode,
   type SelectionSetNode,
   type ValueNode,
 } from "graphql";
@@ -56,9 +57,9 @@ export function rootType(schema: GraphQLSchema, operation: OperationDefinitionNo
  * one per response key (alias or name). Execution merges fields that share a key, so `id` selected directly and
  * again in a fragment comes back once, and is priced once; the sub-selections of a repeated field are merged too.
  */
-export function collectFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
+export function collectFields(selectionSet: SelectionSetNode, context: Context): FieldNode[] {
   const byKey = new Map<string, FieldNode[]>();
-  for (const field of allFields(selectionSet, parentType, context)) {
+  for (const field of allFields(selectionSet, context)) {
     const key = field.alias?.value ?? field.name.value;
     const sameKey = byKey.get(key);
     if (sameKey) sameKey.push(field);
@@ -75,16 +76,23 @@ export function collectFields(selectionSet: SelectionSetNode, parentType: GraphQ
   });
 }
 
-function allFields(selectionSet: SelectionSetNode, parentType: GraphQLNamedType, context: Context): FieldNode[] {
+/**
+ * Every field a selection set holds, in order, through its fragments. A stack of selections still to read rather
+ * than recursion: a chain of thousands of nested fragments can pass validation, and walking it recursively would
+ * run out of stack and answer the request with a 500 instead of the query's own answer.
+ */
+function allFields(selectionSet: SelectionSetNode, context: Context): FieldNode[] {
   const fields: FieldNode[] = [];
-  for (const selection of selectionSet.selections) {
+  const pending: SelectionNode[] = [...selectionSet.selections].reverse();
+  for (let selection = pending.pop(); selection; selection = pending.pop()) {
     if (!included(selection, context)) continue;
-    if (selection.kind === Kind.FIELD) fields.push(selection);
-    else if (selection.kind === Kind.INLINE_FRAGMENT) fields.push(...allFields(selection.selectionSet, parentType, context));
-    else {
-      const fragment = context.fragments.get(selection.name.value);
-      if (fragment) fields.push(...allFields(fragment.selectionSet, parentType, context));
+    if (selection.kind === Kind.FIELD) {
+      fields.push(selection);
+      continue;
     }
+    const inner =
+      selection.kind === Kind.INLINE_FRAGMENT ? selection.selectionSet : context.fragments.get(selection.name.value)?.selectionSet;
+    if (inner) pending.push(...[...inner.selections].reverse());
   }
   return fields;
 }

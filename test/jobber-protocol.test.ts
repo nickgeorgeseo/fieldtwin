@@ -64,6 +64,20 @@ describe("Jobber twin: errors and ids", () => {
     expect(body.errors[0].message).toBeTruthy();
   });
 
+  it("answers fragments nested thousands deep that pass validation with HTTP 200, not a 500 from pricing them", async () => {
+    // Each fragment wraps the next spread in 20 inline fragments: a short chain that validates quickly but nests
+    // deeply. How deep the stack goes depends on the machine, so the chain grows a step at a time.
+    const inline = (n: number) => `${"... on Account { ".repeat(20)}id ...F${n + 1}${" }".repeat(20)}`;
+    for (const length of [200, 300, 400]) {
+      const { jobber } = setup();
+      const chain = Array.from({ length }, (_, n) => `fragment F${n} on Account { ${inline(n)} }`).join("\n");
+      const response = await jobber(`{ account { ...F0 } }\n${chain}\nfragment F${length} on Account { name }`);
+      expect(response.status, `a chain of ${length}`).toBe(200);
+      const body = await response.json();
+      expect(body.data?.account ?? body.errors[0].message).toBeTruthy();
+    }
+  });
+
   it("rejects a variable that is not an EncodedId, in Jobber's documented error shape", async () => {
     const { jobber } = setup();
     const body = await (await jobber("query SampleQuery($id: EncodedId!) { client(id: $id) { id } }", { id: "1" })).json();
