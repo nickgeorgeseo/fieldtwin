@@ -13,7 +13,8 @@ export interface SummaryParts {
   source: string | null;
 }
 
-const SUMMARY = /^(\S+) {2}(\S+) {2}(.*) {2}\((\w+)\)$/;
+// The s flag: the one line can hold a line break after all, inside a name a vendor took as written.
+const SUMMARY = /^(\S+) {2}(\S+) {2}(.*) {2}\((\w+)\)$/s;
 
 export function summaryParts(summary: string): SummaryParts {
   const match = SUMMARY.exec(summary);

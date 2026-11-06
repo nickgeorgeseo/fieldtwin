@@ -18,6 +18,15 @@ describe("reading the twin's one-line summaries of what happened", () => {
     assert.equal(parts.source, "scenario");
   });
 
+  it("takes the line apart when a name in it has a line break, which Housecall Pro accepts", () => {
+    assert.deepEqual(summaryParts('2026-07-13T11:00:00.000Z  housecallpro  CustomerCreated cus_1 "Ana Lee\r\nJr"  (api)'), {
+      at: "2026-07-13T11:00:00.000Z",
+      vendor: "housecallpro",
+      what: 'CustomerCreated cus_1 "Ana Lee\r\nJr"',
+      source: "api",
+    });
+  });
+
   it("shows a summary it can't read as it is", () => {
     assert.deepEqual(summaryParts("something new"), { at: null, vendor: null, what: "something new", source: null });
   });
