@@ -9,6 +9,13 @@ import { setup } from "./helpers.ts";
 type Harness = ReturnType<typeof setup>;
 const sale = (Amount: number) => ({ DetailType: "SalesItemLineDetail", Amount, SalesItemLineDetail: { ItemRef: { value: "1" } } });
 const faultOf = async (response: Response) => (await response.json()).Fault?.Error[0];
+// Built by hand: JSON.stringify would write numbers the way JavaScript reads them, digits lost.
+const raw = (harness: Harness, path: string, json: string) =>
+  harness.app.request(`/v3/company/9341000000000001${path}`, {
+    method: "POST",
+    headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+    body: json,
+  });
 
 async function invoice(harness: Harness, fields: object = {}) {
   return (await (await harness.qboPost("/invoice", { CustomerRef: { value: "1" }, Line: [sale(40)], ...fields })).json()).Invoice;
@@ -47,13 +54,6 @@ describe("QuickBooks twin: text fields", () => {
 });
 
 describe("QuickBooks twin: long numbers in text fields", () => {
-  // Built by hand: JSON.stringify would write these numbers the way JavaScript reads them, digits lost.
-  const raw = (harness: Harness, path: string, json: string) =>
-    harness.app.request(`/v3/company/9341000000000001${path}`, {
-      method: "POST",
-      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
-      body: json,
-    });
   const line = JSON.stringify(sale(40));
 
   it("keeps every digit of a number too long for JavaScript to hold exactly", async () => {
@@ -305,5 +305,19 @@ describe("QuickBooks twin: ids and references", () => {
     expect(created.CustomerRef.value).toBe("2");
     const updated = await harness.qboPost("/invoice", { Id: Number(created.Id), SyncToken: 0, sparse: true, PrivateNote: "Numbers" });
     expect((await updated.json()).Invoice).toMatchObject({ Id: created.Id, SyncToken: "1", PrivateNote: "Numbers" });
+  });
+
+  it("reads an Id or reference written with a zero fraction (SyncToken 0.0, as Python writes a float) as the whole number", async () => {
+    const harness = setup();
+    const priced = `{"Id": 1.0, "DetailType": "SalesItemLineDetail", "Amount": 40, "SalesItemLineDetail": {"ItemRef": {"value": 1.0}}}`;
+    const created = await raw(harness, "/invoice", `{"CustomerRef": {"value": 2.00}, "Line": [${priced}]}`);
+    const { Invoice } = await created.json();
+    expect(Invoice.CustomerRef.value).toBe("2");
+    expect(Invoice.Line[0]).toMatchObject({ Id: "1", SalesItemLineDetail: { ItemRef: { value: "1" } } });
+
+    const update = `{"Id": ${Invoice.Id}.0, "SyncToken": 0.0, "sparse": true, "Line": [${priced}]}`;
+    const updated = (await (await raw(harness, "/invoice", update)).json()).Invoice;
+    expect(updated).toMatchObject({ Id: Invoice.Id, SyncToken: "1" });
+    expect(updated.Line[0].Id).toBe("1"); // the line sent back keeps its Id
   });
 });

@@ -79,12 +79,18 @@ export function readOptionalNumber(
  * A JSON.parse reviver for write bodies. A number JavaScript can't write back as sent (12345678901234567890 comes back
  * as 12345678901234567000, 1e21 as "1e+21", 0.0000001 as "1e-7", 1.50 as "1.5") is kept as its text, so a text field
  * reads what was written, as QuickBooks' own reader would. numberFrom reads that text as the same number as before,
- * so amounts and quantities don't change.
+ * so amounts and quantities don't change. An Id or reference written with a zero fraction (SyncToken 0.0, as Python's
+ * json.dumps writes a float) names the whole number, so it reads as "0", not "0.0", which no record has.
  */
-export function keepWrittenNumbers(_key: string, value: unknown, context?: { source?: string }): unknown {
+export function keepWrittenNumbers(key: string, value: unknown, context?: { source?: string }): unknown {
   const source = context?.source;
-  return typeof value === "number" && source !== undefined && String(value) !== source ? source : value;
+  if (typeof value !== "number" || source === undefined || String(value) === source) return value;
+  const whole = ID_KEYS.has(key) ? /^(-?\d+)\.0+$/.exec(source) : null;
+  return whole?.[1] ?? source;
 }
+
+/** The keys that hold an Id or reference: Id, SyncToken, a *Ref's value, a LinkedTxn's TxnId. */
+const ID_KEYS = new Set(["Id", "SyncToken", "value", "TxnId"]);
 
 /**
  * Text fields as QuickBooks' JSON reader takes them, by path (`PrimaryPhone.FreeFormNumber`): a string as sent, a
