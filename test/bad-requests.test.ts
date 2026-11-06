@@ -55,6 +55,19 @@ describe("QuickBooks twin: request bodies it can't use", () => {
     expect(response.status).toBe(400);
     expect((await response.json()).Fault.Error[0]).toMatchObject({ code: "2010", element });
   });
+
+  const sale = { DetailType: "SalesItemLineDetail", Amount: 5, SalesItemLineDetail: { ItemRef: { value: "1" } } };
+  it.each([
+    ["/customer", { DisplayName: "Ada Fault", Fault: null }, "Customer"],
+    ["/invoice", { CustomerRef: { value: "1" }, Line: [sale], Fault: "x" }, "Invoice"],
+    ["/payment", { CustomerRef: { value: "1" }, TotalAmt: 5, Fault: 1 }, "Payment"],
+  ])("writes a body sent to %s with a property named Fault, dropping it like any field it doesn't model", async (path, body, entity) => {
+    const response = await setup().qboPost(path, body);
+    expect(response.status).toBe(200);
+    const written = await response.json();
+    expect(written[entity].Id).toBeDefined();
+    expect(written[entity]).not.toHaveProperty("Fault");
+  });
 });
 
 describe("Jobber twin: request bodies it can't use", () => {

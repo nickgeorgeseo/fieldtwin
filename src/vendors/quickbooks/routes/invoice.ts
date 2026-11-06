@@ -31,8 +31,9 @@ export function invoiceRoutes(app: Hono, twin: Twin): void {
 
   // One POST endpoint for create and update; an Id in the body means update.
   app.post(`${COMPANY}/invoice`, async (c) => {
-    const body = await readEntityBody<QboInvoice>(c, INVOICE_EXAMPLE, now());
-    if ("Fault" in body) return c.json(body, 400);
+    const read = await readEntityBody<QboInvoice>(c, INVOICE_EXAMPLE, now());
+    if ("fault" in read) return c.json(read.fault, 400);
+    const { body } = read;
     const kind = writeKind(c.req.query("operation"), body, "Invoice", now());
     if (typeof kind !== "string") return c.json(kind, 400);
     const checked = checkRequestId(c, state(), now()); // after the body is read, so nothing writes in between

@@ -25,8 +25,9 @@ export function paymentRoutes(app: Hono, twin: Twin): void {
   });
 
   app.post(`${COMPANY}/payment`, async (c) => {
-    const body = await readEntityBody<QboPayment>(c, '{"CustomerRef": {"value": "1"}, "TotalAmt": 25}', now());
-    if ("Fault" in body) return c.json(body, 400);
+    const read = await readEntityBody<QboPayment>(c, '{"CustomerRef": {"value": "1"}, "TotalAmt": 25}', now());
+    if ("fault" in read) return c.json(read.fault, 400);
+    const { body } = read;
     const kind = writeKind(c.req.query("operation"), body, "Payment", now());
     if (typeof kind !== "string") return c.json(kind, 400);
     if (kind === "update")

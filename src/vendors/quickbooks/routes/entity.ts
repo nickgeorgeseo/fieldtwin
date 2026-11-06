@@ -39,10 +39,13 @@ export function writeKind(
   return body.Id ? "update" : "create";
 }
 
-/** The JSON object a write sends, or the Fault for a body that isn't one. `example` shows the entity's shape. */
-export async function readEntityBody<T>(c: Context, example: string, now: string): Promise<UpdateBody<T> | QboFault> {
+/**
+ * The JSON object a write sends, or the Fault for a body that isn't one. `example` shows the entity's shape. Tagged,
+ * because the body is the client's: one with a property named Fault must still be read as a body, not an error.
+ */
+export async function readEntityBody<T>(c: Context, example: string, now: string): Promise<{ body: UpdateBody<T> } | { fault: QboFault }> {
   const read = await readJsonObject(c, example);
-  return "problem" in read ? qboErrors.invalidProperty(undefined, read.problem, now) : (read.body as UpdateBody<T>);
+  return "problem" in read ? { fault: qboErrors.invalidProperty(undefined, read.problem, now) } : { body: read.body as UpdateBody<T> };
 }
 
 /**

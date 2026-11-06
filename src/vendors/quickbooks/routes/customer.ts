@@ -30,8 +30,9 @@ export function customerRoutes(app: Hono, twin: Twin): void {
 
   // QuickBooks uses one POST endpoint for both create and update. An Id in the body means update.
   app.post(`${COMPANY}/customer`, async (c) => {
-    const body = await readEntityBody<QboCustomer>(c, '{"DisplayName": "Ada Alder"}', now());
-    if ("Fault" in body) return c.json(body, 400);
+    const read = await readEntityBody<QboCustomer>(c, '{"DisplayName": "Ada Alder"}', now());
+    if ("fault" in read) return c.json(read.fault, 400);
+    const { body } = read;
     const kind = writeKind(c.req.query("operation"), body, "Customer", now());
     if (typeof kind !== "string") return c.json(kind, 400);
     // Only now, with the whole body read, is the requestid checked: nothing can write between the check and the write.
