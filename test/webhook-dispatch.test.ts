@@ -34,7 +34,7 @@ function heldDispatcher() {
   const subscribe = (...urls: string[]) => {
     dispatcher.subscriptions = urls.map((url) => ({ vendor: "jobber", url, topics: ["TOPIC"], clientId: "a", clientSecret: "b" }));
   };
-  const notice = (seq: number) => dispatcher.notice({ seq } as TwinEvent, vendor, {}, 0);
+  const notice = (seq: number, nowMs = 0) => dispatcher.notice({ seq } as TwinEvent, vendor, {}, nowMs);
   return { dispatcher, sent, subscribe, notice };
 }
 
@@ -48,6 +48,23 @@ describe("a round of webhook deliveries", () => {
     await vi.waitFor(() => expect(sent.map((delivery) => delivery.url).sort()).toEqual([PROMPT, STALLED]));
     for (const delivery of sent) delivery.answer(200);
     await round;
+  });
+
+  it("doesn't make one app wait for another app that is still answering an earlier round", async () => {
+    const { dispatcher, sent, subscribe, notice } = heldDispatcher();
+    subscribe(STALLED);
+    notice(1);
+    const stalled = dispatcher.deliverDue(0);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+
+    subscribe(PROMPT);
+    notice(2);
+    const prompt = dispatcher.deliverDue(0);
+    await vi.waitFor(() => expect(sent.map((delivery) => delivery.url)).toEqual([STALLED, PROMPT]), { timeout: 200 });
+    sent[1]!.answer(200);
+    await prompt; // done, though the stalled app still hasn't answered
+    sent[0]!.answer(200);
+    await stalled;
   });
 
   it("sends one app its deliveries in order, each after the one before is answered", async () => {
@@ -84,5 +101,23 @@ describe("a round of webhook deliveries", () => {
     await round;
 
     expect(sent).toHaveLength(1);
+  });
+
+  it("doesn't let a round queued before a reset send what was queued after it at the old twin time", async () => {
+    const { dispatcher, sent, subscribe, notice } = heldDispatcher();
+    subscribe(PROMPT);
+    notice(1, 100);
+    const first = dispatcher.deliverDue(100);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notice(2, 100);
+    const second = dispatcher.deliverDue(100); // queued behind the first, at twin time 100
+
+    dispatcher.dropPending(); // a reset takes twin time back to 0
+    notice(3, 50); // due at 50, not yet
+    sent[0]!.answer(200);
+    await Promise.all([first, second]);
+
+    expect(sent.map((delivery) => delivery.itemId)).toEqual(["1"]);
+    expect(dispatcher.deliveries().map(({ itemId, status }) => ({ itemId, status }))).toEqual([{ itemId: "3", status: "pending" }]);
   });
 });

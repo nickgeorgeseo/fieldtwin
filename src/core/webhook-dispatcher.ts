@@ -22,7 +22,7 @@ export class WebhookDispatcher {
   private recent: Queued[] = [];
   private nextId = 1;
   private nextNumber = 1;
-  private running: Promise<void> = Promise.resolve();
+  private sending = new Map<string, Promise<void>>(); // per URL, the deliveries handed to it and not yet answered
   private generation = 0; // bumped by dropPending(), so a delivery already on its way when the world changed is forgotten
   private quiet = false; // set by quietly(): what is recorded meanwhile is history, not news
 
@@ -71,21 +71,22 @@ export class WebhookDispatcher {
   }
 
   /**
-   * Send everything due by `nowMs`. Rounds never overlap; failed deliveries are queued again for later.
-   * This never rejects: a round that throws (a bug) is logged, and the next round runs as usual.
+   * Send everything due by `nowMs`. What is due is taken now, at this twin time, and joins the line for its URL; a
+   * reset or rewind later can't make it pick up deliveries queued after it. Resolves once these have been answered.
+   * This never rejects: a line that throws (a bug) is logged, and the next deliveries to that URL go out as usual.
    */
   deliverDue(nowMs: number): Promise<void> {
-    this.running = this.running.then(() =>
-      this.sendDue(nowMs).catch((error: Error) =>
-        console.error(`fieldtwin: a round of webhook deliveries failed: ${error.stack ?? error}`),
-      ),
-    );
-    return this.running;
+    const generation = this.generation;
+    const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id);
+    this.queue = this.queue.filter((delivery) => delivery.dueMs > nowMs);
+    const byUrl = new Map<string, Queued[]>();
+    for (const delivery of due) byUrl.set(delivery.url, [...(byUrl.get(delivery.url) ?? []), delivery]);
+    return Promise.all([...byUrl].map(([url, deliveries]) => this.sendAfter(url, deliveries, nowMs, generation))).then(() => {});
   }
 
   /** Resolves when the deliveries started so far have been answered (or given up on). */
   idle(): Promise<void> {
-    return this.running;
+    return Promise.all(this.sending.values()).then(() => {});
   }
 
   /** The latest deliveries, oldest first, without their payloads. */
@@ -115,19 +116,23 @@ export class WebhookDispatcher {
 
   /**
    * Each URL gets its due deliveries in order, the next once the one before is answered (Intuit holds an app's later
-   * events back the same way). URLs don't wait for each other, so an app that stalls only delays itself.
+   * events back the same way). Each URL has its own line, so an app that stalls only delays itself, in this round
+   * and every later one.
    */
-  private async sendDue(nowMs: number): Promise<void> {
-    const generation = this.generation;
-    const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id);
-    this.queue = this.queue.filter((delivery) => delivery.dueMs > nowMs);
-    const byUrl = new Map<string, Queued[]>();
-    for (const delivery of due) byUrl.set(delivery.url, [...(byUrl.get(delivery.url) ?? []), delivery]);
-    await Promise.all([...byUrl.values()].map((deliveries) => this.sendInOrder(deliveries, nowMs, generation)));
+  private sendAfter(url: string, deliveries: Queued[], nowMs: number, generation: number): Promise<void> {
+    const line = (this.sending.get(url) ?? Promise.resolve())
+      .then(() => this.sendInOrder(deliveries, nowMs, generation))
+      .catch((error: Error) => console.error(`fieldtwin: webhook deliveries to ${url} failed: ${error.stack ?? error}`));
+    this.sending.set(url, line);
+    void line.then(() => {
+      if (this.sending.get(url) === line) this.sending.delete(url); // nothing queued behind it: forget the URL
+    });
+    return line;
   }
 
   private async sendInOrder(deliveries: Queued[], nowMs: number, generation: number): Promise<void> {
     for (const due of deliveries) {
+      if (this.generation !== generation) return; // reset or rewound before its turn came: forgotten
       due.attempts++;
       const { answer, accepted } = await this.attempt(due, nowMs);
       if (this.generation !== generation) return; // reset or rewound while it was on its way: neither retry nor go on
