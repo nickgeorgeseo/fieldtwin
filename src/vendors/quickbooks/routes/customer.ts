@@ -52,7 +52,8 @@ function createCustomer(twin: Twin, body: Partial<QboCustomer>, requestId: strin
 
   // QuickBooks builds a DisplayName from the person's name when none is given.
   fields.DisplayName ??= [fields.GivenName, fields.FamilyName].filter(Boolean).join(" ") || undefined;
-  if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
+  // Names match without their surrounding spaces (customerNamed), so a name of only spaces is the empty name.
+  if (!fields.DisplayName?.trim()) return qboErrors.missingField("DisplayName", now);
   const taken = customerNamed(state, fields.DisplayName);
   if (taken) return qboErrors.duplicateName(taken.Id, now);
 
@@ -73,7 +74,7 @@ function updateCustomer(twin: Twin, body: UpdateBody<QboCustomer>, requestId: st
   const fields = mergeUpdate(existing, body, WRITABLE_CUSTOMER_FIELDS);
   const badName = checkNames(fields, now);
   if (badName) return badName;
-  if (!fields.DisplayName) return qboErrors.missingField("DisplayName", now);
+  if (!fields.DisplayName?.trim()) return qboErrors.missingField("DisplayName", now);
   const taken = customerNamed(state, fields.DisplayName);
   if (taken && taken.Id !== existing.Id) return qboErrors.duplicateName(taken.Id, now);
 

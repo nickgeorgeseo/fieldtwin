@@ -44,6 +44,16 @@ describe("QuickBooks twin: customer names", () => {
     }
   });
 
+  it("reads a DisplayName of only spaces as the empty name it is, and asks for one (2020)", async () => {
+    const harness = setup();
+    expect(await faultOf(await harness.qboPost("/customer", { DisplayName: "   " }))).toMatchObject({
+      code: "2020",
+      element: "DisplayName",
+    });
+    const update = await harness.qboPost("/customer", { Id: "1", SyncToken: "0", sparse: true, DisplayName: " " });
+    expect(await faultOf(update)).toMatchObject({ code: "2020", element: "DisplayName" });
+  });
+
   it("counts a name as taken whatever its case or surrounding spaces (6240)", async () => {
     const harness = setup();
     const { Customer } = await (await harness.qboGet("/customer/2")).json();
