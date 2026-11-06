@@ -23,4 +23,9 @@ describe("showing twin time", () => {
     assert.equal(minutesLabel(1440), "1 day");
     assert.equal(minutesLabel(90), "90 minutes");
   });
+
+  it("calls a jump of no time 0 minutes, since the twin accepts one", () => {
+    assert.equal(minutesLabel(0), "0 minutes");
+    assert.equal(minutesLabel(1), "1 minute");
+  });
 });

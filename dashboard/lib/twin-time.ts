@@ -24,8 +24,9 @@ function zoneName(utcOffsetHours: number): string {
   return `UTC${utcOffsetHours < 0 ? "−" : "+"}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
 }
 
-/** "1 hour" for 60, "90 minutes" for 90: a jump of the clock as people say it. */
+/** "1 hour" for 60, "90 minutes" for 90, "0 minutes" for 0: a jump of the clock as people say it. */
 export function minutesLabel(minutes: number): string {
-  const [amount, unit] = minutes % 1440 === 0 ? [minutes / 1440, "day"] : minutes % 60 === 0 ? [minutes / 60, "hour"] : [minutes, "minute"];
+  const [amount, unit] =
+    minutes === 0 || minutes % 60 !== 0 ? [minutes, "minute"] : minutes % 1440 === 0 ? [minutes / 1440, "day"] : [minutes / 60, "hour"];
   return `${amount} ${unit}${amount === 1 ? "" : "s"}`;
 }
