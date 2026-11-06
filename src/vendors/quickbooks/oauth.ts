@@ -97,10 +97,23 @@ function tokenResponse(c: Context, result: TokenSet | OAuthError, nowMs: number)
   });
 }
 
-/** "Basic " + base64encode(client_id + ":" + client_secret), as the docs show. Any non-empty pair is accepted. */
+/**
+ * "Basic " + base64encode(client_id + ":" + client_secret), as the docs show. Any non-empty pair is accepted.
+ * RFC 6749 2.3.1 has each part form-encoded first, as OAuth libraries do, so they're decoded here: Intuit's
+ * letters-and-digits credentials read the same either way, and a client_id like "dev@example.com" still matches.
+ */
 function basicCredentials(header: string | undefined): { id: string; secret: string } | undefined {
   const encoded = /^Basic (\S+)$/i.exec(header ?? "")?.[1];
   if (!encoded) return undefined;
-  const [id, ...secret] = Buffer.from(encoded, "base64").toString().split(":");
+  const [id, ...secret] = Buffer.from(encoded, "base64").toString().split(":").map(formDecode);
   return id && secret.join(":") ? { id, secret: secret.join(":") } : undefined;
+}
+
+/** application/x-www-form-urlencoded decoding; a part that isn't valid encoding is taken as it was sent. */
+function formDecode(part: string): string {
+  try {
+    return decodeURIComponent(part.replace(/\+/g, " "));
+  } catch {
+    return part;
+  }
 }

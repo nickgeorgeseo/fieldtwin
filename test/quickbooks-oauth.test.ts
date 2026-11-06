@@ -90,6 +90,15 @@ describe("QuickBooks OAuth twin", () => {
     expect((await response.json()).error).toBe("invalid_client");
   });
 
+  it("form-decodes HTTP Basic credentials, as OAuth libraries encode them, so a client_id like 'dev@example.com' exchanges its code", async () => {
+    const harness = setup();
+    const clientId = "dev@example.com my app";
+    const code = new URL((await authorize(harness, { client_id: clientId })).headers.get("Location")!).searchParams.get("code")!;
+    const encoded = basic(new URLSearchParams({ id: clientId }).toString().slice(3), "s%C3%A9cret");
+    const response = await tokenRequest(harness, { grant_type: "authorization_code", code, redirect_uri: CLIENT.redirectUri }, encoded);
+    expect(response.status).toBe(200);
+  });
+
   it("refreshes an access token, keeping the refresh token as in the documented sample", async () => {
     const harness = setup();
     const first = await connect(harness);
