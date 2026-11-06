@@ -67,11 +67,27 @@ export interface Books {
 export function readBooks(events: TwinEvent[]): Books {
   const records = latestRecords(events);
   const all = <T>(vendor: string, kind: string) => [...(records.get(`${vendor}:${kind}`)?.values() ?? [])] as T[];
+  const qboCustomers = all<QboCustomer>("quickbooks", "customer");
   return {
-    quickbooks: { customers: all<QboCustomer>("quickbooks", "customer"), invoices: all<QboInvoice>("quickbooks", "invoice") },
+    quickbooks: { customers: qboCustomers, invoices: withCurrentNames(all<QboInvoice>("quickbooks", "invoice"), qboCustomers) },
     jobber: { clients: all<JobberClient>("jobber", "client"), invoices: all<JobberInvoice>("jobber", "invoice") },
     housecallpro: { customers: all<HcpCustomer>("housecallpro", "customer"), invoices: all<HcpInvoice>("housecallpro", "invoice") },
   };
+}
+
+/**
+ * QuickBooks refers to a customer by Id, so an invoice shows its customer's current name. A rename records only the
+ * CustomerUpdated event, not one per invoice, so the name comes from the customer, as the twin's own state does it
+ * (src/vendors/quickbooks/state.ts, renameReferences).
+ */
+function withCurrentNames(invoices: QboInvoice[], customers: QboCustomer[]): QboInvoice[] {
+  const names = new Map(customers.map((customer) => [customer.Id, customer.DisplayName]));
+  return invoices.map((invoice) => {
+    const name = names.get(invoice.CustomerRef.value);
+    return name === undefined || name === invoice.CustomerRef.name
+      ? invoice
+      : { ...invoice, CustomerRef: { ...invoice.CustomerRef, name } };
+  });
 }
 
 /** "quickbooks:customer" → Id → the customer as its latest event left it. */

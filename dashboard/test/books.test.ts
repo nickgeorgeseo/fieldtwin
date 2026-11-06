@@ -71,6 +71,16 @@ describe("rebuilding every vendor's books from the event log", () => {
     assert.equal(books.jobber.invoices[0]?.paidAt, "2026-07-13T12:00:00Z");
   });
 
+  it("names a QuickBooks invoice's customer as the customer is named now, as QuickBooks does after a rename", () => {
+    const books = readBooks([
+      event("quickbooks", "CustomerCreated", { customer: qboCustomer("1", "Riley Northcott") }),
+      event("quickbooks", "InvoiceCreated", { invoice: qboInvoice("1", "1", "Riley Northcott", 955, 0) }),
+      event("quickbooks", "CustomerUpdated", { customer: qboCustomer("1", "Riley Northcott-Renamed") }),
+    ]);
+    assert.deepEqual(books.quickbooks.invoices[0]?.CustomerRef, { value: "1", name: "Riley Northcott-Renamed" });
+    assert.equal(matchInvoices(books, "jobber")[0]?.quickbooks?.customer, "Riley Northcott-Renamed");
+  });
+
   it("reads Housecall Pro's customers and invoices too", () => {
     const books = readBooks([
       event("housecallpro", "CustomerCreated", { customer: hcpCustomer(1, "Harper", "Alder", "harper@example.com") }),
