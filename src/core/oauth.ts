@@ -79,6 +79,10 @@ export class OAuthServer {
     if (request.codeChallenge && request.codeChallengeMethod !== "S256") {
       return { error: "invalid_request", description: "Only the S256 code challenge method is supported." };
     }
+    // RFC 7636 4.3 makes code_challenge required with PKCE. A method alone would issue a code with PKCE off.
+    if (!request.codeChallenge && request.codeChallengeMethod !== undefined) {
+      return { error: "invalid_request", description: "code_challenge_method was sent without a code_challenge. Send both, or neither." };
+    }
     const code = this.token(32);
     this.codes.set(code, { ...request, expiresMs: nowMs + this.policy.authorizationCodeSeconds * 1000, used: false });
     return code;
@@ -95,6 +99,14 @@ export class OAuthServer {
     }
     if (code.codeChallenge && !matchesChallenge(request.codeVerifier, code.codeChallenge)) {
       return { error: "invalid_grant", description: "The code_verifier does not match the code_challenge." };
+    }
+    // RFC 9700 2.1.1: a code_verifier is accepted only if the authorization request had a code_challenge, so a
+    // client that forgot the challenge finds out here rather than running without PKCE.
+    if (!code.codeChallenge && request.codeVerifier !== undefined) {
+      return {
+        error: "invalid_grant",
+        description: "A code_verifier was sent, but the authorization request had no code_challenge. Send both, or neither.",
+      };
     }
     code.used = true;
     const grantId = `grant-${++this.grantCount}`;

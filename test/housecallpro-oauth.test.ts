@@ -189,4 +189,20 @@ describe("Housecall Pro OAuth twin", () => {
     expect(right.status).toBe(200);
     expect((await right.json()).token_type).toBe("Bearer");
   });
+
+  it("refuses a code_verifier for a code issued without a code_challenge, and a code_challenge_method without a challenge", async () => {
+    const harness = setup();
+    const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk-twin-verifier";
+    const downgraded = await token(harness, {
+      grant_type: "authorization_code",
+      code: codeFrom(await authorize(harness)),
+      code_verifier: verifier,
+    });
+    expect(downgraded.status).toBe(400);
+    expect(await downgraded.json()).toEqual({ error: "invalid_grant", error_description: INVALID_GRANT });
+
+    const methodOnly = await authorize(harness, { code_challenge_method: "S256" });
+    expect(methodOnly.status).toBe(400);
+    expect((await methodOnly.json()).error).toBe("invalid_request");
+  });
 });

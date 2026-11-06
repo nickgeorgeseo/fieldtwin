@@ -92,6 +92,24 @@ describe("Jobber OAuth twin", () => {
     expect(right.status).toBe(200);
   });
 
+  it("refuses a code_verifier for a code issued without a code_challenge, so PKCE can't be skipped (400 invalid_grant)", async () => {
+    const harness = setup();
+    const response = await token(harness, {
+      grant_type: "authorization_code",
+      code: codeFrom(await authorize(harness)),
+      redirect_uri: CLIENT.redirectUri,
+      code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk-twin-verifier",
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_grant", error_description: expect.stringMatching(/code_challenge/) });
+  });
+
+  it("refuses an authorization request with a code_challenge_method but no code_challenge (400 invalid_request)", async () => {
+    const response = await authorize(setup(), { code_challenge_method: "S256" });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/code_challenge/) });
+  });
+
   it("lets an authorization code expire after 10 minutes of twin time", async () => {
     const harness = setup();
     const code = codeFrom(await authorize(harness));
