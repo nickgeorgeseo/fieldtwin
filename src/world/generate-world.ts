@@ -58,6 +58,10 @@ export interface WorldSize {
 
 const DEFAULT_SIZE: WorldSize = { customers: 25, technicians: 4 };
 
+// Past this, a technician count is a typo. Every tech is built in memory with months of work, so a few million would
+// use up the twin's memory and take it down, on every reset too.
+const MOST_TECHNICIANS = 1000;
+
 export interface WorldOptions {
   startTime: string; // history is laid out around this moment: the past behind it, the schedule ahead
   size?: Partial<WorldSize>;
@@ -66,6 +70,9 @@ export interface WorldOptions {
 
 export function generateWorld(random: SeededRandom, options: WorldOptions): World {
   const { customers, technicians } = { ...DEFAULT_SIZE, ...options.size };
+  if (technicians > MOST_TECHNICIANS) {
+    throw new Error(`World size: at most ${MOST_TECHNICIANS.toLocaleString("en-US")} technicians, not ${technicians}. Ask for fewer.`);
+  }
   const home = random.pick(CITIES);
   const trade = random.pick(TRADES);
   const ownerLastName = random.pick(LAST_NAMES);

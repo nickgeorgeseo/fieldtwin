@@ -31,6 +31,12 @@ describe("control-plane mistakes", () => {
     ["POST", "/_twin/actions/housecallpro/constructor", "1", "has no scenario action"],
     ["POST", "/_twin/actions/jobber/toString", "1", "has no scenario action"],
     ["POST", "/_twin/actions/housecallpro/newCustomers", "4294967296", "1,000"],
+    [
+      "POST",
+      "/_twin/scenario",
+      'name: Big\nseed: 7\nstartTime: "2026-07-13T11:00:00Z"\nworld: { technicians: 3000000 }\n',
+      "1,000 technicians",
+    ],
     ["POST", "/_twin/checkpoints/nope/rewind", "", 'No checkpoint named "nope"'],
     ["POST", "/_twin/actions/salesforce/payInvoices", "1", 'No vendor named "salesforce". Vendors: '],
   ])("%s %s with the body %j says what to send", async (method, path, body, says) => {

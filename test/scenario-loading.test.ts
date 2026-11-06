@@ -32,6 +32,7 @@ describe("loading a scenario that is wrong", () => {
     ["more new clients than it can name", scenario('timeline:\n  - at: "+0m"\n    jobber: { newClients: 4294967296 }\n'), "1,000"],
     ["more new customers than it can name", scenario('timeline:\n  - at: "+0m"\n    housecallpro: { newCustomers: 20000 }\n'), "1,000"],
     ["a world too big to name", scenario("world: { customers: 1000 }\n"), "customers"],
+    ["more technicians than any business has", scenario("world: { technicians: 3000000 }\n"), "at most 1,000 technicians"],
     ["a key it doesn't know", scenario("fault:\n  - { name: x, vendor: jobber, rate: 1, effect: { status: 503 } }\n"), "fault"],
   ])("leaves the twin as it was, given %s", (_label, yaml, says) => {
     const { twin } = setup();
