@@ -38,6 +38,20 @@ describe("recording against a sandbox", () => {
     await expect(checkTokens(sandboxAnswering(200, { status: "ok" }), ["housecallpro"])).rejects.toThrow("HOUSECALLPRO_API_URL");
   });
 
+  it.each([
+    ["quickbooks", 429, {}],
+    ["housecallpro", 503, {}],
+    ["jobber", 502, {}],
+    ["jobber", 200, { errors: [{ message: "Throttled", extensions: { code: "THROTTLED" } }] }],
+  ] as const)(
+    "says to try again later when the check meets a vendor throttling or down, rather than blame its URL: %s, HTTP %i",
+    async (vendor, status, body) => {
+      const checked = checkTokens(sandboxAnswering(status, body), [vendor]);
+      await expect(checked).rejects.toThrow("try again later");
+      await expect(checked).rejects.not.toThrow(/_URL|QBO_API_BASE/);
+    },
+  );
+
   it("goes ahead when every token and key works", async () => {
     const working = fakeTarget(async (url) => {
       if (String(url).includes("graphql")) return Response.json({ data: { account: { id: "a" } } });

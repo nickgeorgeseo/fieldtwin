@@ -53,7 +53,7 @@ interface RequestOptions {
  * An answer no case may observe: the vendor was throttling or down, or stopped accepting the run's own credential (an
  * expired token, a deleted key). It says nothing about the API, so the case stops, and a recording keeps its last.
  */
-function refuseUnrecordable(
+export function refuseUnrecordable(
   vendor: string,
   answer: Answer,
   ownCredential: boolean,

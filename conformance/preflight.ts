@@ -1,17 +1,20 @@
-import { housecallpro, jobber, quickbooks, type Target, type Vendor } from "./case.ts";
+import { housecallpro, jobber, quickbooks, refuseUnrecordable, type Target, type Vendor } from "./case.ts";
 
 /**
  * Before recording anything, make sure each sandbox accepts its token and its URL is right. Tokens last an hour,
  * and a recording made with a dead one is 401s from start to finish: committed, it would fail every case as if the
- * twin were wrong.
+ * twin were wrong. A vendor throttling or down says nothing about either, so the check says to try again later
+ * rather than send anyone off to change settings that are right.
  */
 export async function checkTokens(target: Target, vendors: Vendor[]): Promise<void> {
   if (vendors.includes("quickbooks")) {
-    const { status } = await reach(
+    const answer = await reach(
       quickbooks(target, "GET", `companyinfo/${target.quickbooks.realmId}`, undefined, { anyAnswer: true }),
       "QuickBooks",
       target.quickbooks.apiBase,
     );
+    refuseUnrecordable("QuickBooks", answer, false);
+    const { status } = answer;
     if (status === 401 || status === 403) {
       throw new Error(
         `QuickBooks refused QBO_ACCESS_TOKEN (HTTP ${status}). Access tokens last an hour: get a fresh one, for the sandbox company in QBO_REALM_ID.`,
@@ -25,6 +28,7 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
   }
   if (vendors.includes("jobber")) {
     const answer = await reach(jobber(target, "{ account { id } }", { anyAnswer: true }), "Jobber", target.jobber.apiUrl);
+    refuseUnrecordable("Jobber", answer, false);
     if (answer.status === 401 || answer.status === 403) {
       throw new Error(`Jobber refused JOBBER_ACCESS_TOKEN (HTTP ${answer.status}). Access tokens last an hour: get a fresh one.`);
     }
@@ -36,6 +40,7 @@ export async function checkTokens(target: Target, vendors: Vendor[]): Promise<vo
     // "This API is available to any Pro on the MAX or XL Plan": https://docs.housecallpro.com/
     const { apiBase } = target.housecallpro;
     const answer = await reach(housecallpro(target, "GET", "/company", undefined, { anyAnswer: true }), "Housecall Pro", apiBase);
+    refuseUnrecordable("Housecall Pro", answer, false);
     if (answer.status === 401 || answer.status === 403) {
       throw new Error(
         `Housecall Pro refused HOUSECALLPRO_API_KEY (HTTP ${answer.status}). Use one of the account's API keys: the API is for Pros on the MAX or XL plan.`,
