@@ -30,6 +30,8 @@ export function readLineItems(value: unknown): LineFields[] | Refusal {
 
 function readLineItem(value: unknown, path: string): LineFields | Refusal {
   if (!isObject(value)) return refuse(`${path} must be a line item, like {"name": "Service call", "unit_price": 8900}.`);
+  if (value.pricing_form != null && !isObject(value.pricing_form))
+    return refuse(`${path}.pricing_form must be a price form object, like {"id": "pbpf_..."}, not ${shown(value.pricing_form)}.`);
   if (value.pricing_form != null) return refuse(`${path}.pricing_form: the twin doesn't model price forms yet.`, 501);
   const fields = withoutNulls(value); // a field sent as null takes its default, as one not sent does
   const { name, description = null, unit_price = 0, unit_cost = 0, quantity = 1, kind = "labor", taxable = true } = fields;

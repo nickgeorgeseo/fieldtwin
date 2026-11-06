@@ -173,6 +173,11 @@ describe("Housecall Pro twin: job requests the twin refuses", () => {
       [{ schedule: "tomorrow" }, "schedule"],
       [{ lead_source: 42 }, "lead_source"],
       [{ notes: ["Gate code 4411"] }, "notes"],
+      [{ job_fields: "jt_1" }, "job_fields"],
+      [{ job_fields: ["jt_1"] }, "job_fields"],
+      [{ schedule: { ...SCHEDULE, anytime: "yes" } }, "schedule.anytime"],
+      [{ schedule: { ...SCHEDULE, anytime: 1 } }, "schedule.anytime"],
+      [{ line_items: [{ name: "Formed", pricing_form: false }] }, "line_items[0].pricing_form"],
     ] as const) {
       const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, ...extra });
       expect(response.status, field).toBe(422);

@@ -36,6 +36,8 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
   if (employees.some((id) => !state.employees.has(id))) return refuse("employee not found", 404);
   // After the lookups, like the other 501s: a record that doesn't exist is the client's to fix before the twin's gaps matter.
   const fields = body.job_fields;
+  if (fields != null && !isObject(fields))
+    return refuse(`job_fields must be an object, like {"job_type_id": "jt_..."}, not ${shown(fields)}.`);
   if (isObject(fields) && (fields.job_type_id != null || fields.business_unit_id != null)) {
     return refuse("job_fields: the twin doesn't model job types or business units yet.", 501);
   }
@@ -87,6 +89,8 @@ function readSchedule(value: unknown, timeZone: string): JobRequest["schedule"] 
   if (value === undefined || value === null) return undefined;
   if (!isObject(value))
     return refuse('schedule must be an object, like {"scheduled_start": "2026-07-20T14:00:00", "scheduled_end": "2026-07-20T16:00:00"}.');
+  if (value.anytime != null && typeof value.anytime !== "boolean")
+    return refuse(`schedule.anytime must be true or false, not ${shown(value.anytime)}.`);
   if (value.anytime === true) return refuse("schedule.anytime: the twin doesn't model anytime schedules yet.", 501);
   const times: number[] = [];
   for (const name of ["scheduled_start", "scheduled_end"]) {
