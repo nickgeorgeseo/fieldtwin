@@ -123,6 +123,25 @@ describe("QuickBooks OAuth twin", () => {
     });
   });
 
+  it("answers a second redirect_uri or client_id with 400 even when another parameter repeats first, never redirecting to it", async () => {
+    const harness = setup();
+    const evil = "https://evil.example.com/cb";
+    const redirects = `state=1&state=2&client_id=${CLIENT.id}&response_type=code&scope=com.intuit.quickbooks.accounting`;
+    const twoRedirects = await harness.app.request(
+      `/connect/oauth2?${redirects}&redirect_uri=${encodeURIComponent(evil)}&redirect_uri=${encodeURIComponent(CLIENT.redirectUri)}`,
+    );
+    expect(twoRedirects.status).toBe(400);
+    expect(await twoRedirects.json()).toMatchObject({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^redirect_uri/),
+    });
+
+    const clients = `scope=com.intuit.quickbooks.accounting&scope=x&client_id=evil&client_id=${CLIENT.id}&response_type=code`;
+    const twoClients = await harness.app.request(`/connect/oauth2?${clients}&redirect_uri=${encodeURIComponent(CLIENT.redirectUri)}`);
+    expect(twoClients.status).toBe(400);
+    expect(await twoClients.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^client_id/) });
+  });
+
   it("exchanges the code for tokens in the documented response shape", async () => {
     const tokens = await connect(setup());
     expect(tokens).toEqual({

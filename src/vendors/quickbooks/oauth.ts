@@ -33,10 +33,10 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     }
     // A repeated parameter redirects with invalid_request, like the other errors here, unless it leaves the
     // client or the redirect URI in doubt: then there's no one to safely send the browser back to (RFC 6749 4.1.2.1).
+    // Asked about by name, so a state or scope repeated earlier in the query can't hide a second redirect_uri.
+    const inDoubt = repeatedQueryParameter(c, ["client_id", "redirect_uri"]);
+    if (inDoubt) return c.json({ error: "invalid_request", error_description: inDoubt.problem }, 400);
     const repeated = repeatedQueryParameter(c);
-    if (repeated?.name === "client_id" || repeated?.name === "redirect_uri") {
-      return c.json({ error: "invalid_request", error_description: repeated.problem }, 400);
-    }
     const redirectProblem = redirectUriProblem(redirectUri);
     if (redirectProblem) return c.json({ error: "invalid_request", error_description: redirectProblem }, 400);
     const back = new URL(redirectUri);

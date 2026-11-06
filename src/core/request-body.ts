@@ -83,9 +83,10 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
 /**
  * A query parameter sent more than once, if any. RFC 6749 3.1 says request parameters "MUST NOT be included more
  * than once", and a request that does is invalid_request (4.1.2.1): otherwise which value counts is up to the server.
+ * With `among`, only those parameters count, so a caller can ask about one even when another repeats earlier.
  */
-export function repeatedQueryParameter(c: Context): { name: string; problem: string } | undefined {
-  const name = Object.entries(c.req.queries()).find(([, values]) => values.length > 1)?.[0];
+export function repeatedQueryParameter(c: Context, among?: readonly string[]): { name: string; problem: string } | undefined {
+  const name = Object.entries(c.req.queries()).find(([key, values]) => values.length > 1 && (!among || among.includes(key)))?.[0];
   return name === undefined ? undefined : { name, problem: repeatedProblem(name) };
 }
 
