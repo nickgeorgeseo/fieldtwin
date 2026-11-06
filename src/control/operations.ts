@@ -71,6 +71,9 @@ export async function advanceClock(twin: Twin, minutes: number) {
   }
   const scenarioEvents = twin.log.length - before; // counted now: API writes may arrive while webhooks go out
   await twin.deliverWebhooks();
+  // A retry can come due while an earlier attempt is still waiting for its answer: once every line is answered, send it.
+  await twin.webhooks.idle();
+  await twin.deliverWebhooks();
   return { twinTime: twin.clock.nowIso(), scenarioEvents };
 }
 

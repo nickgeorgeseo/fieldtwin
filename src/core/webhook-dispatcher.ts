@@ -71,17 +71,25 @@ export class WebhookDispatcher {
   }
 
   /**
-   * Send everything due by `nowMs`. What is due is taken now, at this twin time, and joins the line for its URL; a
-   * reset or rewind later can't make it pick up deliveries queued after it. Resolves once these have been answered.
-   * This never rejects: a line that throws (a bug) is logged, and the next deliveries to that URL go out as usual.
+   * Send everything due by `nowMs`. Each URL's deliveries join that URL's own line, and are picked when their turn comes,
+   * so a retry that came due while an earlier attempt was still on its way goes out too. A reset or rewind in between (a
+   * new generation) forgets the turn. Resolves once the deliveries due now have been answered. This never rejects: a line that throws (a bug) is logged, and the next
+   * deliveries to that URL go out as usual.
    */
   deliverDue(nowMs: number): Promise<void> {
     const generation = this.generation;
-    const due = this.queue.filter((delivery) => delivery.dueMs <= nowMs).sort((a, b) => a.dueMs - b.dueMs || a.id - b.id);
-    this.queue = this.queue.filter((delivery) => delivery.dueMs > nowMs);
-    const byUrl = new Map<string, Queued[]>();
-    for (const delivery of due) byUrl.set(delivery.url, [...(byUrl.get(delivery.url) ?? []), delivery]);
-    return Promise.all([...byUrl].map(([url, deliveries]) => this.sendAfter(url, deliveries, nowMs, generation))).then(() => {});
+    const due = new Set(this.queue.filter((delivery) => delivery.dueMs <= nowMs).map((delivery) => delivery.url));
+    // A URL still answering gets a turn too, for a retry its answer may queue, but nobody waits on it: an app that is slow
+    // to answer holds up only itself (advanceClock waits for every line, through idle()).
+    for (const url of this.sending.keys()) if (!due.has(url)) void this.sendAfter(url, nowMs, generation);
+    return Promise.all([...due].map((url) => this.sendAfter(url, nowMs, generation))).then(() => {});
+  }
+
+  /** The deliveries to `url` due by `nowMs`, oldest first, taken off the queue. */
+  private takeDue(url: string, nowMs: number): Queued[] {
+    const due = this.queue.filter((delivery) => delivery.url === url && delivery.dueMs <= nowMs);
+    this.queue = this.queue.filter((delivery) => !due.includes(delivery));
+    return due.sort((a, b) => a.dueMs - b.dueMs || a.id - b.id);
   }
 
   /** Resolves when the deliveries started so far have been answered (or given up on). */
@@ -119,9 +127,9 @@ export class WebhookDispatcher {
    * events back the same way). Each URL has its own line, so an app that stalls only delays itself, in this round
    * and every later one.
    */
-  private sendAfter(url: string, deliveries: Queued[], nowMs: number, generation: number): Promise<void> {
+  private sendAfter(url: string, nowMs: number, generation: number): Promise<void> {
     const line = (this.sending.get(url) ?? Promise.resolve())
-      .then(() => this.sendInOrder(deliveries, nowMs, generation))
+      .then(() => (this.generation === generation ? this.sendInOrder(this.takeDue(url, nowMs), nowMs, generation) : undefined))
       .catch((error: Error) => console.error(`fieldtwin: webhook deliveries to ${url} failed: ${error.stack ?? error}`));
     this.sending.set(url, line);
     void line.then(() => {

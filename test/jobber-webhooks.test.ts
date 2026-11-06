@@ -172,3 +172,32 @@ describe("Jobber webhooks", () => {
     expect((await response.json()).error).toMatch(/JOB_CREATE.*CLIENT_CREATE, INVOICE_UPDATE/);
   });
 });
+
+describe("advancing the clock while a Jobber delivery is still waiting for its answer", () => {
+  it("sends the retry that comes due on the way before it answers, though the first attempt was still out when it began", async () => {
+    const sentAt: string[] = [];
+    const { app, twin } = createApp({
+      sendWebhook: async () => {
+        sentAt.push(twin.clock.nowIso());
+        await new Promise((resolve) => setTimeout(resolve, 30)); // well inside Jobber's second, then a refusal
+        return new Response(null, { status: 500 });
+      },
+    });
+    const json = { "Content-Type": "application/json" };
+    await app.request("/_twin/webhooks", {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify([
+        { vendor: "jobber", url: "https://app.example.com/hooks", topics: ["CLIENT_CREATE"], clientId: "a", clientSecret: "s" },
+      ]),
+    });
+    await app.request("/api/graphql", {
+      method: "POST",
+      headers: { ...json, Authorization: "Bearer dev", "X-JOBBER-GRAPHQL-VERSION": "2025-04-16" },
+      body: JSON.stringify({ query: 'mutation { clientCreate(input: { firstName: "Ada", lastName: "Byrne" }) { client { id } } }' }),
+    });
+    // The first attempt is on its way now; its retry is due a minute later, inside the five the advance moves.
+    await app.request("/_twin/clock/advance", { method: "POST", headers: json, body: JSON.stringify({ minutes: 5 }) });
+    expect(sentAt).toEqual(["2026-07-13T11:00:00.000Z", "2026-07-13T11:05:00.000Z"]);
+  });
+});
