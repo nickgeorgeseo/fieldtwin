@@ -141,6 +141,9 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 - An invoice created with a unit price longer than a double holds (1 × "10.00499999999999999" at 10.00) can be updated again. Its line used to store 10.005, so every later update, even a sparse PrivateNote change, answered 6070. Qty × UnitPrice is now checked only on the lines a request sends. The stored price is the nearest double that still multiplies to the checked Amount, so sending a line back exactly as GET returned it passes.
 - A QuickBooks invoice or payment sent without a TxnDate gets the company's date for the same floored moment as its CreateTime. Half a millisecond before a pre-1970 local midnight used to give it the next day.
 - A SyncToken, Id, line Id, reference value, or TxnId sent as a JSON number with a zero fraction (0.0, 1.0, which is how Python's json.dumps writes a float) reads as the whole number again. SyncToken 0.0 used to answer 5010 Stale Object on every retry, and CustomerRef 1.0 answered 2500. Text fields still keep 100.0 exactly as written.
+- Jobber's visit, job, and invoice statuses read the business's date from the floored twin time, as QuickBooks' "today" does, so the two never disagree about which day it is.
+- The dashboard pairs a twice-booked invoice for a Jobber business client with no email under the company name, as Jobber names the client and the sync looks it up.
+- `connect()` throws a `TwinError` saying where it was sent when an address that isn't a twin redirects it to a relative path like `/login`, not a bare `TypeError`.
 
 ## 0.5.3 - 2026-10-29
 
