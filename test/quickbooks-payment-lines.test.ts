@@ -48,4 +48,17 @@ describe("QuickBooks twin: payment lines", () => {
     expect(error.Detail).toContain("60.00");
   });
 
+  it("asks for TxnType written as Invoice when a LinkedTxn sends it in other letters (2010)", async () => {
+    const harness = setup();
+    const invoice = await invoiceFor(harness, 50);
+    const response = await harness.qboPost("/payment", {
+      CustomerRef: { value: "1" },
+      TotalAmt: 50,
+      Line: [{ Amount: 50, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "invoice" }] }],
+    });
+    const error = (await response.json()).Fault.Error[0];
+    expect(error).toMatchObject({ code: "2010", element: "Line.LinkedTxn.TxnType" });
+    expect(error.Detail).toContain('"Invoice"');
+    expect((await (await harness.qboGet(`/invoice/${invoice.Id}`)).json()).Invoice.Balance).toBe(50);
+  });
 });

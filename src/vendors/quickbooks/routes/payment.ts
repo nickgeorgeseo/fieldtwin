@@ -76,6 +76,10 @@ function createPayment(twin: Twin, body: UpdateBody<QboPayment>, requestId: stri
       return qboErrors.unsupportedOperation("The twin applies each payment line to one invoice. Send one line per invoice.", now);
     }
     if (!link.TxnType) return qboErrors.missingField("Line.LinkedTxn.TxnType", now);
+    // TxnType is an enum written "Invoice". A different case is a typo, not another kind of transaction.
+    if (typeof link.TxnType === "string" && link.TxnType !== "Invoice" && link.TxnType.toLowerCase() === "invoice") {
+      return qboErrors.invalidProperty("Line.LinkedTxn.TxnType", `TxnType must be "Invoice", not "${link.TxnType}".`, now);
+    }
     if (link.TxnType !== "Invoice") {
       return qboErrors.unsupportedOperation(`The twin applies payments to invoices only, not to ${link.TxnType}.`, now);
     }
