@@ -64,13 +64,29 @@ describe("Jobber webhooks", () => {
       data: {
         webHookEvent: {
           topic: "CLIENT_CREATE",
-          appId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+          appId: "4c9a75cc-a717-8fb6-8c85-6f26ba825073", // an RFC 9562 UUID (version 8, a SHA-256 of the client_id)
           accountId: twin.state<JobberState>("jobber").account.id,
           itemId: created.id,
           occurredAt: "2026-07-13T06:00:00-05:00", // the business's local time, with its offset, like the docs' sample
         },
       },
     });
+  });
+
+  it("carry an appId that is a valid RFC 9562 UUID for every app, one per client_id", async () => {
+    const { app, twin, control, events } = twinWithEndpoint();
+    const apps = Array.from({ length: 20 }, (_, n) => ({
+      ...APP,
+      url: `${APP.url}/${n}`,
+      clientId: `client-${n}`,
+      topics: ["CLIENT_CREATE"],
+    }));
+    await control("PUT", "/_twin/webhooks", apps);
+    await createClient(app);
+    await twin.webhooks.idle();
+    const appIds = events().map((event) => event.appId);
+    expect(new Set(appIds).size).toBe(20);
+    for (const appId of appIds) expect(appId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it("fire INVOICE_UPDATE twice when an invoice is paid, about a second apart, as the docs describe", async () => {

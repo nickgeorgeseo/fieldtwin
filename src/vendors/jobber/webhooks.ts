@@ -42,7 +42,7 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
   request(notification, subscription, state) {
     const webHookEvent = {
       topic: notification.topic,
-      appId: stableUuid(subscription.clientId), // Jobber gives each app a UUID; the twin has no app registry (FIDELITY.md)
+      appId: appIdFor(subscription.clientId), // Jobber gives each app a UUID; the twin has no app registry (FIDELITY.md)
       accountId: state.account.id,
       itemId: notification.itemId,
       occurredAt: localTime(notification.occurredAtMs, state.account.utcOffsetHours), // like the documented sample
@@ -52,3 +52,14 @@ export const jobberWebhooks: VendorWebhooks<JobberState> = {
     return { body, headersAt: () => ({ "Content-Type": "application/json", "X-Jobber-Hmac-SHA256": signature }) };
   },
 };
+
+/**
+ * The app's `appId`: stableUuid's hash of the client_id, with RFC 9562's version and variant bits set, so it is a
+ * real UUID (version 8, the custom version, as a SHA-256 name-based UUID is: https://www.rfc-editor.org/rfc/rfc9562#section-5.8)
+ * and apps that validate it as one accept it. Done here, not in stableUuid, so other vendors' ids don't change.
+ */
+function appIdFor(clientId: string): string {
+  const hex = stableUuid(clientId);
+  const variant = ((Number.parseInt(hex[19]!, 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 14)}8${hex.slice(15, 19)}${variant}${hex.slice(20)}`;
+}
