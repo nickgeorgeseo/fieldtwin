@@ -1,4 +1,4 @@
-import { TwinError } from "./client-error.ts";
+import { parseAnswer, TwinError } from "./client-error.ts";
 import { connectThroughOAuth, type OAuthApp } from "./client-oauth.ts";
 import type {
   AuthMode,
@@ -99,16 +99,9 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
     if (!response.ok) throw new TwinError(refusal(await response.text(), method, path, response.status), response.status);
     return response;
   }
-  // A dev server on the wrong port can answer 200 with a page on every path; say so, not "Unexpected token '<'".
   async function json<T>(method: string, path: string, body?: { json: unknown } | { text: string }): Promise<T> {
     const response = await request(method, path, body);
-    const text = await response.text();
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      const answered = `${method} /_twin${path} answered HTTP ${response.status} with something other than JSON`;
-      throw new TwinError(`${answered}: ${text.slice(0, 200)} (is this a twin's address?)`, response.status);
-    }
+    return parseAnswer<T>(await response.text(), `${method} /_twin${path}`, response.status);
   }
 
   return {
@@ -147,9 +140,12 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
       const query = new URLSearchParams();
       if (since) query.set("since", since);
       if (after) query.set("after", after);
-      const response = await request("GET", `/log.jsonl${query.size ? `?${query}` : ""}`);
+      const path = `/log.jsonl${query.size ? `?${query}` : ""}`;
+      const response = await request("GET", path);
       const text = await response.text();
-      const events = text ? text.split("\n").map((line) => JSON.parse(line) as TwinLogEvent) : [];
+      // JSON Lines: one event per line, each read as json() reads a whole answer.
+      const read = (line: string) => parseAnswer<TwinLogEvent>(line, `GET /_twin${path}`, response.status);
+      const events = text ? text.split("\n").map(read) : [];
       return { events, position: response.headers.get("X-Twin-Log-Position") ?? "" };
     },
     setFaults: (rules) => json("PUT", "/faults", { json: rules }),

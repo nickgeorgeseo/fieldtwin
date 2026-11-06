@@ -1,4 +1,4 @@
-import { TwinError } from "./client-error.ts";
+import { parseAnswer, TwinError } from "./client-error.ts";
 import type { Tokens, VendorName } from "./client-types.ts";
 
 /**
@@ -69,7 +69,11 @@ export async function connectThroughOAuth(base: string, send: Fetch, vendor: Ven
       if (exchange.headers.has("X-Twin-Fault")) continue;
       break;
     }
-    const tokens = JSON.parse(answer) as { access_token: string; refresh_token: string; expires_in: number };
+    const tokens = parseAnswer<{ access_token: string; refresh_token: string; expires_in: number }>(
+      answer,
+      `POST ${oauth.token}`,
+      exchange.status,
+    );
     const realmId = callback.get("realmId") ?? undefined;
     return {
       accessToken: tokens.access_token,

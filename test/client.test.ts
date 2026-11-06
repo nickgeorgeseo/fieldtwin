@@ -215,6 +215,41 @@ describe("connectTwin()", () => {
       message: expect.stringContaining("GET /_twin answered HTTP 200 with something other than JSON: <!doctype"),
     });
   });
+
+  it("throws a TwinError from every method, the log included, when the address answers 200 with a page", async () => {
+    const page = "<!doctype html><title>dev server</title>";
+    const twin = connectTwin("http://not.a.twin", { fetch: () => new Response(page, { headers: { "Content-Type": "text/html" } }) });
+    const calls = [
+      () => twin.status(),
+      () => twin.log(),
+      () => twin.log({ since: "before-sync" }),
+      () => twin.changes("before-sync"),
+      () => twin.webhooks(),
+      () => twin.connect("jobber"),
+    ];
+    for (const call of calls) {
+      const refusal = await call().catch((error: unknown) => error);
+      expect(refusal).toBeInstanceOf(TwinError);
+      expect(refusal).toMatchObject({ status: 200, message: expect.stringContaining("<!doctype") });
+    }
+    await expect(twin.log()).rejects.toThrow("GET /_twin/log.jsonl answered HTTP 200 with something other than JSON: <!doctype");
+  });
+
+  it("throws a TwinError saying what answered when an OAuth token endpoint answers 200 with a page", async () => {
+    const page = "<!doctype html><title>dev server</title>";
+    const twin = connectTwin("http://not.a.twin", {
+      fetch: (url) =>
+        url.includes("/authorize")
+          ? new Response(null, { status: 302, headers: { Location: "http://localhost:3000/callback?code=abc&state=fieldtwin" } })
+          : new Response(page, { headers: { "Content-Type": "text/html" } }),
+    });
+    const refusal = await twin.connect("jobber").catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(TwinError);
+    expect(refusal).toMatchObject({
+      status: 200,
+      message: expect.stringContaining("POST /api/oauth/token answered HTTP 200 with something other than JSON: <!doctype"),
+    });
+  });
 });
 
 describe("the client's types", () => {
