@@ -86,6 +86,23 @@ describe("QuickBooks twin: GET /query", () => {
     expect(body.Fault.Error[0]).toMatchObject({ code: "500", Message: "Unsupported operation" });
     expect(body.Fault.Error[0].Detail).toContain("!=");
   });
+
+  it("answers 4000 for syntax written as a quoted value, which is only ever a value", async () => {
+    const statuses: string[] = [];
+    for (const statement of [
+      "select '*' from Customer",
+      "select count '(' '*' ')' from Customer",
+      "select * from Customer where DisplayName 'like' 'Kendall%'",
+      "select * from Customer where Id 'in' '(' '1' ',' '2' ')'",
+      "select * from Customer where Id '=' '3'",
+      "select * from Customer where GivenName '!=' 'K'",
+      "select * from Customer orderby DisplayName ',' Id",
+    ]) {
+      const { status, body } = await query(setup(), statement);
+      statuses.push(`${status} ${body.Fault?.Error[0].code}`);
+    }
+    expect(statuses).toEqual(Array(7).fill("400 4000"));
+  });
 });
 
 describe("QuickBooks twin: querying each entity", () => {

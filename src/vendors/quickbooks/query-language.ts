@@ -125,7 +125,9 @@ class Parser {
   }
 
   private operator(property: string): QueryOperator {
-    const text = this.tokens[this.position]?.text.toLowerCase();
+    // Only a symbol or a word is syntax: a quoted '=' or 'like' is a value, so it can't stand in for the operator.
+    const token = this.tokens[this.position];
+    const text = token?.kind === "symbol" || token?.kind === "word" ? token.text.toLowerCase() : undefined;
     if (text === "=" || text === "<" || text === ">" || text === "<=" || text === ">=" || text === "like" || text === "in") {
       this.position++;
       return text;
@@ -193,7 +195,8 @@ class Parser {
   }
 
   private acceptSymbol(symbol: string): boolean {
-    if (this.tokens[this.position]?.text !== symbol) return false;
+    const token = this.tokens[this.position];
+    if (token?.kind !== "symbol" || token.text !== symbol) return false;
     this.position++;
     return true;
   }
