@@ -145,6 +145,17 @@ describe("Housecall Pro twin: what it doesn't serve", () => {
     expect((await response.json()).error.message).toMatch(/GET \/customers\/ yet\. .*no trailing slash: try \/customers\./);
   });
 
+  it("suggests dropping a trailing slash only when the path without it is one it serves", async () => {
+    const { hcpGet, hcpPut } = setup();
+    // /leads isn't served, "//" leaves no path, and /jobs/{id} is served only for GET.
+    for (const response of [await hcpGet("/leads/"), await hcpGet("//"), await hcpPut("/jobs/job_x/", {})]) {
+      expect(response.status).toBe(501);
+      expect((await response.json()).error.message).not.toMatch(/trailing slash/);
+    }
+    const served = await hcpGet("/jobs/job_x/appointments/");
+    expect((await served.json()).error.message).toMatch(/no trailing slash: try \/jobs\/job_x\/appointments\./);
+  });
+
   it("lists exactly the operations it serves when it answers 501, so a write it doesn't model isn't claimed", async () => {
     const { hcpPost } = setup();
     const response = await hcpPost("/jobs/job_x/line_items", { name: "Extra" });

@@ -45,8 +45,10 @@ export function housecallproRoutes(twin: Twin): Hono {
   // mistake it for "that record doesn't exist" (a 404) or a request it should fix (a 400 or 422).
   app.all(`${HCP}/*`, (c) => {
     const path = c.req.path.slice(HCP.length) || "/";
-    const slash = path.length > 1 && path.endsWith("/") ? ` Its paths take no trailing slash: try ${path.replace(/\/+$/, "")}.` : "";
-    const detail = `The twin doesn't model ${c.req.method} ${path} yet.${slash} It serves ${SERVED}; see FIDELITY.md.`;
+    // The slash hint only when the path without it would work, so a client is never sent to retry a request that can't.
+    const trimmed = path.replace(/\/+$/, "");
+    const slash = trimmed !== path && serves(c.req.method, trimmed) ? ` Its paths take no trailing slash: try ${trimmed}.` : "";
+    const detail = `The twin doesn't model ${c.req.method} ${path} yet.${slash} It serves ${SERVED_TEXT}; see FIDELITY.md.`;
     return c.json(hcpError(detail), 501);
   });
   return app;
@@ -54,21 +56,29 @@ export function housecallproRoutes(twin: Twin): Hono {
 
 // Every operation the twin serves, so a client can tell at once whether the one it called is coming. A new operation
 // is added here and asserted in test/housecallpro.test.ts's 501 test, which checks what this list claims.
-const SERVED = [
-  "GET /company",
-  "GET, POST /customers",
-  "GET, PUT /customers/{id}",
-  "GET, POST /customers/{id}/addresses",
-  "GET /customers/{id}/addresses/{address_id}",
-  "GET /employees",
-  "GET, POST /jobs",
-  "GET /jobs/{id}",
-  "GET /jobs/{id}/line_items",
-  "GET /jobs/{id}/appointments",
-  "GET /jobs/{id}/invoices",
-  "GET /invoices",
-  "GET /api/invoices/{uuid}",
-  "GET /estimates",
-  "GET /estimates/{id}",
-  "GET /estimates/{id}/options/{option_id}/line_items",
-].join("; ");
+const SERVED: [methods: string, path: string][] = [
+  ["GET", "/company"],
+  ["GET, POST", "/customers"],
+  ["GET, PUT", "/customers/{id}"],
+  ["GET, POST", "/customers/{id}/addresses"],
+  ["GET", "/customers/{id}/addresses/{address_id}"],
+  ["GET", "/employees"],
+  ["GET, POST", "/jobs"],
+  ["GET", "/jobs/{id}"],
+  ["GET", "/jobs/{id}/line_items"],
+  ["GET", "/jobs/{id}/appointments"],
+  ["GET", "/jobs/{id}/invoices"],
+  ["GET", "/invoices"],
+  ["GET", "/api/invoices/{uuid}"],
+  ["GET", "/estimates"],
+  ["GET", "/estimates/{id}"],
+  ["GET", "/estimates/{id}/options/{option_id}/line_items"],
+];
+const SERVED_TEXT = SERVED.map(([methods, path]) => `${methods} ${path}`).join("; ");
+
+/** Whether the twin serves this method on this path, an {id} standing for any one segment. */
+function serves(method: string, path: string): boolean {
+  return SERVED.some(
+    ([methods, pattern]) => methods.split(", ").includes(method) && new RegExp(`^${pattern.replace(/\{\w+\}/g, "[^/]+")}$`).test(path),
+  );
+}
