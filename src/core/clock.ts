@@ -38,6 +38,14 @@ export function isRealDate(iso: string): boolean {
 }
 
 /**
+ * A twin-time moment as ISO 8601, floored: Date drops a fraction of a millisecond toward zero, so before 1970 it
+ * would read the next millisecond, ahead of the clock. Use it for any time computed from nowMs().
+ */
+export function twinIso(ms: number): string {
+  return new Date(Math.floor(ms)).toISOString();
+}
+
+/**
  * Twin time.
  *
  * Nothing in this codebase calls Date.now(). Everything asks the clock instead.
@@ -72,7 +80,7 @@ export class TwinClock {
   }
 
   nowIso(): string {
-    return this.now().toISOString();
+    return twinIso(this.currentMs);
   }
 
   advance(milliseconds: number): void {

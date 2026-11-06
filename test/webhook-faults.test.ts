@@ -44,6 +44,23 @@ describe("webhook delivery faults", () => {
     expect(received.at(-1)).toEqual({ topic: "CLIENT_CREATE", fault: "late" });
   });
 
+  it("list a late delivery as due in the millisecond it falls in before 1970, never the next one", async () => {
+    const { app, twin } = createApp({ startTime: "1969-12-31T00:00:00Z", sendWebhook: async () => new Response(null, { status: 200 }) });
+    setWebhooks(twin, [
+      { vendor: "jobber", url: "https://app.example.com/hooks", topics: ["CLIENT_CREATE"], clientId: "app", clientSecret: "s" },
+    ]);
+    setFaults(twin, [{ name: "late", vendor: "jobber", webhook: "*", rate: 1, effect: { delayMs: 600_000 } }]);
+    await advanceClock(twin, 0.00001); // 0.6 ms: the clock now holds a fraction of a millisecond
+    const created = await app.request("/api/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer dev", "X-JOBBER-GRAPHQL-VERSION": "2025-04-16" },
+      body: JSON.stringify({ query: 'mutation { clientCreate(input: { firstName: "Ada", lastName: "Byrne" }) { client { createdAt } } }' }),
+    });
+    expect((await created.json()).data.clientCreate.client.createdAt).toBe("1969-12-31T00:00:00.000Z");
+    const { deliveries } = await (await app.request("/_twin/webhooks")).json();
+    expect(deliveries.at(-1).dueAt).toBe("1969-12-31T00:10:00.000Z");
+  });
+
   it("deliver the copy even when the rule's name isn't plain ASCII, naming it percent-encoded", async () => {
     const { twin, received } = subscribedTwin();
     setFaults(twin, [

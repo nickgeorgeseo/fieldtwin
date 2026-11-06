@@ -1,3 +1,4 @@
+import { twinIso } from "./clock.ts";
 import { faultHeaderValue, type TwinEvent } from "./types.ts";
 import type { VendorTwin } from "./vendor-twin.ts";
 import type { Delivery, DeliveryFaults, DeliveryPolicy, DeliveryRequest, WebhookSender, WebhookSubscription } from "./webhooks.ts";
@@ -61,7 +62,7 @@ export class WebhookDispatcher {
     const queued: Queued = {
       ...delivery,
       id: this.nextId++,
-      dueAt: new Date(delivery.dueMs).toISOString(),
+      dueAt: twinIso(delivery.dueMs),
       attempts: 0,
       status: "pending",
       lastAnswer: null,
@@ -150,7 +151,7 @@ export class WebhookDispatcher {
         due.status = "delivered";
       } else if (retryAfterMs !== null) {
         due.dueMs = nowMs + retryAfterMs;
-        due.dueAt = new Date(due.dueMs).toISOString();
+        due.dueAt = twinIso(due.dueMs);
         this.queue.push(due);
       } else {
         due.status = "failed";

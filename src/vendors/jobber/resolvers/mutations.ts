@@ -1,3 +1,4 @@
+import { twinIso } from "../../../core/clock.ts";
 import type { NewEvent } from "../../../core/types.ts";
 import { encodeId, nextIdNumber } from "../encoded-id.ts";
 import type { JobberClient } from "../types.ts";
@@ -40,7 +41,7 @@ export function createMutations(context: ResolverContext, record: (event: NewEve
         companyName: input.companyName?.trim() || null,
         emails: (input.emails ?? []).map((email) => ({ address: email.address, primary: email.primary ?? false })),
         phones: [],
-        createdAt: new Date(context.nowMs()).toISOString(),
+        createdAt: twinIso(context.nowMs()),
       };
       record({ vendor: "jobber", type: "ClientCreated", data: { client } });
       return { client: clientNode(client, context), userErrors };
