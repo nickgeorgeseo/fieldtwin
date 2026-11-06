@@ -31,3 +31,12 @@ export async function follow<T>(list: Followed<T>, read: (after: string | null) 
   const all = await read(null);
   return all === "changed" ? NOT_READ : all;
 }
+
+/**
+ * Whether `next` is `previous` read on from (follow() added to its end), rather than read again from the start. The
+ * items follow() keeps are the very objects it read before, so the same object in the same place means the same
+ * history. Equal is not enough: a reset replays the same seed into events equal to the old ones.
+ */
+export function wentOnFrom<T extends object>(previous: T[], next: T[]): boolean {
+  return previous.length > 0 && next[previous.length - 1] === previous.at(-1);
+}

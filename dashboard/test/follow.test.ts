@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { follow, NOT_READ, type Read } from "../lib/follow.ts";
+import { follow, NOT_READ, type Read, wentOnFrom } from "../lib/follow.ts";
 
 /**
  * A list the twin keeps adding to, `count` items long, as a page reads it. Its positions are "count-history", so a read
@@ -51,5 +51,27 @@ describe("following a list the twin keeps adding to", () => {
     };
     assert.deepEqual(await follow(await follow(NOT_READ, read), read), { items: [1, 2], position: null });
     assert.deepEqual(asked, [null, null]);
+  });
+});
+
+describe("telling a list read on from one read again from the start", () => {
+  /** twinList's items as events: each read parses new objects, as reading the log does. */
+  const asEvents = (twin: ReturnType<typeof twinList>) => async (after: string | null) => {
+    const read = await twin.read(after);
+    return read === "changed" ? read : { ...read, items: read.items.map((seq) => ({ seq })) };
+  };
+
+  it("says a list follow() added to went on from the one before", async () => {
+    const first = await follow(NOT_READ, asEvents(twinList("a", 3)));
+    assert.equal(wentOnFrom(first.items, (await follow(first, asEvents(twinList("a", 5)))).items), true);
+  });
+
+  it("says a list read again after a reset, rewind, or scenario did not, though it is longer and starts the same", async () => {
+    const first = await follow(NOT_READ, asEvents(twinList("a", 3)));
+    assert.equal(wentOnFrom(first.items, (await follow(first, asEvents(twinList("b", 5)))).items), false);
+  });
+
+  it("says the first read went on from nothing", async () => {
+    assert.equal(wentOnFrom([], (await follow(NOT_READ, asEvents(twinList("a", 3)))).items), false);
   });
 });

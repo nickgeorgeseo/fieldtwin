@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type EventFilter, filterEvents } from "@/lib/events.ts";
+import { wentOnFrom } from "@/lib/follow.ts";
+import type { TwinEvent } from "@/lib/twin-types.ts";
 import { VENDOR_LABELS } from "@/lib/vendors.ts";
 import { EventRow } from "./event-row.tsx";
 import { useTwin } from "./twin-provider.tsx";
@@ -25,13 +27,13 @@ export function EventFeed() {
   const [filter, setFilter] = useState<EventFilter>({ vendor: "", sources: ["api", "scenario", "control"], search: "" });
   const [shown, setShown] = useState(PAGE);
   const [freshAfter, setFreshAfter] = useState(Number.POSITIVE_INFINITY);
-  const newestRead = useRef(0);
+  const lastRead = useRef<TwinEvent[]>([]);
 
-  // Mark what arrived since the last read. After a rewind or reset nothing is new.
+  // Mark what arrived since the last read. After a rewind, reset, or scenario the log is read again, and nothing is new.
   useEffect(() => {
-    const newest = events.at(-1)?.seq ?? 0;
-    setFreshAfter(newestRead.current && newest > newestRead.current ? newestRead.current : Number.POSITIVE_INFINITY);
-    newestRead.current = newest;
+    const before = lastRead.current;
+    setFreshAfter(wentOnFrom(before, events) ? (before.at(-1)?.seq ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY);
+    lastRead.current = events;
   }, [events]);
 
   const visible = useMemo(() => filterEvents(events, filter).reverse(), [events, filter]);
