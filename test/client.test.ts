@@ -77,6 +77,15 @@ describe("the twin's client", async () => {
     expect((await twin.status()).checkpoints).toEqual([]);
   });
 
+  it("answers a wrongly written scenario name with the twin's name check, not as YAML", async () => {
+    for (const name of ["Flaky-APIs", "flaky apis", "flaky_apis"]) {
+      await expect(twin.loadScenario(name)).rejects.toMatchObject({
+        status: 400,
+        message: expect.stringContaining("isn't a scenario name"),
+      });
+    }
+  });
+
   it("follows the log from a position, and says when its history is gone", async () => {
     const all = await twin.log();
     expect(all.events.length).toBeGreaterThan(100);

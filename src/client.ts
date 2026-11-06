@@ -114,12 +114,14 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
     url: base,
     status: () => json("GET", ""),
     reset: () => json("POST", "/reset"),
-    loadScenario: (scenario) =>
+    // A scenario's YAML always has a "key: value" in it; any other string is meant as a name, even a wrongly written
+    // one ("Flaky-APIs"), so the twin's name check answers it rather than a YAML error about a string.
+    loadScenario: async (scenario) =>
       typeof scenario !== "string"
         ? json("POST", "/scenario", { text: JSON.stringify(scenario) }) // JSON is YAML, so the same route reads it
-        : /^[a-z0-9-]+$/.test(scenario)
-          ? json("POST", `/scenarios/${scenario}`)
-          : json("POST", "/scenario", { text: scenario }),
+        : /[:\n]/.test(scenario)
+          ? json("POST", "/scenario", { text: scenario })
+          : json("POST", `/scenarios/${segment(scenario)}`),
     scenarios: () => json("GET", "/scenarios"),
     advance: ({ minutes = 0, hours = 0, days = 0 }) =>
       json("POST", "/clock/advance", { json: { minutes: minutes + hours * 60 + days * 1440 } }),
