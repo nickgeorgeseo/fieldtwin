@@ -56,6 +56,12 @@ describe("Jobber OAuth twin", () => {
     expect(location.searchParams.get("state")).toBe("xyz");
   });
 
+  it("refuses a redirect URI with a fragment, which OAuth forbids, as 400 invalid_request", async () => {
+    const response = await authorize(setup(), { redirect_uri: `${CLIENT.redirectUri}#section` });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/fragment/) });
+  });
+
   it("exchanges the code for a JWT access token carrying its expiry, in the documented response shape", async () => {
     const harness = setup();
     const tokens = await connect(harness);

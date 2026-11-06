@@ -48,11 +48,16 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
   }
 }
 
-/** What's wrong with an OAuth redirect_uri, if anything: it must be an absolute URL to send the browser back to. */
+/**
+ * What's wrong with an OAuth redirect_uri, if anything: it must be an absolute URL to send the browser back to, and
+ * "MUST NOT include a fragment component" (RFC 6749 3.1.2), since the code goes in the query.
+ */
 export function redirectUriProblem(redirectUri: string): string | undefined {
-  return URL.canParse(redirectUri)
-    ? undefined
-    : `redirect_uri must be an absolute URL, like http://localhost:3000/callback, not "${redirectUri}".`;
+  if (!URL.canParse(redirectUri)) {
+    return `redirect_uri must be an absolute URL, like http://localhost:3000/callback, not "${redirectUri}".`;
+  }
+  if (redirectUri.includes("#")) return `redirect_uri must not include a fragment (#...): send "${redirectUri.split("#")[0]}".`;
+  return undefined;
 }
 
 /**

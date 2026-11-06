@@ -62,6 +62,12 @@ describe("QuickBooks OAuth twin", () => {
     expect(location.searchParams.get("state")).toBe("security_token=138r5719ru3e1");
   });
 
+  it("refuses a redirect URI with a fragment, which OAuth forbids, as 400 invalid_request", async () => {
+    const response = await authorize(setup(), { redirect_uri: `${CLIENT.redirectUri}#section` });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/fragment/) });
+  });
+
   it("exchanges the code for tokens in the documented response shape", async () => {
     const tokens = await connect(setup());
     expect(tokens).toEqual({

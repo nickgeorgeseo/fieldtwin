@@ -146,6 +146,12 @@ describe("Housecall Pro OAuth twin", () => {
     expect((await plain.json()).error).toBe("invalid_request");
   });
 
+  it("refuses a redirect URI with a fragment, which OAuth forbids, as 400 invalid_request", async () => {
+    const response = await authorize(setup(), { redirect_uri: `${CLIENT.redirectUri}#section` });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/fragment/) });
+  });
+
   it("refuses a token request whose body isn't JSON or a form, saying the docs send JSON", async () => {
     const harness = setup();
     const post = (contentType: string, body: string) =>
