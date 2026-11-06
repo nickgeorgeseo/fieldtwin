@@ -13,9 +13,13 @@ export function encodeId(type: string, n: number): string {
   return Buffer.from(`gid://Jobber/${type}/${n}`).toString("base64");
 }
 
-/** The record type and number inside an id the twin made, or undefined for anything else. */
+/**
+ * The record type and number inside an id the twin made, or undefined for anything else. The number must be
+ * written the way the twin writes it: `Client/01` is no id the twin made, so it resolves to null like any unknown
+ * id rather than finding Client 1 and answering with an id the caller never sent.
+ */
 export function decodeId(id: string): { type: string; n: number } | undefined {
-  const match = /^gid:\/\/Jobber\/(\w+)\/(\d+)$/.exec(Buffer.from(id, "base64").toString());
+  const match = /^gid:\/\/Jobber\/(\w+)\/(0|[1-9]\d*)$/.exec(Buffer.from(id, "base64").toString());
   return match ? { type: match[1]!, n: Number(match[2]) } : undefined;
 }
 

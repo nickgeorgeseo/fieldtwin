@@ -133,6 +133,16 @@ describe("Jobber twin: errors and ids", () => {
     expect(body).toMatchObject({ data: { client: null } });
     expect(body.errors).toBeUndefined();
   });
+
+  it("returns null for an id that spells a record's number another way, like gid://Jobber/Client/01", async () => {
+    const { jobber } = setup();
+    const query = "query ($id: EncodedId!) { client(id: $id) { id } }";
+    for (const number of ["01", "001"]) {
+      const id = Buffer.from(`gid://Jobber/Client/${number}`).toString("base64");
+      const body = await (await jobber(query, { id })).json();
+      expect(body, number).toMatchObject({ data: { client: null } });
+    }
+  });
 });
 
 describe("Jobber twin: ids with and without padding", () => {
