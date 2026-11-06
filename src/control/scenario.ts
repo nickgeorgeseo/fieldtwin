@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "yaml";
 import { z } from "zod";
 import { parseTwinTime, TWIN_TIME_FORM } from "../core/clock.ts";
+import { localMidnight } from "../core/local-time.ts";
 import { isObject } from "../core/request-body.ts";
 import { type FaultRule, isFaultStatus, VENDOR_NAMES, type VendorName } from "../core/types.ts";
 import type { WebhookSubscription } from "../core/webhooks.ts";
@@ -153,9 +154,7 @@ function timeOf(at: string, startMs: number, utcOffsetHours: number): number | u
 
   const localTime = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(at);
   if (localTime) {
-    const localStart = new Date(startMs + utcOffsetHours * 3_600_000);
-    const localMidnightUtc = Date.UTC(localStart.getUTCFullYear(), localStart.getUTCMonth(), localStart.getUTCDate());
-    return localMidnightUtc + (Number(localTime[1]) - utcOffsetHours) * 3_600_000 + Number(localTime[2]) * 60_000;
+    return localMidnight(startMs, utcOffsetHours) + (Number(localTime[1]) - utcOffsetHours) * 3_600_000 + Number(localTime[2]) * 60_000;
   }
 
   return parseTwinTime(at);

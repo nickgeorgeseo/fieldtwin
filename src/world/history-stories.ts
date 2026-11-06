@@ -135,11 +135,11 @@ function invoiceFor(job: WorldJob, context: HistoryContext): WorldInvoice | unde
 /** A time during business hours, `day` days from the start, in the company's time zone. */
 function businessHour(context: HistoryContext, day: number, earliestLocalHour: number): number {
   const { random, startMs, utcOffsetHours } = context;
-  const localNow = new Date(startMs + utcOffsetHours * HOUR);
   const hour = random.int(Math.min(earliestLocalHour, LAST_START_HOUR), LAST_START_HOUR);
   const minute = random.pick([0, 30]);
-  const localMidnight = Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + day);
-  return localMidnight + (hour - utcOffsetHours) * HOUR + minute * 60_000;
+  // Midnight at the business, counted in whole days: Date.UTC would read years 0 to 99 as 1900 to 1999.
+  const localMidnight = Math.floor((startMs + utcOffsetHours * HOUR) / DAY) * DAY;
+  return localMidnight + day * DAY + (hour - utcOffsetHours) * HOUR + minute * 60_000;
 }
 
 function localHourNow(context: HistoryContext): number {

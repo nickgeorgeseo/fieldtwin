@@ -11,3 +11,11 @@ export function localTime(ms: number, utcOffsetHours: number): string {
   const hours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, "0");
   return `${local}${sign}${hours}:${String(Math.abs(offsetMinutes) % 60).padStart(2, "0")}`;
 }
+
+/**
+ * Midnight on the business's own date at `ms`, on its local clock read as UTC (add the local hour, minus the offset,
+ * for a moment). Counted in whole days rather than built with Date.UTC, which reads years 0 to 99 as 1900 to 1999.
+ */
+export function localMidnight(ms: number, utcOffsetHours: number): number {
+  return Math.floor((ms + utcOffsetHours * 3_600_000) / 86_400_000) * 86_400_000;
+}

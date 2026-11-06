@@ -375,7 +375,7 @@ timeline:
 
 Housecall Pro has `newCustomers` too, like Jobber's `newClients`. A job is finished only once all of its visits have begun, so `completeJobs` never marks work done before its time. Finishing a job doesn't invoice it: `invoiceJobs` invoices finished work, the work finished longest ago first, and from then on `payInvoices` can pay it.
 
-A scenario with a typo, an unknown key, or a time without a UTC offset is refused when it loads, with the reason, and the twin stays as it was.
+A scenario with a typo, an unknown key, a time without a UTC offset, or a year before 0100 (a typo like `0026`) is refused when it loads, with the reason, and the twin stays as it was.
 
 ## The control plane
 

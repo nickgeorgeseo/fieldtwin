@@ -43,6 +43,25 @@ describe("loading a scenario that is wrong", () => {
     expect({ status: describeTwin(twin), log: twin.log.all() }).toEqual(before);
     expect(() => resetTwin(twin)).not.toThrow();
   });
+
+  it("refuses a start time in years 0000 to 0099, like the typo 0026, with a 400 that says so", async () => {
+    const { app } = setup();
+    const res = await app.request("/_twin/scenario", { method: "POST", body: 'name: Typo\nseed: 7\nstartTime: "0026-07-13T11:00:00Z"\n' });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("year 0100");
+  });
+});
+
+describe("a scenario that starts just after a year begins in UTC, while the business's own day is still the year before", () => {
+  it("builds its world, and reads a business time in the timeline on the business's own date", async () => {
+    const { app } = setup();
+    const yaml = 'name: New Year\nseed: 7\nstartTime: "0100-01-01T02:00:00Z"\ntimeline:\n  - at: "23:00"\n    jobber: { newClients: 1 }\n';
+    const res = await app.request("/_twin/scenario", { method: "POST", body: yaml });
+    expect(res.status).toBe(200);
+    const { company, upcoming } = await res.json();
+    const businessDate = Date.parse("0099-12-31T00:00:00Z"); // 02:00 UTC is still the evening before at the business
+    expect(upcoming[0].at).toBe(new Date(businessDate + (23 - company.utcOffsetHours) * 3_600_000).toISOString());
+  });
 });
 
 describe("a scheduled action that throws when it runs, though its check passed", () => {

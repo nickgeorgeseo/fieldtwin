@@ -1,13 +1,16 @@
 /** How to write a moment so it means the same one on every machine. */
-export const TWIN_TIME_FORM = 'Write a date, a time, and a UTC offset, like "2026-07-13T08:00:00-05:00" or "2026-07-13T13:00:00Z".';
+export const TWIN_TIME_FORM =
+  'Write a date from year 0100 on, a time, and a UTC offset, like "2026-07-13T08:00:00-05:00" or "2026-07-13T13:00:00Z".';
 
 /**
  * An ISO 8601 time with a UTC offset, in epoch milliseconds; undefined for anything else. A time without an offset is
  * refused: Date.parse would read it in the host's time zone, and the same scenario would start at a different
- * moment on every machine. So is a day the calendar doesn't have: Date.parse would quietly start 2026-02-30 in March.
+ * moment on every machine. So is a day the calendar doesn't have: Date.parse would quietly start 2026-02-30 in March. And
+ * so is a year from 0000 to 0099: almost always a typo for this century ("0026"), and a year Date.UTC would read as 1900
+ * to 1999.
  */
 export function parseTwinTime(text: string): number | undefined {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}:\d{2})$/.test(text)) return undefined;
+  if (!/^(?!00)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}:\d{2})$/.test(text)) return undefined;
   if (!isRealDate(text.slice(0, 10))) return undefined;
   const ms = Date.parse(text);
   return Number.isNaN(ms) ? undefined : ms;
