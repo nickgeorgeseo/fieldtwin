@@ -194,6 +194,6 @@ export class Twin {
       this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
       this.timeline.rearmAfter(this.clock.nowMs());
     });
-    this.checkpoints.forgetAfter(checkpoint.seq);
+    this.checkpoints.forgetAfter(name);
   }
 }

@@ -80,6 +80,20 @@ describe("rewinding to a checkpoint", () => {
     expect(() => rewindTo(twin, "later")).toThrow('No checkpoint named "later"');
   });
 
+  it("forgets the checkpoints taken later even when nothing was recorded in between, so twin time never jumps forward", async () => {
+    const { app } = setup();
+    const post = (path: string, body?: unknown) =>
+      app.request(`/_twin${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+    await post("/checkpoints/earlier");
+    await post("/clock/advance", { minutes: 60 });
+    expect((await (await post("/checkpoints/later")).json()).time).toBe("2026-07-13T12:00:00.000Z");
+
+    const rewound = await (await post("/checkpoints/earlier/rewind")).json();
+    expect(rewound.checkpoints.map(({ name }: { name: string }) => name)).toEqual(["earlier"]);
+    expect((await post("/checkpoints/later/rewind")).status).toBe(400);
+    expect((await (await app.request("/_twin")).json()).twinTime).toBe("2026-07-13T11:00:00.000Z");
+  });
+
   it("is the only way back: the clock itself refuses to move backwards", () => {
     const { twin } = setup();
     expect(() => twin.clock.advance(-1)).toThrow("Rewind to a checkpoint");

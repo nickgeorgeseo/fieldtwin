@@ -5,10 +5,11 @@ import type { Checkpoint } from "./types.ts";
  * keeps to go back there exactly (`Saved`; for the twin, where its fault dice were).
  */
 export class Checkpoints<Saved> {
-  private named = new Map<string, { checkpoint: Checkpoint; saved: Saved }>();
+  private named = new Map<string, { checkpoint: Checkpoint; saved: Saved }>(); // in the order they were taken
 
   take(name: string, seq: number, time: string, saved: Saved): Checkpoint {
     const checkpoint = { name, seq, time };
+    this.named.delete(name); // taking a name again makes it the latest, not a checkpoint from where it first stood
     this.named.set(name, { checkpoint, saved });
     return checkpoint;
   }
@@ -27,10 +28,15 @@ export class Checkpoints<Saved> {
     return entry;
   }
 
-  /** After a rewind to `seq`: checkpoints taken later point at history that no longer exists. */
-  forgetAfter(seq: number): void {
-    for (const [name, { checkpoint }] of this.named) {
-      if (checkpoint.seq > seq) this.named.delete(name);
+  /**
+   * After a rewind to `name`: checkpoints taken later point at history that no longer exists. Later in the order taken,
+   * not by log position: one taken after the clock moved but nothing was recorded has the same seq, and a later time.
+   */
+  forgetAfter(name: string): void {
+    let later = false;
+    for (const taken of [...this.named.keys()]) {
+      if (later) this.named.delete(taken);
+      later ||= taken === name;
     }
   }
 
