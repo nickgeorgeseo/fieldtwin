@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
+import { grantTokens, type OAuthPolicy } from "../../core/oauth.ts";
 import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem, repeatedQueryParameter } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import { HCP } from "./routes/base.ts";
@@ -66,13 +66,8 @@ export function housecallproOAuthRoutes(app: Hono, twin: Twin): void {
     const missing = missingGrantParameter(field);
     if (missing) return c.json({ error: "invalid_request", error_description: missing }, 400);
 
-    let result: TokenSet | OAuthError;
-    if (field("grant_type") === "authorization_code") {
-      const request = { clientId: field("client_id"), code: field("code"), redirectUri: field("redirect_uri") };
-      result = oauth().exchange({ ...request, codeVerifier: field("code_verifier") || undefined }, nowMs());
-    } else if (field("grant_type") === "refresh_token") {
-      result = oauth().refresh({ clientId: field("client_id"), refreshToken: field("refresh_token") }, nowMs());
-    } else {
+    const result = grantTokens(oauth(), { clientId: field("client_id"), field, pkce: true }, nowMs());
+    if (!result) {
       return c.json({ error: "unsupported_grant_type", error_description: "grant_type must be authorization_code or refresh_token." }, 400);
     }
 

@@ -183,6 +183,24 @@ export class OAuthServer {
   }
 }
 
+/**
+ * A token request's grant, as its grant_type says: a code exchanged for tokens (with its PKCE verifier when the vendor
+ * takes one) or a refresh token used. Undefined for any other grant type, which each vendor refuses in its own words.
+ */
+export function grantTokens(
+  server: OAuthServer,
+  request: { clientId: string; field: (name: string) => string; pkce: boolean },
+  nowMs: number,
+): TokenSet | OAuthError | undefined {
+  const { clientId, field, pkce } = request;
+  if (field("grant_type") === "authorization_code") {
+    const codeVerifier = pkce ? field("code_verifier") || undefined : undefined;
+    return server.exchange({ clientId, code: field("code"), redirectUri: field("redirect_uri"), codeVerifier }, nowMs);
+  }
+  if (field("grant_type") === "refresh_token") return server.refresh({ clientId, refreshToken: field("refresh_token") }, nowMs);
+  return undefined;
+}
+
 /** PKCE S256: the challenge is the base64url SHA-256 of the verifier, without padding (RFC 7636). */
 function matchesChallenge(verifier: string | undefined, challenge: string): boolean {
   return verifier !== undefined && createHash("sha256").update(verifier).digest("base64url") === challenge;

@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import type { OAuthError, OAuthPolicy, TokenSet } from "../../core/oauth.ts";
+import { grantTokens, type OAuthError, type OAuthPolicy, type TokenSet } from "../../core/oauth.ts";
 import { missingGrantParameter, readForm, readJsonObject, redirectUriProblem, repeatedQueryParameter } from "../../core/request-body.ts";
 import type { Twin } from "../../core/twin.ts";
 import type { QboState } from "./types.ts";
@@ -65,12 +65,9 @@ export function quickbooksOAuthRoutes(app: Hono, twin: Twin): void {
     const missing = missingGrantParameter(field);
     if (missing) return c.json({ error: "invalid_request", error_description: missing }, 400);
 
-    let result: TokenSet | OAuthError;
-    if (field("grant_type") === "authorization_code") {
-      result = oauth().exchange({ clientId: client.id, code: field("code"), redirectUri: field("redirect_uri") }, nowMs());
-    } else if (field("grant_type") === "refresh_token") {
-      result = oauth().refresh({ clientId: client.id, refreshToken: field("refresh_token") }, nowMs());
-    } else {
+    // Intuit documents no PKCE, so a code_verifier is ignored as any field the twin doesn't model.
+    const result = grantTokens(oauth(), { clientId: client.id, field, pkce: false }, nowMs());
+    if (!result) {
       return c.json({ error: "unsupported_grant_type", error_description: "grant_type must be authorization_code or refresh_token" }, 400);
     }
     return tokenResponse(c, result, nowMs());
