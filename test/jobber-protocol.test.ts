@@ -78,6 +78,16 @@ describe("Jobber twin: errors and ids", () => {
     }
   });
 
+  it("prices fragments that each spread the next one twice at once, as the fields they reach, not once per spread", async () => {
+    // Thirty levels that each spread the next twice: under 2 KB of query, but 2^30 spreads if each were walked again.
+    const { jobber } = setup();
+    const chain = Array.from({ length: 30 }, (_, n) => `fragment F${n} on Account { ...F${n + 1} ...F${n + 1} }`).join("\n");
+    const body = await (await jobber(`{ account { ...F0 } }\n${chain}\nfragment F30 on Account { id name }`)).json();
+    expect(Object.keys(body.data.account)).toEqual(["id", "name"]);
+    expect(body.extensions.cost.requestedQueryCost).toBe(3);
+    expect(body.extensions.cost.actualQueryCost).toBe(3);
+  });
+
   it("rejects a variable that is not an EncodedId, in Jobber's documented error shape", async () => {
     const { jobber } = setup();
     const body = await (await jobber("query SampleQuery($id: EncodedId!) { client(id: $id) { id } }", { id: "1" })).json();

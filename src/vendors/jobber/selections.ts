@@ -80,15 +80,24 @@ export function collectFields(selectionSet: SelectionSetNode, context: Context):
  * Every field a selection set holds, in order, through its fragments. A stack of selections still to read rather
  * than recursion: a chain of thousands of nested fragments can pass validation, and walking it recursively would
  * run out of stack and answer the request with a 500 instead of the query's own answer.
+ *
+ * A fragment spread a second time in the same selection set adds nothing, so it is read once, as the spec's
+ * CollectFields does (https://spec.graphql.org/October2021/#CollectFields()). Reading it again would add only fields
+ * already found, and fragments that each spread the next twice would double the walk at every level.
  */
 function allFields(selectionSet: SelectionSetNode, context: Context): FieldNode[] {
   const fields: FieldNode[] = [];
+  const visitedFragments = new Set<string>();
   const pending: SelectionNode[] = [...selectionSet.selections].reverse();
   for (let selection = pending.pop(); selection; selection = pending.pop()) {
     if (!included(selection, context)) continue;
     if (selection.kind === Kind.FIELD) {
       fields.push(selection);
       continue;
+    }
+    if (selection.kind === Kind.FRAGMENT_SPREAD) {
+      if (visitedFragments.has(selection.name.value)) continue;
+      visitedFragments.add(selection.name.value);
     }
     const inner =
       selection.kind === Kind.INLINE_FRAGMENT ? selection.selectionSet : context.fragments.get(selection.name.value)?.selectionSet;
