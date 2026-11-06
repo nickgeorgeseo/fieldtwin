@@ -79,6 +79,7 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
 
   const keptIds = new Set(existing.flatMap((line) => ("Id" in line ? [line.Id] : [])));
   let nextLineId = Math.max(0, ...[...keptIds].map(Number)) + 1;
+  const givenIds = new Set<string>(); // Ids used so far in this request
   const lines: QboSalesItemLine[] = [];
 
   for (const [index, line] of requested.entries()) {
@@ -104,8 +105,11 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
       return qboErrors.amountMismatch(Amount, now);
     }
 
-    // An update keeps the Id of a line it sends back; new lines get new Ids.
-    const Id = line.Id !== undefined && keptIds.has(String(line.Id)) ? String(line.Id) : String(nextLineId++);
+    // An update keeps the Id of a line it sends back; new lines get new Ids. A second copy of a line (a client
+    // that cloned a line it read, Id and all) is a new line, so two lines never share an Id.
+    const sentId = line.Id === undefined ? undefined : String(line.Id);
+    const Id = sentId !== undefined && keptIds.has(sentId) && !givenIds.has(sentId) ? sentId : String(nextLineId++);
+    givenIds.add(Id);
     lines.push({
       Id,
       LineNum: index + 1,

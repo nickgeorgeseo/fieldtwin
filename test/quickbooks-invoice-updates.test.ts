@@ -72,6 +72,17 @@ describe("QuickBooks twin: updating invoices", () => {
     expect(Invoice.Line.at(-1)).toEqual({ Amount: 195, DetailType: "SubTotalLineDetail", SubTotalLineDetail: {} });
   });
 
+  it("gives a new Id to a second copy of a line sent back, so no two lines share an Id", async () => {
+    const harness = setup();
+    const original = await createdInvoice(harness);
+    const [first] = original.Line;
+    const copy = { ...first, Amount: 45, SalesItemLineDetail: { ...first.SalesItemLineDetail, Qty: 1, UnitPrice: 45 } };
+    const { Invoice } = await (
+      await harness.qboPost("/invoice", { Id: original.Id, SyncToken: "0", sparse: true, Line: [first, copy] })
+    ).json();
+    expect(Invoice.Line.map((line: { Id?: string }) => line.Id)).toEqual(["1", "3", undefined]);
+  });
+
   it("rejects an update that sends an old SyncToken (5010), changing nothing", async () => {
     const harness = setup();
     const original = await createdInvoice(harness);
