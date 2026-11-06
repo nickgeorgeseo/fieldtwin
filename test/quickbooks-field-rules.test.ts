@@ -261,6 +261,18 @@ describe("QuickBooks twin: ids and references", () => {
     expect(await faultOf(await harness.qboPost("/payment", { ...payment, Line: [], TxnDate: unreadable }))).toMatchObject({ code: "2070" });
   });
 
+  it("reads a line Id of null as not sent, so the line is a new one (Python's None)", async () => {
+    const harness = setup();
+    const created = await invoice(harness, { Line: [{ ...sale(40), Id: null }] });
+    expect(created.Line[0]).toMatchObject({ Id: "1", Amount: 40 });
+    const update = { Id: created.Id, SyncToken: "0", sparse: true, Line: [created.Line[0], { ...sale(5), Id: null }] };
+    const updated = (await (await harness.qboPost("/invoice", update)).json()).Invoice;
+    expect(updated.Line.slice(0, 2)).toMatchObject([
+      { Id: "1", Amount: 40 },
+      { Id: "2", Amount: 5 },
+    ]);
+  });
+
   it("still reads an Id or reference sent as a number as its digits", async () => {
     const harness = setup();
     const created = await invoice(harness, { CustomerRef: { value: 2 } });

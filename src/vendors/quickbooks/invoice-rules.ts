@@ -114,9 +114,10 @@ function salesLines(state: QboState, input: unknown, existing: QboInvoiceLine[],
     }
 
     // An update keeps the Id of a line it sends back; new lines get new Ids. A second copy of a line (a client
-    // that cloned a line it read, Id and all) is a new line, so two lines never share an Id.
+    // that cloned a line it read, Id and all) is a new line, so two lines never share an Id. A null Id (Python's
+    // None) is one not sent, as for SyncToken and amounts.
     const sentId = refId(line.Id);
-    if (line.Id !== undefined && sentId === undefined) {
+    if (line.Id !== undefined && line.Id !== null && sentId === undefined) {
       return qboErrors.invalidProperty(
         "Line.Id",
         `Line ${index + 1} has Id ${asSent(line.Id)}. Send the Id you read, or none for a new line.`,
