@@ -1,3 +1,4 @@
+import { OutOfNamesError } from "../world/generate-world.ts";
 import { streams } from "./streams.ts";
 import type { Twin } from "./twin.ts";
 import type { NewEvent, VendorName } from "./types.ts";
@@ -101,13 +102,18 @@ export class Timeline {
 }
 
 /**
- * A scheduled entry whose action threw when it ran, though its check passed when the scenario loaded: a bug in the
- * vendor's action, named by its entry ("jobber newClients at 2026-07-13T12:00:00.000Z"), with what threw as its cause.
+ * A scheduled entry whose action threw when it ran, though its check passed when the scenario loaded, named by its
+ * entry ("jobber newClients at 2026-07-13T12:00:00.000Z"), with what threw as its cause. Usually a bug in the vendor's
+ * action; but a timeline that brings in more newcomers than the world has names for has reached a limit the scenario
+ * can fix, which no check at load can see coming, since requests take names too.
  */
 export class ScenarioEntryError extends Error {
+  readonly isBug: boolean;
+
   constructor(entry: TimelineEntry, cause: unknown, ifItFails?: string) {
     const what = `${entry.vendor} ${entry.action} at ${new Date(entry.atMs).toISOString()}`;
     const failed = `${what} failed: ${cause instanceof Error ? cause.message : String(cause)}`;
     super(ifItFails ? `${failed}; ${ifItFails}` : failed, { cause });
+    this.isBug = !(cause instanceof OutOfNamesError);
   }
 }

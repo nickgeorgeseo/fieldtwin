@@ -51,6 +51,18 @@ describe("control-plane mistakes", () => {
     expect(error).toContain("how many");
     expect(error).not.toContain("like { newClients: 5 }");
   });
+
+  it("is a 400 when a scenario's timeline brings in more new clients than the twin has names for, with the clock stopped there", async () => {
+    const { app, twin } = setup();
+    const entries = Array.from({ length: 8 }, (_, i) => `  - at: "+${i + 1}h"\n    jobber: { newClients: 1000 }\n`).join("");
+    await send(app, "POST", "/_twin/scenario", `name: Crowded\nseed: 7\nstartTime: "2026-07-13T11:00:00Z"\ntimeline:\n${entries}`);
+    const { status, error } = await errorOf(await send(app, "POST", "/_twin/clock/advance", '{"minutes": 600}'));
+    expect(status).toBe(400);
+    expect(error).toContain("jobber newClients at 2026-07-13T19:00:00.000Z failed: Every name the twin can make is taken");
+    expect(error).not.toContain("bug in fieldtwin");
+    expect(twin.clock.nowIso()).toBe("2026-07-13T19:00:00.000Z");
+    expect(logged).not.toHaveBeenCalled();
+  }, 30_000);
 });
 
 describe("a bug in the twin behind the control plane", () => {

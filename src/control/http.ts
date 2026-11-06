@@ -43,10 +43,12 @@ export function controlRoutes(twin: Twin): Hono {
 
   // Control-plane mistakes (unknown checkpoint, bad scenario) come back as readable 400s. A TypeError and its kin, or
   // a scheduled action that throws though its check passed, mean a bug in the twin, not the request: a 500, logged
-  // with its stack and its cause's. A log read after a position from another history is neither: a 409, so the reader
-  // knows to read the log again from the start.
+  // with its stack and its cause's. A scheduled action that ran out of names for newcomers is the scenario's to fix,
+  // so a 400. A log read after a position from another history is neither: a 409, so the reader knows to read the log
+  // again from the start.
   app.onError((error, c) => {
-    const bug = [TypeError, RangeError, ReferenceError, ScenarioEntryError].some((kind) => error instanceof kind);
+    const bug =
+      [TypeError, RangeError, ReferenceError].some((kind) => error instanceof kind) || (error instanceof ScenarioEntryError && error.isBug);
     if (bug) {
       console.error(`fieldtwin: unexpected error answering ${c.req.method} ${c.req.path}: ${stackOf(error)}`);
       return c.json(

@@ -182,8 +182,11 @@ function newCustomer(random: SeededRandom, world: World, n: number, takenNames: 
       if (!takenNames.has(`${firstName} ${lastName}`)) return makeCustomer(random, n, firstName, lastName, home);
     }
   }
-  throw new Error(`Every name the twin can make is taken (${takenNames.size} people)`);
+  throw new OutOfNamesError(`Every name the twin can make is taken (${takenNames.size} people). Bring in fewer, or reset the twin.`);
 }
+
+/** The world has no names left for newcomers: a limit a scenario or request ran into, not a bug in the twin. */
+export class OutOfNamesError extends Error {}
 
 function makeCustomer(random: SeededRandom, n: number, firstName: string, lastName: string, home: Home): WorldCustomer {
   return {
