@@ -84,7 +84,11 @@ describe("Jobber query cost: variables and directives", () => {
     const harness = setup();
     const required = "query ($s: Boolean!) { account { id name @skip(if: $s) } }";
     const optional = "query ($s: Boolean = false) { account { id name @include(if: $s) } }";
-    for (const [query, variables] of [[required, {}], [required, { s: null }], [optional, { s: null }]] as const) {
+    for (const [query, variables] of [
+      [required, {}],
+      [required, { s: null }],
+      [optional, { s: null }],
+    ] as const) {
       const response = await harness.jobber(query, variables);
       expect(response.status).toBe(200);
       const body = await response.json();

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import {
   buildSchema,
   type DocumentNode,
+  type GraphQLError,
   type GraphQLFormattedError,
   GraphQLScalarType,
   getLocation,
@@ -74,7 +75,15 @@ export function prepare(request: GraphQLRequest): { document: DocumentNode } | {
     return { errors: [formatted(error)] };
   }
 
-  const validationErrors = validate(schema, document);
+  // A chain of fragments, each spreading the next, parses flat but validates recursively, and can run out of stack:
+  // that is the client's query being too deep, so it gets an error like a parse failure does, not a 500.
+  let validationErrors: readonly GraphQLError[];
+  try {
+    validationErrors = validate(schema, document);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    return { errors: [{ message: `The query is nested too deeply to validate (${error.message}). Spread fragments less deeply.` }] };
+  }
   if (validationErrors.length) return { errors: validationErrors.map((error) => error.toJSON()) };
 
   const operation = chosenOperation(document, request.operationName);

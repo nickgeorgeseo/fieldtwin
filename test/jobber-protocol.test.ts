@@ -54,6 +54,16 @@ describe("Jobber twin: errors and ids", () => {
     }
   });
 
+  it("answers a chain of fragment spreads too long to validate with HTTP 200 and an errors list, not a 500", async () => {
+    const { jobber } = setup();
+    const chain = Array.from({ length: 6_000 }, (_, n) => `fragment F${n} on Account { id ...F${n + 1} }`).join("\n");
+    const response = await jobber(`{ account { ...F0 } }\n${chain}\nfragment F6000 on Account { id }`);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toBeUndefined();
+    expect(body.errors[0].message).toBeTruthy();
+  });
+
   it("rejects a variable that is not an EncodedId, in Jobber's documented error shape", async () => {
     const { jobber } = setup();
     const body = await (await jobber("query SampleQuery($id: EncodedId!) { client(id: $id) { id } }", { id: "1" })).json();
