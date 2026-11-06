@@ -4,6 +4,14 @@ All notable changes to fieldtwin. The format follows [Keep a Changelog](https://
 
 ## Unreleased
 
+### Added
+
+- A typed client for the control plane. `startTwin()` now answers one, with `checkpoint()`, `changes()`, `rewind()`, `loadScenario()`, `advance({ hours: 2 })`, `runAction()`, `log()`, `setFaults()`, `setAuth()`, `setWebhooks()`, and the rest beside `url`, `port`, and `close()`, so a test no longer writes its own fetch helper; `connectTwin(url)` makes the same client for a twin started some other way, and `fieldtwin/client` has it alone, with no Node.js imports. A refusal throws a `TwinError` with the twin's reason and HTTP status.
+- `changes()` and `log()` are typed: narrow a change by `vendor` and `type` (or ask `changes()` for only those) and its `data` is that vendor's record, named as its docs name it, like `data.invoice.DocNumber`. The package exports the control plane's answers as types too: `TwinStatus`, `Change`, `TwinLogEvent`, `Scenario`, `FaultRule`, `WebhookSubscription`, and the rest.
+- `connect(vendor)` connects an app through the twin's OAuth server as a person approving it would, and answers its tokens (and QuickBooks' `realmId`), for tests whose code takes tokens rather than getting them, in `flaky-apis` or any twin checking OAuth for real.
+- A scenario can be an object: `startTwin({ scenario: { seed: 7, faults: [...] } })` and `loadScenario(object)`, typed as `Scenario`, so a test needs no YAML file.
+- `GET /_twin/vendors` names each vendor the twin serves, where its API lives, the actions `POST /_twin/actions` takes, and the webhook topics it sends, so tools needn't hard-code them.
+
 ## 0.5.3 - 2026-10-29
 
 The MCP tools say more about themselves. Each carries MCP's tool annotations (read-only, destructive, idempotent, and whether it reaches outside the twin), has a title, and describes its parameters. The descriptions say what each tool leaves alone and what it answers with. Glama shows the annotations as tags and grades the descriptions. The twin itself is unchanged.

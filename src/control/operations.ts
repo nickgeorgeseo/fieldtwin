@@ -33,6 +33,19 @@ export function describeTwin(twin: Twin) {
   };
 }
 
+/** Each vendor the twin serves: where its API lives, the actions runAction takes, and the webhook topics it sends. */
+export function describeVendors(twin: Twin) {
+  return twin.vendorNames().map((name) => {
+    const vendor = twin.vendor(name);
+    return {
+      name,
+      pathPrefix: vendor.pathPrefix,
+      actions: Object.keys(vendor.scenarioActions ?? {}),
+      webhookTopics: [...(vendor.webhooks?.topics ?? [])],
+    };
+  });
+}
+
 export function resetTwin(twin: Twin) {
   twin.reset();
   return describeTwin(twin);

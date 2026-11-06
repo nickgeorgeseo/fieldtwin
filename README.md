@@ -160,35 +160,20 @@ import { after, beforeEach, test } from "node:test";
 import { startTwin } from "fieldtwin";
 import { syncPaidInvoices } from "../src/sync.ts"; // your code
 
-const running = await startTwin(); // a twin of this file's own, on a free port
-after(() => running.close());
-
-/** Something the twin recorded: what changed, in which vendor, with the whole record as that vendor's API returns it. */
-interface Change {
-  vendor: string;
-  type: string;
-  data: any;
-}
-
-/** A request to the twin's control plane, failing the test with the twin's reason if it refuses. */
-async function twin(method: string, path: string) {
-  const response = await fetch(`${running.url}/_twin${path}`, { method });
-  if (!response.ok) throw new Error(`${method} /_twin${path}: ${await response.text()}`);
-  return response.json();
-}
+const twin = await startTwin(); // a twin of this file's own, on a free port
+after(() => twin.close());
 
 beforeEach(async () => {
-  await twin("POST", "/scenarios/flaky-apis"); // a fresh world for each test: 429s, 503s, and writes whose answer is lost
-  await twin("POST", "/checkpoints/before-sync");
+  await twin.loadScenario("flaky-apis"); // a fresh world for each test: 429s, 503s, and writes whose answer is lost
+  await twin.checkpoint("before-sync");
 });
 
 test("books each invoice once, even when QuickBooks loses the answer to a write", async () => {
-  await syncPaidInvoices({ jobberUrl: running.url, quickbooksUrl: running.url });
+  await syncPaidInvoices({ jobberUrl: twin.url, quickbooksUrl: twin.url });
 
-  const changes: Change[] = await twin("GET", "/checkpoints/before-sync/changes?source=api"); // what your code did
-  const booked = changes
-    .filter((change) => change.vendor === "quickbooks" && change.type === "InvoiceCreated")
-    .map((change) => change.data.invoice.DocNumber);
+  // What your code did, not what it logged: each invoice it created, typed as QuickBooks returns it
+  const created = await twin.changes("before-sync", { source: "api", vendor: "quickbooks", type: "InvoiceCreated" });
+  const booked = created.map((change) => change.data.invoice.DocNumber);
 
   assert.ok(booked.length > 0, "the sync booked no invoices");
   assert.equal(new Set(booked).size, booked.length, `an invoice was booked twice: ${booked.join(", ")}`);
@@ -239,8 +224,9 @@ When a run fails, its event log is kept with it: everything your code did to the
 A few things to know:
 
 - **Tests that share a twin share its world.** Each file that calls `startTwin()` gets its own, so files can run in parallel; tests within a file take turns, as Node's runner and Vitest run them by default. One twin started beside the tests is shared by all of them: run the files one at a time (`node --test --test-concurrency=1`, Vitest's `--no-file-parallelism`, Jest's `--runInBand`).
-- **`startTwin()` takes the settings the command does**: `seed`, `auth` (`"any-token"` or `"oauth"`), `scenario` (a ready-made one's name or a YAML file's path), and `port` (a free one unless you say). It answers `url`, `port`, and `close()`.
-- **`flaky-apis` checks OAuth tokens for real**, so your code connects through the twin's [OAuth endpoints](#authentication), as it will in production. To test retries alone, follow the scenario with `PUT /_twin/auth` and `{"mode": "any-token"}`.
+- **`startTwin()` takes the settings the command does**: `seed`, `auth` (`"any-token"` or `"oauth"`), `scenario` (a ready-made one's name, a YAML file's path, or a scenario object), and `port` (a free one unless you say). It answers a client for the control plane, with `url`, `port`, and `close()`: `status()`, `reset()`, `loadScenario()`, `advance({ minutes })`, `runAction()`, `checkpoint()`, `changes()`, `rewind()`, `log()`, `setFaults()`, `setAuth()`, `setWebhooks()`, `webhooks()`, `vendors()`, and `connect()`. A refusal throws a `TwinError` with the twin's reason. For a twin started some other way (`npx fieldtwin`, a CI step), `connectTwin("http://localhost:4010")` gives the same client; `fieldtwin/client` has it alone, with no Node.js imports.
+- **`changes()` is typed.** Narrow by `vendor` and `type` and each change's `data` is that vendor's record, named as its docs name it: `data.invoice.DocNumber` for QuickBooks, `data.job.invoice_number` for Housecall Pro.
+- **`flaky-apis` checks OAuth tokens for real**, so your code connects through the twin's [OAuth endpoints](#authentication), as it will in production. When the code under test takes tokens rather than getting them, `await twin.connect("quickbooks")` connects an app the way a person approving it would and answers its `accessToken`, `refreshToken`, and (for QuickBooks) `realmId`. To test retries alone, follow the scenario with `twin.setAuth("any-token")`.
 - **For a stronger check**, the reference integration's [flaky test](examples/sync-jobber-invoice-to-quickbooks/test/sync-flaky.test.ts) syncs through `flaky-apis` and checks the books end exactly as a clean run leaves them.
 
 ## A worked example: Jobber to QuickBooks
@@ -407,6 +393,7 @@ Everything under `/_twin` controls the fake world rather than imitating a vendor
 | `PUT /_twin/faults` | Replace the active fault rules |
 | `PUT /_twin/auth` `{"mode": "oauth"}` | Check bearer tokens for real (`oauth`) or accept any (`any-token`) |
 | `GET /_twin/scenarios` | The ready-made scenarios and what each one tests |
+| `GET /_twin/vendors` | Each vendor the twin serves: where its API lives, the actions `POST /_twin/actions` takes, and the webhook topics it sends |
 | `POST /_twin/scenarios/:name` | Load a ready-made scenario |
 | `POST /_twin/scenario` (YAML body) | Load your own scenario |
 | `GET /_twin/log.jsonl?since=:checkpoint` | The event log, one event per line (all of it without `since`). With the seed, it is everything a bug report needs. Its `X-Twin-Log-Position` header says where the log ends |
@@ -488,6 +475,7 @@ src/
   app.ts       wires it together
   start.ts     startTwin(): a twin on its own port, from code
   index.ts     what `import { startTwin } from "fieldtwin"` gets
+  client.ts    the typed control-plane client startTwin() and connectTwin() return
   cli.ts       the fieldtwin command
   server.ts    entry point for `npm start`
   mcp.ts       entry point for `npm run mcp` and `fieldtwin mcp`

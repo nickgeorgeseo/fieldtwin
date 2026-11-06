@@ -43,8 +43,24 @@ describe("the npm package", () => {
 
   it('keeps only the type declarations that `import ... from "fieldtwin"` can reach', () => {
     const declarations = packed.filter((file) => file.endsWith(".d.ts"));
-    expect(declarations).toContain("dist/start.d.ts");
-    expect(declarations.filter((file) => file.startsWith("dist/vendors/"))).toEqual([]);
+    expect(declarations).toEqual(expect.arrayContaining(["dist/start.d.ts", "dist/client.d.ts", "dist/client-types.d.ts"]));
+    // Of the vendors, only their records and events, which type what changes() answers: no routes or resolvers.
+    const vendorDeclarations = declarations.filter((file) => file.startsWith("dist/vendors/"));
+    expect(vendorDeclarations.filter((file) => !/^dist\/vendors\/[a-z]+\/(events|types)(\/[a-z]+)?\.d\.ts$/.test(file))).toEqual([]);
+  });
+
+  it("ships the client as fieldtwin/client, which loads without Node's own modules, for a browser or another runtime", () => {
+    expect(packed).toContain(pkg.exports["./client"].default.replace(/^\.\//, ""));
+    const reached = new Set<string>();
+    const visit = (file: string) => {
+      if (reached.has(file)) return;
+      reached.add(file);
+      for (const [, specifier] of readFileSync(join(ROOT, file), "utf8").matchAll(/(?:from |import\()"([^"]+)"/g)) {
+        expect(specifier, `${file} imports ${specifier}`).toMatch(/^\.\.?\//);
+        visit(join(file, "..", specifier!));
+      }
+    };
+    visit(pkg.exports["./client"].default);
   });
 
   it("runs its command on plain Node, without tsx, serving every vendor", async () => {

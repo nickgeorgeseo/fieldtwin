@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { createAdaptorServer } from "@hono/node-server";
 import { type AppOptions, createApp } from "./app.ts";
+import { connectTwin, type TwinClient } from "./client.ts";
+import type { Scenario } from "./client-types.ts";
 import { listScenarios, loadScenario, loadScenarioByName, parseAuthMode } from "./control/operations.ts";
 import type { Twin } from "./core/twin.ts";
 
@@ -10,13 +12,15 @@ export interface StartOptions extends Omit<AppOptions, "startTime"> {
   port?: number;
   /** The address to listen on: the loopback address unless you ask (SECURITY.md says why). */
   hostname?: string;
-  /** A ready-made scenario's name, like "flaky-apis", or the path to a scenario YAML file. */
-  scenario?: string;
+  /** A ready-made scenario's name, like "flaky-apis", the path to a scenario YAML file, or a scenario object. */
+  scenario?: string | Scenario;
 }
 
-export interface RunningTwin {
-  /** Where the twin answers, like http://localhost:53122: the base URL for QuickBooks and Jobber, and /housecallpro under it. */
-  url: string;
+/**
+ * A twin started by startTwin(): its control plane as a client (checkpoint(), changes(), loadScenario(), and the rest;
+ * see client.ts), where it listens, and how to stop it.
+ */
+export interface RunningTwin extends TwinClient {
   port: number;
   /** The twin itself, for reading its state in process. The control plane at `${url}/_twin` changes it. */
   twin: Twin;
@@ -55,7 +59,7 @@ export async function startTwin(options: StartOptions = {}): Promise<RunningTwin
   const actualPort = typeof address === "object" && address ? address.port : port;
   let closing: Promise<void> | undefined; // the first close, which later calls wait for: afterEach and afterAll may both close
   return {
-    url: addressOf(hostname, actualPort).url,
+    ...connectTwin(addressOf(hostname, actualPort).url),
     port: actualPort,
     twin,
     close: () =>
@@ -67,10 +71,11 @@ export async function startTwin(options: StartOptions = {}): Promise<RunningTwin
 }
 
 /**
- * Load a scenario given as a ready-made one's name (`npx fieldtwin flaky-apis`) or a YAML file
- * (`npx fieldtwin my-scenario.yaml`).
+ * Load a scenario given as a ready-made one's name (`npx fieldtwin flaky-apis`), a YAML file
+ * (`npx fieldtwin my-scenario.yaml`), or, from code, a scenario object.
  */
-export function loadScenarioArgument(twin: Twin, argument: string) {
+export function loadScenarioArgument(twin: Twin, argument: string | Scenario) {
+  if (typeof argument !== "string") return loadScenario(twin, JSON.stringify(argument)); // JSON is YAML
   if (!/\.ya?ml$/i.test(argument)) return loadScenarioByName(twin, argument);
   let yaml: string;
   try {

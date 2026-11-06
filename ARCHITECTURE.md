@@ -71,7 +71,8 @@ faults/       imports core/ only. Never a specific vendor.
 control/      imports core/ only; HTTP and MCP adapters both go through operations.ts
 app.ts        the only file that knows every piece exists
 start.ts      startTwin(): app.ts on a port of its own, for code and for server.ts
-index.ts      what `import ... from "fieldtwin"` gets: startTwin and createApp
+index.ts      what `import ... from "fieldtwin"` gets: startTwin, connectTwin, createApp, and the public types
+client.ts     the control-plane client startTwin() and connectTwin() return: fetch only, no Node.js imports (fieldtwin/client)
 server.ts     entry point for `npm start`: start.ts plus settings from the environment, printed and exiting on trouble
 mcp.ts        entry point for `npm run mcp`, the same plus MCP over stdio
 examples/     imports nothing from src/: it reaches the twin over HTTP, like any client

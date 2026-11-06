@@ -13,6 +13,7 @@ export function controlRoutes(twin: Twin): Hono {
   const app = new Hono();
 
   app.get("/_twin", (c) => c.json(ops.describeTwin(twin)));
+  app.get("/_twin/vendors", (c) => c.json(ops.describeVendors(twin)));
   app.post("/_twin/reset", (c) => c.json(ops.resetTwin(twin)));
   app.post("/_twin/clock/advance", async (c) =>
     c.json(await ops.advanceClock(twin, (await objectBody(c, '{"minutes": 60}')).minutes as number)),
