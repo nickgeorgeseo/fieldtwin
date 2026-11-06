@@ -12,7 +12,10 @@ import type { WebhookSubscription } from "../core/webhooks.ts";
  * it is, which faults are active, and a timeline of things that happen as twin time passes.
  * See "Scenario timelines" in ARCHITECTURE.md.
  */
+// The longest latencyMs or delayMs. Node cuts a timer over 2^31-1 ms (about 24.8 days) to 1 ms, so a rule meant to
+// hang requests would answer them at once; each matching rule waits on its own timer, so their sum may be longer.
 const WEEK_MS = 7 * 86_400_000;
+const atMostAWeek = { message: "can be at most a week (604800000)" };
 
 const FaultRuleSchema = z
   .object({
@@ -26,11 +29,11 @@ const FaultRuleSchema = z
     effect: z
       .object({
         status: z.number().refine(isFaultStatus, { message: "must be an HTTP error status, like 429 or 503" }).optional(),
-        latencyMs: z.number().int().nonnegative().optional(),
+        latencyMs: z.number().int().nonnegative().max(WEEK_MS, atMostAWeek).optional(),
         message: z.string().optional(),
         lostResponse: z.boolean().optional(),
         duplicate: z.boolean().optional(),
-        delayMs: z.number().int().positive().max(WEEK_MS, { message: "can be at most a week (604800000)" }).optional(),
+        delayMs: z.number().int().positive().max(WEEK_MS, atMostAWeek).optional(),
       })
       .strict()
       .refine((effect) => !effect.lostResponse || effect.status !== undefined, {

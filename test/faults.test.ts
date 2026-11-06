@@ -84,6 +84,14 @@ describe("fault rules", () => {
     const badVendor = await putFaults(app, [{ name: "x", vendor: "salesforce", rate: 1, effect: { status: 500 } }]);
     expect((await badVendor.json()).error).toContain("0.vendor");
   });
+
+  it("refuse a latency over a week, which a timer can't wait and would cut to a millisecond", async () => {
+    const { app, twin } = setup();
+    const response = await putFaults(app, [{ name: "slow", vendor: "quickbooks", rate: 1, effect: { latencyMs: 2_200_000_000 } }]);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("0.effect.latencyMs: can be at most a week (604800000)");
+    expect(twin.faultRules).toEqual([]);
+  });
 });
 
 describe("layered fault rules", () => {
