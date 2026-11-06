@@ -135,10 +135,16 @@ interface LineInput {
   SalesItemLineDetail?: { ItemRef?: QboRef; Qty?: unknown; UnitPrice?: unknown; ServiceDate?: string };
 }
 
-/** The last ordinary invoice number plus one. A DocNumber like "JB-77", or too long to count on from exactly, is skipped. */
+/**
+ * The last ordinary invoice number plus one, counted with BigInt so a long number goes on exactly. A DocNumber
+ * like "JB-77" is skipped, and so is one whose next number wouldn't fit DocNumber's 21 characters.
+ */
 function nextDocNumber(state: QboState): string {
-  const numbers = [...state.invoices.values()].flatMap((invoice) =>
-    /^\d{1,15}$/.test(invoice.DocNumber ?? "") ? [Number(invoice.DocNumber)] : [],
-  );
-  return String(Math.max(FIRST_DOC_NUMBER - 1, ...numbers) + 1);
+  let last = BigInt(FIRST_DOC_NUMBER - 1);
+  for (const { DocNumber = "" } of state.invoices.values()) {
+    if (!/^\d+$/.test(DocNumber)) continue;
+    const number = BigInt(DocNumber);
+    if (number > last && String(number + 1n).length <= MAX_LENGTHS.DocNumber) last = number;
+  }
+  return String(last + 1n);
 }

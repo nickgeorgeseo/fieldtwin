@@ -122,6 +122,15 @@ describe("QuickBooks twin: invoice numbers", () => {
     const next = await invoice(harness);
     expect(Number(next.DocNumber)).toBe(Number(first.DocNumber) + 1);
   });
+
+  it("keeps counting past 15 digits, so automatic numbers never repeat", async () => {
+    const harness = setup();
+    await invoice(harness, { DocNumber: "999999999999999" });
+    const numbers = [(await invoice(harness)).DocNumber, (await invoice(harness)).DocNumber];
+    expect(numbers).toEqual(["1000000000000000", "1000000000000001"]);
+    await invoice(harness, { DocNumber: "99999999999999999998" }); // 20 digits, past what a JavaScript number holds exactly
+    expect((await invoice(harness)).DocNumber).toBe("99999999999999999999");
+  });
 });
 
 describe("QuickBooks twin: paid invoices and their customers", () => {
