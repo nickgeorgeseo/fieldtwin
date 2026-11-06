@@ -69,9 +69,13 @@ describe("QuickBooks query values", () => {
     expect(quoted.body.QueryResponse.totalCount).toBeGreaterThan(0);
   });
 
-  it("match no text against true or false", async () => {
-    const { body } = await query(setup(), "SELECT COUNT(*) FROM Customer WHERE DisplayName = false");
-    expect(body.QueryResponse.totalCount).toBe(0);
+  it("match no text against true or false, even text that says true or false", async () => {
+    const harness = setup();
+    await harness.qboPost("/customer", { DisplayName: "False" });
+    await invoiceNumbered(harness, "TRUE");
+    const customers = await query(harness, "SELECT COUNT(*) FROM Customer WHERE DisplayName = false");
+    const invoices = await query(harness, "SELECT COUNT(*) FROM Invoice WHERE DocNumber IN (true, false)");
+    expect([customers.body.QueryResponse.totalCount, invoices.body.QueryResponse.totalCount]).toEqual([0, 0]);
   });
 
   it("refuse an Active that is neither true nor false, instead of reading it as false", async () => {

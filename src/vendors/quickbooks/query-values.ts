@@ -27,7 +27,8 @@ export function comparable(property: string, value: unknown): unknown {
     const text = String(value).toLowerCase();
     return text === "true" ? true : text === "false" ? false : undefined;
   }
-  return String(value);
+  // true and false stay what they are, so holds() can match them with no text, not even a customer named "False".
+  return typeof value === "boolean" ? value : String(value);
 }
 
 export function unreadableValue(property: string, value: QueryValue): string {
@@ -48,11 +49,17 @@ const ORDER_TESTS: Record<Exclude<QueryOperator, "like">, (order: number) => boo
   ">=": (order) => order >= 0,
 };
 
-/** Whether a record's value (as comparable() gives it) meets a condition. A record without the property never does. */
+/**
+ * Whether a record's value (as comparable() gives it) meets a condition. A record without the property never does,
+ * and text or an Id never meets true or false.
+ */
 export function holds({ property, operator, values }: QueryCondition, actual: unknown): boolean {
   if (actual === undefined) return false;
   if (operator === "like") return likeMatches(String(values[0]), String(actual));
-  return values.some((wanted) => ORDER_TESTS[operator](compareValues(property, actual, wanted)));
+  const isBoolean = typeof actual === "boolean";
+  return values.some(
+    (wanted) => (typeof wanted === "boolean") === isBoolean && ORDER_TESTS[operator](compareValues(property, actual, wanted)),
+  );
 }
 
 /**
