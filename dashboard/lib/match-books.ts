@@ -115,11 +115,11 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
       status: "only-in-quickbooks",
     });
   }
+  // Newest number first. A DocNumber is free text ("5x"), so one comparison that reads the digits in it as numbers
+  // keeps the order the same whatever order the log has them in.
   return rows.sort(
     (a, b) =>
-      INVOICE_ORDER.indexOf(a.status) - INVOICE_ORDER.indexOf(b.status) ||
-      Number(b.number) - Number(a.number) ||
-      b.number.localeCompare(a.number),
+      INVOICE_ORDER.indexOf(a.status) - INVOICE_ORDER.indexOf(b.status) || b.number.localeCompare(a.number, "en", { numeric: true }),
   );
 }
 

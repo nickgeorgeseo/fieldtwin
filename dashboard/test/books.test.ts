@@ -230,6 +230,24 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
     assert.equal(byNumber["1"]?.service?.customer, "Kendall Dunmore");
   });
 
+  it("lists invoices newest number first in one order, whatever order the log has them in", () => {
+    const booked = [
+      qboInvoice("1", "10", "Kendall Dunmore", 1, 1),
+      qboInvoice("2", "9", "Kendall Dunmore", 1, 1),
+      qboInvoice("3", "5x", "Kendall Dunmore", 1, 1),
+    ];
+    const orders = [booked, [booked[2], booked[0], booked[1]], [booked[1], booked[2], booked[0]]].map((invoices) =>
+      matchInvoices(readBooks(invoices.map((invoice) => event("quickbooks", "InvoiceCreated", { invoice }))), "jobber").map(
+        (row) => row.number,
+      ),
+    );
+    assert.deepEqual(orders, [
+      ["10", "9", "5x"],
+      ["10", "9", "5x"],
+      ["10", "9", "5x"],
+    ]);
+  });
+
   it("keeps an invoice the books booked twice under one number, since QuickBooks accepts the second", () => {
     const twice = readBooks([
       event("jobber", "ClientCreated", { client: client(1, "Kendall", "Dunmore", "kendall@example.com") }),
