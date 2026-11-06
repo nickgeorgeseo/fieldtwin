@@ -83,6 +83,12 @@ describe("startTwin()", () => {
     for (const hostname of ["", "  "]) await expect(startTwin({ hostname })).rejects.toThrow("hostname must be an address to listen on");
   });
 
+  it("refuses a port that isn't a port number, instead of listening on a socket file named after it", async () => {
+    for (const port of ["my-port", Number.NaN, -1, 1.5, 65536] as unknown as number[]) {
+      await expect(startTwin({ port })).rejects.toThrow("port must be a whole number from 0 to 65535, like 4010, or 0 for a free one");
+    }
+  });
+
   it("names the port option, not an environment variable, when its port is taken", async () => {
     const first = await start();
     const refusal = startTwin({ port: first.port });

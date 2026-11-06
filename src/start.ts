@@ -38,6 +38,10 @@ export async function startTwin(options: StartOptions = {}): Promise<RunningTwin
   if (!hostname.trim()) throw new Error('hostname must be an address to listen on, like "127.0.0.1", not an empty string');
   // Checked as the command checks FIELDTWIN_SEED and FIELDTWIN_AUTH: a typo shouldn't quietly make another twin.
   if (seed !== undefined && !(Number.isSafeInteger(seed) && seed >= 0)) throw new Error(`seed must be a whole number like 42, not ${seed}`);
+  // Node's listen() reads a port that isn't a number as a Unix socket path, which no URL can reach.
+  if (!(Number.isSafeInteger(port) && port >= 0 && port <= 65535)) {
+    throw new Error(`port must be a whole number from 0 to 65535, like 4010, or 0 for a free one, not ${port}`);
+  }
   const { app, twin } = createApp({ ...appOptions, seed, auth: auth === undefined ? undefined : parseAuthMode(auth) });
   if (scenario) loadScenarioArgument(twin, scenario);
   // Left as they are, @hono/node-server swaps in its own Request and Response globals, in the caller's process too.
