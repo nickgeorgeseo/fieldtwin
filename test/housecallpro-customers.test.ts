@@ -125,6 +125,13 @@ describe("Housecall Pro twin: listing customers", () => {
     expect(await search(person.street)).toContain(person.email);
     expect(await search("nobody-by-this-name")).toEqual([]);
   });
+
+  it("finds a customer by text that runs from the street into the city, when the address has no second line", async () => {
+    const { twin, hcpGet } = setup();
+    const person = twin.world.customers[3]!;
+    const response = await hcpGet(`/customers?q=${encodeURIComponent(`${person.street} ${person.city}`)}`);
+    expect(((await response.json()).customers as { email: string }[]).map((c) => c.email)).toContain(person.email);
+  });
 });
 
 describe("Housecall Pro twin: one customer", () => {

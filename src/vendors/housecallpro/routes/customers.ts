@@ -106,7 +106,12 @@ function matchesSearch(customer: HcpCustomer, q: string): boolean {
   const needle = q.trim().toLowerCase();
   if (!needle) return true;
   const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
-  const addresses = customer.addresses.map((address) => ADDRESS_TEXT_FIELDS.map((field) => address[field] ?? "").join(" "));
+  // Empty fields dropped, as in the name, so "7 Birch Ave Hillview" still finds an address with no street_line_2.
+  const addresses = customer.addresses.map((address) =>
+    ADDRESS_TEXT_FIELDS.map((field) => address[field])
+      .filter(Boolean)
+      .join(" "),
+  );
   if ([name, customer.email ?? "", ...addresses].some((text) => text.toLowerCase().includes(needle))) return true;
   const digits = needle.replace(/[\s().+-]/g, "");
   return /^\d+$/.test(digits) && (customer.mobile_number ?? "").replace(/\D/g, "").includes(digits);
