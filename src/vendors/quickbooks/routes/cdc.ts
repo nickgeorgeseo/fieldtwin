@@ -23,9 +23,13 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
   const now = () => twin.clock.nowIso();
 
   app.get(`${COMPANY}/cdc`, (c) => {
-    const entityList = c.req.query("entities");
+    // A list of only commas or spaces names nothing to capture: as missing as no list at all.
+    const entityNames = (c.req.query("entities") ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
     const changedSince = c.req.query("changedSince");
-    if (!entityList) return c.json(qboErrors.missingField("entities", now()), 400);
+    if (!entityNames.length) return c.json(qboErrors.missingField("entities", now()), 400);
     if (!changedSince) return c.json(qboErrors.missingField("changedSince", now()), 400);
 
     const sinceMs = readUtcTime(changedSince);
@@ -35,14 +39,11 @@ export function cdcRoutes(app: Hono, twin: Twin): void {
     }
 
     const entities: QboEntityName[] = [];
-    for (const name of entityList.split(",").filter((name) => name.trim())) {
+    for (const name of entityNames) {
       const entity = entityNamed(name);
       if (!entity) {
         const supported = Object.keys(ENTITY_RECORDS).join(", ");
-        return c.json(
-          qboErrors.unsupportedOperation(`The twin can't capture changes for ${name.trim()}. Supported: ${supported}`, now()),
-          400,
-        );
+        return c.json(qboErrors.unsupportedOperation(`The twin can't capture changes for ${name}. Supported: ${supported}`, now()), 400);
       }
       entities.push(entity);
     }

@@ -105,4 +105,13 @@ describe("QuickBooks twin: change data capture", () => {
     expect(body.Fault.Error[0]).toMatchObject({ code: "500" });
     expect(body.Fault.Error[0].Detail).toContain("Estimate");
   });
+
+  it("refuses an entities list that names no entity, rather than answering that nothing changed", async () => {
+    const harness = setup();
+    for (const entities of [",", "%20", "%20,%20"]) {
+      const { status, body } = await cdc(harness, entities, "2026-07-13");
+      expect(status).toBe(400);
+      expect(body.Fault.Error[0]).toMatchObject({ code: "2020", element: "entities" });
+    }
+  });
 });
