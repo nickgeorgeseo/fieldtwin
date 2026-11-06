@@ -39,9 +39,10 @@ export function operationOf(schema: GraphQLSchema, document: DocumentNode, varia
       operation ??= definition;
     }
   }
-  // The variables as execution will see them: declared defaults filled in. If they don't coerce, execution reports it.
+  // The variables as execution will see them: declared defaults filled in. prepare() has already answered variables
+  // that don't coerce; their raw values are never priced, since a page size of "5" or 2.5 isn't one.
   const coerced = getVariableValues(schema, operation?.variableDefinitions ?? [], variables);
-  return { operation, context: { schema, variables: coerced.coerced ?? variables, fragments } };
+  return { operation, context: { schema, variables: coerced.coerced ?? {}, fragments } };
 }
 
 export function rootType(schema: GraphQLSchema, operation: OperationDefinitionNode): GraphQLNamedType {
@@ -65,10 +66,18 @@ export function collectFields(selectionSet: SelectionSetNode, parentType: GraphQ
   return fields;
 }
 
-/** Whether `@skip(if: ...)` and `@include(if: ...)` keep a selection in the query. */
+/**
+ * Whether `@skip(if: ...)` and `@include(if: ...)` keep a selection in the query. An `if` that is null (a nullable
+ * variable sent as null) isn't a Boolean: execution answers that with an error, so pricing counts the selection in
+ * rather than throwing, which would answer the request with a 500.
+ */
 function included(selection: FieldNode | InlineFragmentNode | FragmentSpreadNode, context: Context): boolean {
-  if (getDirectiveValues(GraphQLSkipDirective, selection, context.variables)?.if === true) return false;
-  return getDirectiveValues(GraphQLIncludeDirective, selection, context.variables)?.if !== false;
+  try {
+    if (getDirectiveValues(GraphQLSkipDirective, selection, context.variables)?.if === true) return false;
+    return getDirectiveValues(GraphQLIncludeDirective, selection, context.variables)?.if !== false;
+  } catch {
+    return true;
+  }
 }
 
 export function fieldType(parentType: GraphQLNamedType, field: FieldNode): GraphQLNamedType | undefined {

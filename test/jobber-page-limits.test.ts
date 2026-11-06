@@ -79,4 +79,31 @@ describe("Jobber query cost: variables and directives", () => {
     const skipped = await (await harness.jobber("{ clients(first: 10) { nodes { id name @skip(if: true) } } }")).json();
     expect(skipped.extensions.cost.requestedQueryCost).toBe(10);
   });
+
+  it("answers a missing or null Boolean in @skip or @include with a variable error and HTTP 200, not a 500", async () => {
+    const harness = setup();
+    const required = "query ($s: Boolean!) { account { id name @skip(if: $s) } }";
+    const optional = "query ($s: Boolean = false) { account { id name @include(if: $s) } }";
+    for (const [query, variables] of [[required, {}], [required, { s: null }], [optional, { s: null }]] as const) {
+      const response = await harness.jobber(query, variables);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.errors[0].message).toContain('"Boolean!"');
+      expect(body.errors[0].extensions?.code).not.toBe("INTERNAL_SERVER_ERROR");
+    }
+  });
+
+  it("reports a variable that doesn't coerce, instead of pricing its raw value and throttling", async () => {
+    const harness = setup();
+    const nested = "query ($n: Int) { clients(first: $n) { nodes { id jobs(first: $n) { nodes { id title } } } } }";
+    for (const n of ["5", 3_000_000_000, 2.5]) {
+      const body = await (await harness.jobber(nested, { n })).json();
+      expect(body.errors).toHaveLength(1);
+      expect(body.errors[0].message).toContain('Variable "$n" got invalid value');
+      expect(body.errors[0].extensions?.code).not.toBe("THROTTLED");
+    }
+    const sent = await (await harness.jobber(nested, { n: 5 })).json();
+    expect(sent.errors).toBeUndefined();
+    expect(sent.extensions.cost.throttleStatus.currentlyAvailable).toBe(10_000 - sent.extensions.cost.actualQueryCost);
+  });
 });

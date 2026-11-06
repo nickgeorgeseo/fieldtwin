@@ -5,6 +5,7 @@ import {
   type GraphQLFormattedError,
   GraphQLScalarType,
   getLocation,
+  getVariableValues,
   Kind,
   type OperationDefinitionNode,
   parse,
@@ -76,9 +77,23 @@ export function prepare(request: GraphQLRequest): { document: DocumentNode } | {
   const validationErrors = validate(schema, document);
   if (validationErrors.length) return { errors: validationErrors.map((error) => error.toJSON()) };
 
-  const variableErrors = encodedIdVariableErrors(document, request);
+  const operation = chosenOperation(document, request.operationName);
+  const variableErrors = encodedIdVariableErrors(document, operation, request);
   if (variableErrors.length) return { errors: variableErrors };
+
+  // Variables that don't coerce are an error before anything runs, so they are reported before the cost is priced:
+  // priced from their raw values, a page size of "5" would count as 100 and throttle a query that should say why.
+  const coerced = getVariableValues(schema, operation?.variableDefinitions ?? [], request.variables);
+  if (coerced.errors) return { errors: coerced.errors.map((error) => error.toJSON()) };
   return { document };
+}
+
+/** The operation the request runs: the one named by operationName, or the first. */
+function chosenOperation(document: DocumentNode, operationName: string | undefined): OperationDefinitionNode | undefined {
+  return document.definitions.find(
+    (definition): definition is OperationDefinitionNode =>
+      definition.kind === Kind.OPERATION_DEFINITION && (!operationName || definition.name?.value === operationName),
+  );
 }
 
 /**
@@ -86,11 +101,11 @@ export function prepare(request: GraphQLRequest): { document: DocumentNode } | {
  * https://developer.getjobber.com/docs/using_jobbers_api/handling_api_errors/ (Scalar Coercion)
  * graphql-js would also reject it, but with differently worded messages, so the twin checks first.
  */
-function encodedIdVariableErrors(document: DocumentNode, request: GraphQLRequest): GraphQLFormattedError[] {
-  const operation = document.definitions.find(
-    (definition): definition is OperationDefinitionNode =>
-      definition.kind === Kind.OPERATION_DEFINITION && (!request.operationName || definition.name?.value === request.operationName),
-  );
+function encodedIdVariableErrors(
+  document: DocumentNode,
+  operation: OperationDefinitionNode | undefined,
+  request: GraphQLRequest,
+): GraphQLFormattedError[] {
   const errors: GraphQLFormattedError[] = [];
   for (const definition of operation?.variableDefinitions ?? []) {
     const name = definition.variable.name.value;
