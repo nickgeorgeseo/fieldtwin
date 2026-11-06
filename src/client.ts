@@ -160,7 +160,13 @@ export function connectTwin(url: string, options: ConnectOptions = {}): TwinClie
   };
 }
 
-const NAME_EXAMPLES = { checkpoint: "before-sync", vendor: "jobber", action: "payInvoices", scenario: "flaky-apis" };
+// Each kind with its article, so the refusal reads "An action needs a name".
+const NAME_EXAMPLES = {
+  checkpoint: ["A checkpoint", "before-sync"],
+  vendor: ["A vendor", "jobber"],
+  action: ["An action", "payInvoices"],
+  scenario: ["A scenario", "flaky-apis"],
+};
 
 /**
  * A name in a path, so a checkpoint called "a/b" or "50%" is still one segment. "." and ".." can't be one, even encoded:
@@ -169,7 +175,8 @@ const NAME_EXAMPLES = { checkpoint: "before-sync", vendor: "jobber", action: "pa
  * are refused here, before anything is sent, as the twin refuses them as checkpoint names.
  */
 function segment(name: string, kind: keyof typeof NAME_EXAMPLES): string {
-  if (name === "") throw new TwinError(`A ${kind} needs a name, like "${NAME_EXAMPLES[kind]}".`, 400);
+  const [named, example] = NAME_EXAMPLES[kind];
+  if (name === "") throw new TwinError(`${named} needs a name, like "${example}".`, 400);
   if (name === "." || name === "..") {
     throw new TwinError(`"${name}" can't be sent as a name in a URL: the URL would reach another route. Pick another name.`, 400);
   }

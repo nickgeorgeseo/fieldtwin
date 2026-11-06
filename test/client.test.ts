@@ -90,6 +90,11 @@ describe("the twin's client", async () => {
     }
   });
 
+  it("says an empty action name needs a name in plain English", async () => {
+    await expect(twin.runAction("jobber", "", 1)).rejects.toThrow('An action needs a name, like "payInvoices".');
+    await expect(twin.checkpoint("")).rejects.toThrow('A checkpoint needs a name, like "before-sync".');
+  });
+
   it("answers a wrongly written scenario name with the twin's name check, not as YAML", async () => {
     for (const name of ["Flaky-APIs", "flaky apis", "flaky_apis"]) {
       await expect(twin.loadScenario(name)).rejects.toMatchObject({
