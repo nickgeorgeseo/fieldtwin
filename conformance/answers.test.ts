@@ -28,6 +28,42 @@ describe("recording a sandbox that sends the credential back", () => {
       expect(JSON.stringify(results)).not.toContain(echoing[vendor].accessToken);
     },
   );
+
+  // JSON may write any character as \uXXXX, and "/" as "\/", so a body can repeat a token without its text containing it.
+  const escaped = (text: string) => JSON.stringify(text).replace(/[^"]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
+  it.each(["quickbooks", "jobber"] as const)(
+    "keeps the %s access token out of what it records even when the sandbox writes it with JSON escapes",
+    async (vendor) => {
+      const token = `fieldtwin/${vendor}/token`;
+      const echoing = fakeTarget(
+        async (_, init) => {
+          const sent = escaped(new Headers(init?.headers).get("Authorization") ?? "");
+          const text = `{"Fault":{"Error":[{"code":${sent}}],"type":${sent}},"errors":[{"message":${sent}}],${sent}:${sent}}`;
+          return new Response(text, { status: 400, headers: { "Content-Type": "application/json" } });
+        },
+        vendor === "quickbooks"
+          ? { quickbooks: { apiBase: "https://sandbox-quickbooks.api.intuit.com/v3", realmId: "123", accessToken: token } }
+          : { jobber: { apiUrl: "https://api.getjobber.com/api/graphql", accessToken: token } },
+      );
+      const cases = CASES.filter((testCase) => testCase.vendor === vendor);
+      const results = await observeAll(echoing, cases);
+      const { recording } = nextRecording(undefined, cases, results, "2026-10-12T00:00:00Z", "test");
+      expect(Object.keys(recording.cases).length).toBeGreaterThan(0);
+      expect(JSON.stringify(recording)).not.toContain(token);
+      expect(JSON.stringify(results)).not.toContain(token);
+    },
+  );
+
+  it("keeps the Housecall Pro API key out of an answer that writes it with JSON escapes, its names included", async () => {
+    const echoing = fakeTarget(async (_, init) => {
+      const sent = escaped(new Headers(init?.headers).get("Authorization") ?? "");
+      return new Response(`{"error":${sent},${sent}:1}`, { status: 400 });
+    });
+    const answer = await housecallpro(echoing, "GET", "/customers");
+    expect(JSON.stringify(answer)).not.toContain(echoing.housecallpro.apiKey);
+    expect(answer.body).toEqual({ error: "Token (the API key)", "Token (the API key)": 1 });
+  });
 });
 
 describe("recording with a token fetch won't send", () => {

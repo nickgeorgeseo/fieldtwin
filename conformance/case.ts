@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { answerOf } from "./answer.ts";
 
 /**
  * A conformance case is a short scripted session against one vendor API, boiled down to observations a twin and
@@ -65,13 +66,6 @@ export function refuseUnrecordable(
     throw new Error(`${vendor} answered ${what}, which says nothing about the API: try again later`);
   }
   if (answer.status === 401 && ownCredential) throw new Error(`${vendor} stopped accepting ${stoppedAccepting}`);
-}
-
-// The answer, with the run's own credential replaced by `label` wherever the body repeats it: recordings are made from
-// answers and may hold no token or key, so a sandbox that echoes a header back loses it here, before any case sees it.
-async function answerOf(response: Response, credential: string, label: string): Promise<Answer> {
-  const text = await response.text();
-  return { status: response.status, body: parsed(credential ? text.replaceAll(credential, label) : text) };
 }
 
 /**
@@ -165,17 +159,9 @@ export async function housecallpro(
   return answer;
 }
 
-function parsed(text: string): Answer["body"] {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The body of a 2xx answer; anything else stops the case with what went wrong. The body it quotes has lost the run's
- * credential already (answerOf), and reaches only the console: a case that stops is never recorded (recordings.ts).
+ * credential already (answer.ts), and reaches only the console: a case that stops is never recorded (recordings.ts).
  */
 export function expectOk(answer: Answer, doing: string): Answer["body"] {
   if (answer.status >= 200 && answer.status < 300) return answer.body;
