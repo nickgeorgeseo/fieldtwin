@@ -62,6 +62,14 @@ describe("control-plane mistakes", () => {
     expect(logged).not.toHaveBeenCalled();
   });
 
+  it("refuses an auth mode nested thousands of lists deep, naming it without writing it out", async () => {
+    const deep = "[".repeat(8000) + "]".repeat(8000);
+    const { status, error } = await errorOf(await send(setup().app, "PUT", "/_twin/auth", `{"mode": ${deep}}`));
+    expect(status).toBe(400);
+    expect(error).toBe('Unknown auth mode a list nested too deeply to show. Use "any-token" or "oauth".');
+    expect(logged).not.toHaveBeenCalled();
+  });
+
   it("explains an action's parameters without assuming they came from a scenario file", async () => {
     const { error } = await errorOf(await send(setup().app, "POST", "/_twin/actions/jobber/newClients", '{"newClients": 5}'));
     expect(error).toContain("how many");

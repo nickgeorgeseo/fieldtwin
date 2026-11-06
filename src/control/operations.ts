@@ -1,5 +1,6 @@
 import { parseTwinTime } from "../core/clock.ts";
 import { SeededRandom } from "../core/random.ts";
+import { shown } from "../core/request-body.ts";
 import type { Twin } from "../core/twin.ts";
 import type { AuthMode, EventSource, TwinEvent, VendorName } from "../core/types.ts";
 import { scenarioActionOf } from "../core/vendor-twin.ts";
@@ -141,7 +142,7 @@ export function setAuthMode(twin: Twin, mode: unknown) {
 
 export function parseAuthMode(mode: unknown): AuthMode {
   if (mode === "any-token" || mode === "oauth") return mode;
-  throw new Error(`Unknown auth mode "${String(mode)}". Use "any-token" or "oauth".`);
+  throw new Error(`Unknown auth mode ${shown(mode)}. Use "any-token" or "oauth".`); // shown(): String() overflows on a deep list
 }
 
 /**
