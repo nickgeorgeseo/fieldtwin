@@ -1,6 +1,6 @@
 import { readUtcTime } from "../../../core/clock.ts";
 import { isObject, shown } from "../../../core/request-body.ts";
-import { hcpTimeAt } from "../dates.ts";
+import { hcpTimeAt, zonedTime } from "../dates.ts";
 import type { HcpState } from "../types/index.ts";
 import { type LineFields, readLineItems } from "./line-item-body.ts";
 import { type Refusal, readTags, refuse, withoutNulls } from "./refusal.ts";
@@ -42,7 +42,7 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
 
   const invoiceNumber = readInvoiceNumber(body.invoice_number, state);
   if ("problem" in invoiceNumber) return invoiceNumber;
-  const schedule = readSchedule(body.schedule);
+  const schedule = readSchedule(body.schedule, state.company.time_zone);
   if (schedule && "problem" in schedule) return schedule;
   const lines = readLineItems(body.line_items);
   if ("problem" in lines) return lines;
@@ -83,7 +83,7 @@ function readInvoiceNumber(sent: unknown, state: HcpState): { value: string | un
 }
 
 /** A schedule is a start and an end ("ISO-8601 formatted date string", UTC unless it says otherwise), end after start. */
-function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
+function readSchedule(value: unknown, timeZone: string): JobRequest["schedule"] | Refusal {
   if (value === undefined || value === null) return undefined;
   if (!isObject(value))
     return refuse('schedule must be an object, like {"scheduled_start": "2026-07-20T14:00:00", "scheduled_end": "2026-07-20T16:00:00"}.');
@@ -97,6 +97,10 @@ function readSchedule(value: unknown): JobRequest["schedule"] | Refusal {
     // Before standard time, a zone's offset had seconds in it (Chicago's was -05:50:36), which no ISO-8601 offset can
     // write, so the _local times would be wrong. No real job is scheduled that long ago.
     if (new Date(ms).getUTCFullYear() < 1900) return refuse(`schedule.${name} must be in 1900 or later, not ${shown(text)}.`);
+    // An offset can carry 9999-12-31 into the year 10000, which ISO 8601 writes "+010000-...": no filter of the twin's
+    // (or most clients) reads that back, and an appointment's start_date would be cut short.
+    if ([hcpTimeAt(ms), zonedTime(ms, timeZone)].some((time) => !/^\d{4}-/.test(time)))
+      return refuse(`schedule.${name} must be in 9999 or earlier, in UTC and in the company's time zone, not ${shown(text)}.`);
     times.push(ms);
   }
   // Times are kept to the second (hcpTime), so compare them as kept: 14:00:00.1 to 14:00:00.9 would be no time at all.

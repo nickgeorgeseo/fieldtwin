@@ -115,6 +115,17 @@ describe("Housecall Pro twin: job requests the twin refuses", () => {
     }
   });
 
+  it("refuses a schedule its offset carries past 9999, whose times it couldn't write with a four-digit year", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await jobCast(harness);
+    const schedule = { scheduled_start: "9999-12-31T23:00:00-12:00", scheduled_end: "9999-12-31T23:30:00-12:00" };
+    const before = harness.twin.log.length;
+    const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, schedule });
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.message).toMatch(/scheduled_start must be in 9999 or earlier/);
+    expect(harness.twin.log.length).toBe(before);
+  });
+
   it("refuses to number a job after the largest invoice number it can count to, rather than repeat it", async () => {
     const harness = setup();
     const { customerId, addressId } = await jobCast(harness);
