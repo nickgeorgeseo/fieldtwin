@@ -30,8 +30,9 @@ export class Twin {
 
   private readonly vendors = new Map<VendorName, VendorTwin>();
   private states = new Map<VendorName, unknown>();
-  // Each saves what a rewind there puts back exactly: where the fault dice were, and which timeline entry was next.
-  private checkpoints = new Checkpoints<{ faultRandom: FaultRandom; timeline: number }>();
+  // Each saves what a rewind there puts back exactly: where the fault dice were, which timeline entry was next, and the
+  // clock to the fraction of a millisecond (advances may be fractional minutes; a checkpoint's ISO time is whole ms).
+  private checkpoints = new Checkpoints<{ faultRandom: FaultRandom; timeline: number; nowMs: number }>();
 
   // Rate-limit budgets and OAuth grants: request bookkeeping, outside the event log. See bookkeeping.ts.
   private readonly bookkeeping = new Bookkeeping((vendor) => streams.oauth(this.options.seed, [...this.vendors.keys()].indexOf(vendor)));
@@ -175,7 +176,7 @@ export class Twin {
   }
 
   checkpoint(name: string): Checkpoint {
-    const saved = { faultRandom: copyFaultRandom(this.faultRandom), timeline: this.timeline.position() };
+    const saved = { faultRandom: copyFaultRandom(this.faultRandom), timeline: this.timeline.position(), nowMs: this.clock.nowMs() };
     return this.checkpoints.take(name, this.log.length, this.clock.nowIso(), saved);
   }
 
@@ -195,6 +196,7 @@ export class Twin {
     const faultRandom = copyFaultRandom(saved.faultRandom); // a copy, so rewinding there again rolls the same once more
     this.startOver(() => {
       this.restart(new TwinClock(checkpoint.time), faultRandom, this.log.all().slice(0, checkpoint.seq));
+      this.clock.advance(saved.nowMs - this.clock.nowMs()); // the fraction of a millisecond the ISO time leaves out
       this.timeline.resumeAt(saved.timeline);
     });
     this.checkpoints.forgetAfter(name);

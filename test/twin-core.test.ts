@@ -94,6 +94,21 @@ describe("rewinding to a checkpoint", () => {
     expect((await (await app.request("/_twin")).json()).twinTime).toBe("2026-07-13T11:00:00.000Z");
   });
 
+  it("goes back to the exact moment, to the fraction of a millisecond, so the same requests record the same times", async () => {
+    const { app, qboPost } = setup();
+    const advance = (minutes: number) => app.request("/_twin/clock/advance", { method: "POST", body: JSON.stringify({ minutes }) });
+    const createdAt = async () => {
+      await advance(0.00001); // 0.6 ms: the clock now holds a fraction of a millisecond
+      return (await (await qboPost("/customer", { DisplayName: "Same Each Time" })).json()).Customer.MetaData.CreateTime;
+    };
+    await advance(0.00001);
+    await app.request("/_twin/checkpoints/fraction", { method: "POST" });
+    const first = await createdAt();
+
+    await app.request("/_twin/checkpoints/fraction/rewind", { method: "POST" });
+    expect(await createdAt()).toBe(first);
+  });
+
   it("is the only way back: the clock itself refuses to move backwards", () => {
     const { twin } = setup();
     expect(() => twin.clock.advance(-1)).toThrow("Rewind to a checkpoint");
