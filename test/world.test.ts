@@ -135,10 +135,27 @@ describe("the world's history", () => {
     }
   });
 
-  it("always leaves the most recently finished job waiting to be invoiced", () => {
+  it("leaves the most recently finished job waiting to be invoiced, in a world without drift", () => {
     const finished = history.jobs.filter((job) => job.visits.every((visit) => visit.completedAt));
     const latest = finished.reduce((a, b) => (a.visits.at(-1)!.completedAt! > b.visits.at(-1)!.completedAt! ? a : b));
     expect(history.invoices.some((invoice) => invoice.jobKey === latest.key)).toBe(false);
+  });
+
+  it("leaves finished work waiting to be invoiced in every world, drifted ones too", () => {
+    // Drift's own work can be the most recently finished, already invoiced and paid, as drift.ts needs it to be.
+    const drifted = [
+      { customers: 3, drift: { inactiveInAccounting: 1 } },
+      { customers: 3, drift: { fieldServiceOnly: 2 } },
+      { customers: 30, drift: { renamedInAccounting: 3, fieldServiceOnly: 2, accountingOnly: 2, inactiveInAccounting: 1 } },
+    ];
+    for (const { customers, drift } of drifted) {
+      for (let seed = 1; seed <= 100; seed++) {
+        const { history } = generateWorld(new SeededRandom(seed), { startTime: START, size: { customers, technicians: 2 }, drift });
+        const invoiced = new Set(history.invoices.map((invoice) => invoice.jobKey));
+        const waiting = history.jobs.filter((job) => job.visits.every((visit) => visit.completedAt) && !invoiced.has(job.key));
+        expect(waiting.length, `seed ${seed} with ${JSON.stringify(drift)}`).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("invoices completed jobs only, and pays invoices after issuing them and before today", () => {

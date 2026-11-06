@@ -94,7 +94,9 @@ export function makeHistory(context: HistoryContext): WorldHistory {
   ];
   const openQuotes = Array.from({ length: Math.max(1, Math.round(customers.length / 8)) }, () => openQuote(context));
 
-  // The most recently finished job is always still waiting to be invoiced, so every world has some.
+  // The most recently finished of these jobs is still waiting to be invoiced, so every world has some. Drift's work,
+  // added below, can finish later still, but it must stay invoiced (and the inactive customers' paid), so this is
+  // picked first and drift's jobs are left alone: in a drifted world the latest finished job may be invoiced already.
   const finished = stories.filter((story) => story.job.visits.every((visit) => visit.completedAt));
   const latest = finished.reduce((a, b) => (a.job.visits.at(-1)!.completedAt! > b.job.visits.at(-1)!.completedAt! ? a : b));
   latest.invoice = undefined;
