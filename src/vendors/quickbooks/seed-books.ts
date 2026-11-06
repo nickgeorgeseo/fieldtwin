@@ -1,6 +1,7 @@
 import { multiplyMoney, sumMoney } from "../../core/money.ts";
 import type { NewEvent } from "../../core/types.ts";
 import type { World } from "../../world/generate-world.ts";
+import { qboToday } from "./dates.ts";
 import type { QboCustomer, QboInvoice, QboPayment, QboSalesItemLine } from "./types.ts";
 
 /**
@@ -11,6 +12,9 @@ import type { QboCustomer, QboInvoice, QboPayment, QboSalesItemLine } from "./ty
  * matched). Jobber and Housecall Pro number each invoice the same way, from the world.
  * Payments made more than BOOKKEEPING_LAG_DAYS ago are recorded against them the same way. Everything newer
  * is missing on purpose: syncing it is the job of the code under test.
+ *
+ * Transaction dates are the company's own calendar day, as for a transaction created through the API (qboToday): an
+ * invoice issued at 8 p.m. in Texas is dated that day, though it is tomorrow in UTC.
  */
 export const BOOKKEEPING_LAG_DAYS = 14;
 const LAG_MS = BOOKKEEPING_LAG_DAYS * 86_400_000;
@@ -18,6 +22,7 @@ const LAG_MS = BOOKKEEPING_LAG_DAYS * 86_400_000;
 export function seedBooks(world: World, customers: Map<string, QboCustomer>): NewEvent[] {
   const events: NewEvent[] = [];
   const cutoff = Date.parse(world.asOf) - LAG_MS;
+  const companyDay = (iso: string) => qboToday(Date.parse(iso), world.company.utcOffsetHours);
   const itemId = (catalogKey: string) => String(world.catalog.findIndex((entry) => entry.key === catalogKey) + 1);
 
   // The bookkeeper can only have entered invoices for customers who are in the books at all.
@@ -39,8 +44,8 @@ export function seedBooks(world: World, customers: Map<string, QboCustomer>): Ne
       Id: String(index + 1),
       SyncToken: "0",
       DocNumber: String(worldInvoice.number),
-      TxnDate: worldInvoice.issuedAt.slice(0, 10),
-      DueDate: worldInvoice.dueAt.slice(0, 10),
+      TxnDate: companyDay(worldInvoice.issuedAt),
+      DueDate: companyDay(worldInvoice.dueAt),
       CustomerRef: { value: customer.Id, name: customer.DisplayName },
       Line: [...lines, { Amount: total, DetailType: "SubTotalLineDetail", SubTotalLineDetail: {} }],
       TotalAmt: total,
@@ -62,7 +67,7 @@ export function seedBooks(world: World, customers: Map<string, QboCustomer>): Ne
     const payment: QboPayment = {
       Id: String(index + 1),
       SyncToken: "0",
-      TxnDate: worldInvoice.paidAt!.slice(0, 10),
+      TxnDate: companyDay(worldInvoice.paidAt!),
       CustomerRef: invoice.CustomerRef,
       TotalAmt: invoice.TotalAmt,
       UnappliedAmt: 0,

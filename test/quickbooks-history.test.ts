@@ -22,9 +22,29 @@ describe("QuickBooks twin: the books so far", () => {
     expect(Invoice.map((invoice: { DocNumber: string }) => invoice.DocNumber)).toEqual(entered.map((invoice) => String(invoice.number)));
     for (const [index, invoice] of Invoice.entries()) {
       const world = entered[index]!;
-      expect(invoice.TxnDate).toBe(world.issuedAt.slice(0, 10));
-      expect(invoice.DueDate).toBe(world.dueAt.slice(0, 10));
       expect(invoice.TotalAmt).toBe(world.lineItems.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0));
+    }
+  });
+
+  it("dates invoices and payments on the company's own calendar, so one entered in the evening isn't dated tomorrow", async () => {
+    const harness = setup();
+    const offsetMs = harness.twin.world.company.utcOffsetHours * 3_600_000;
+    const companyDay = (iso: string) => new Date(Date.parse(iso) + offsetMs).toISOString().slice(0, 10);
+    const cutoff = harness.twin.clock.nowMs() - LAG_MS;
+    const entered = harness.twin.world.history.invoices.filter((invoice) => Date.parse(invoice.issuedAt) <= cutoff);
+    // Some were issued in the company's evening, when it is already tomorrow in UTC.
+    expect(entered.some((invoice) => companyDay(invoice.issuedAt) !== invoice.issuedAt.slice(0, 10))).toBe(true);
+
+    const { Invoice } = await query(harness, "select * from Invoice maxresults 1000");
+    for (const [index, invoice] of Invoice.entries()) {
+      expect(invoice.TxnDate).toBe(companyDay(entered[index]!.issuedAt));
+      expect(invoice.DueDate).toBe(companyDay(entered[index]!.dueAt));
+    }
+    const { Payment } = await query(harness, "select * from Payment maxresults 1000");
+    for (const payment of Payment) {
+      const [{ TxnId }] = payment.Line[0].LinkedTxn;
+      const paidFor = entered[Number(TxnId) - 1]!;
+      expect(payment.TxnDate).toBe(companyDay(paidFor.paidAt!));
     }
   });
 
