@@ -11,7 +11,8 @@ export type JsonReviver = (key: string, value: unknown, context?: { source?: str
 /**
  * The body as a JSON object, or what's wrong with it. `example` shows the shape the endpoint expects; `reviver`, if
  * given, reads each value as JSON.parse's does. A reviver recurses, so it runs out of stack on nesting a plain
- * JSON.parse still reads; such a body is read without it, so the vendor still answers with what was wrong.
+ * JSON.parse still reads; such a body is read without it, so the vendor still answers with what was wrong, unless
+ * the reviver would have read one of its numbers differently: that body is refused rather than read wrong.
  */
 export async function readJsonObject(
   c: Context,
@@ -26,12 +27,31 @@ export async function readJsonObject(
     } catch (error) {
       if (!reviver || !(error instanceof RangeError)) throw error;
       body = JSON.parse(text);
+      const misread = numberRevivedDifferently(text, reviver);
+      if (misread !== undefined) {
+        return {
+          problem: `The request body is nested too deeply for the twin to read ${misread} as sent. Nest it less deeply, or send the number as a string.`,
+        };
+      }
     }
   } catch (error) {
     return { problem: `The request body isn't valid JSON (${(error as Error).message}). Send a JSON object, like ${example}.` };
   }
   if (!isObject(body)) return { problem: `The request body must be a JSON object, like ${example}.` };
   return { body };
+}
+
+/**
+ * The first number in a JSON text that `reviver` reads as something other than JSON.parse does, if any. Strings are
+ * matched whole and skipped, so only numbers outside them count; the text has already parsed, so this reads it right.
+ */
+function numberRevivedDifferently(text: string, reviver: JsonReviver): string | undefined {
+  for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)) {
+    if (token.startsWith('"')) continue;
+    const value = JSON.parse(token);
+    if (!Object.is(reviver("", value, { source: token }), value)) return token;
+  }
+  return undefined;
 }
 
 /** An OAuth request's form fields, or what's wrong with the body. OAuth 2.0 sends forms, never JSON. */

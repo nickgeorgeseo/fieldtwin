@@ -64,6 +64,31 @@ describe("QuickBooks twin: long numbers in text fields", () => {
     expect((await (await raw(harness, "/payment", paymentBody)).json()).Payment.PaymentRefNum).toBe("12345678901234567890");
   });
 
+  it("refuses a long number it can't read digit for digit, beside a list nested too deeply to read that way (2010)", async () => {
+    // Reading a number by its digits recurses, and runs out of stack on nesting a plain JSON.parse still reads. Where
+    // depends on the engine's stack, so find the shallowest nesting that does it here.
+    const tooDeep = (() => {
+      for (let depth = 1000; depth <= 512_000; depth *= 2) {
+        const text = `${"[".repeat(depth)}${"]".repeat(depth)}`;
+        try {
+          JSON.parse(text, (_key, value) => value);
+        } catch {
+          JSON.parse(text); // still read without one
+          return text;
+        }
+      }
+      throw new Error("JSON.parse read every nesting with a reviver, so this engine needs no fallback");
+    })();
+    const harness = setup();
+    const response = await raw(harness, "/customer", `{"DisplayName": 12345678901234567890, "Notes": ${tooDeep}}`);
+    expect(response.status).toBe(400);
+    const fault = await faultOf(response);
+    expect(fault.code).toBe("2010");
+    expect(fault.Detail).toContain("12345678901234567890");
+    const deepWithoutLongNumbers = await raw(harness, "/customer", `{"DisplayName": "Deep Ada", "Notes": ${tooDeep}}`);
+    expect(deepWithoutLongNumbers.status).toBe(200);
+  });
+
   it("counts a 22-digit DocNumber sent as a number by its 22 digits, past the 21 allowed (2050)", async () => {
     const response = await raw(
       setup(),
