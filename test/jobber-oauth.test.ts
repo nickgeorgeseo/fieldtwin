@@ -169,6 +169,32 @@ describe("Jobber OAuth twin", () => {
     expect(await twoGrantTypes.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/^grant_type/) });
   });
 
+  it("reads a field named like scope[] sent once as sent once, and still refuses one sent twice", async () => {
+    const harness = setup();
+    const send = (fields: [string, string][]) =>
+      harness.app.request("/api/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams([["client_id", CLIENT.id], ["client_secret", CLIENT.secret], ...fields]).toString(),
+      });
+    const once = await send([
+      ["grant_type", "refresh_token"],
+      ["refresh_token", "unknown"],
+      ["scope[]", "read"],
+    ]);
+    expect(await once.json()).toMatchObject({ error: "invalid_grant" }); // past the form: only the made-up token is refused
+    const twice = await send([
+      ["grant_type", "refresh_token"],
+      ["refresh_token", "unknown"],
+      ["scope[]", "read"],
+      ["scope[]", "write"],
+    ]);
+    expect(await twice.json()).toMatchObject({
+      error: "invalid_request",
+      error_description: expect.stringMatching(/^scope\[\] was sent more than once/),
+    });
+  });
+
   it("needs the client secret", async () => {
     const harness = setup();
     const response = await harness.app.request("/api/oauth/token", {

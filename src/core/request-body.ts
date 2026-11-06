@@ -40,15 +40,20 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
   if (!/application\/x-www-form-urlencoded|multipart\/form-data/i.test(c.req.header("Content-Type") ?? "")) {
     return { problem: `Send the request body as ${formEncoded}, as OAuth 2.0 requires.` };
   }
-  let body: Record<string, unknown>;
+  let body: FormData;
   try {
-    body = await c.req.parseBody({ all: true }); // a field sent twice comes back as an array
+    // FormData, not parseBody: parseBody makes any field named like scope[] a list, sent once or not, so a field sent
+    // once could not be told from one sent twice.
+    body = await c.req.formData();
   } catch {
     return { problem: `The request body isn't a form the twin can read. Send it as ${formEncoded}.` };
   }
-  const repeated = Object.keys(body).find((name) => Array.isArray(body[name]));
+  const names = [...new Set(body.keys())];
+  const repeated = names.find((name) => body.getAll(name).length > 1);
   if (repeated) return { problem: repeatedProblem(repeated) };
-  const fields = Object.entries(body).filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  const fields = names
+    .map((name) => [name, body.get(name)] as const)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string");
   return { form: Object.fromEntries(fields) };
 }
 
