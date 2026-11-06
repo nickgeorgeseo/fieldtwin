@@ -116,11 +116,20 @@ export function matchInvoices(books: Books, service: FieldService): InvoiceRow[]
     });
   }
   // Newest number first. A DocNumber is free text ("5x"), so one comparison that reads the digits in it as numbers
-  // keeps the order the same whatever order the log has them in.
+  // keeps the order the same whatever order the log has them in. Numbers it reads as equal ("5" and "05") fall back to
+  // the text itself, then to the QuickBooks Id, so no two rows ever tie.
   return rows.sort(
     (a, b) =>
-      INVOICE_ORDER.indexOf(a.status) - INVOICE_ORDER.indexOf(b.status) || b.number.localeCompare(a.number, "en", { numeric: true }),
+      INVOICE_ORDER.indexOf(a.status) - INVOICE_ORDER.indexOf(b.status) ||
+      b.number.localeCompare(a.number, "en", { numeric: true }) ||
+      byText(b.number, a.number) ||
+      byText(b.quickbooks?.id ?? "", a.quickbooks?.id ?? ""),
   );
+}
+
+/** Plain text order, code unit by code unit: never 0 for two different strings, unlike a locale's. */
+function byText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** Pairs each field-service record with the first record in the books that has the same key and isn't paired yet. */

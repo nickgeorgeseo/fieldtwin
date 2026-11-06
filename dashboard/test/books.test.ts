@@ -248,6 +248,24 @@ describe("matching invoices by Jobber's number and QuickBooks' DocNumber", () =>
     ]);
   });
 
+  it("lists numbers that read as the same number, like 5 and 05, in one order too, and the same number booked twice by Id", () => {
+    const booked = [
+      qboInvoice("7", "5", "Kendall Dunmore", 1, 1),
+      qboInvoice("8", "05", "Kendall Dunmore", 1, 1),
+      qboInvoice("9", "5", "Kendall Dunmore", 1, 1),
+    ];
+    const orders = [booked, [booked[1], booked[2], booked[0]], [booked[2], booked[0], booked[1]]].map((invoices) =>
+      matchInvoices(readBooks(invoices.map((invoice) => event("quickbooks", "InvoiceCreated", { invoice }))), "jobber").map(
+        (row) => `${row.number}/${row.quickbooks?.id}`,
+      ),
+    );
+    assert.deepEqual(orders, [
+      ["5/9", "5/7", "05/8"],
+      ["5/9", "5/7", "05/8"],
+      ["5/9", "5/7", "05/8"],
+    ]);
+  });
+
   it("keeps an invoice the books booked twice under one number, since QuickBooks accepts the second", () => {
     const twice = readBooks([
       event("jobber", "ClientCreated", { client: client(1, "Kendall", "Dunmore", "kendall@example.com") }),
