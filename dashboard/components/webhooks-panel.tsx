@@ -29,16 +29,18 @@ const STATUS_TONES: Record<Delivery["status"], BadgeTone> = { delivered: "green"
 
 /** Where the twin sends webhooks, and how each delivery went (GET and PUT /_twin/webhooks). */
 export function WebhooksPanel() {
-  const { status, logKey } = useTwin();
+  const { status } = useTwin();
   const { busy, notice, run } = useAction();
   const [report, setReport] = useState<WebhookReport | null>(null);
   const [text, setText] = useState(EXAMPLE);
   const offset = status?.company.utcOffsetHours ?? 0;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliveries happen as the log grows and time passes, which logKey tracks
+  // Read on each time the twin's status is read, not only when logKey changes: a delivery finishes on its own, after
+  // the event that sent it, without growing the log or moving the clock.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: status is read every few seconds and after each change, which is when to read on
   useEffect(() => {
     twinGet<WebhookReport>("/webhooks").then(setReport, () => setReport(null));
-  }, [logKey, notice]);
+  }, [status, notice]);
 
   const subscribe = (subscriptions: unknown) =>
     run(async () => {
