@@ -54,8 +54,11 @@ function numberRevivedDifferently(text: string, reviver: JsonReviver): string | 
   return undefined;
 }
 
-/** An OAuth request's form fields, or what's wrong with the body. OAuth 2.0 sends forms, never JSON. */
-export async function readForm(c: Context): Promise<{ form: Record<string, string> } | { problem: string }> {
+/**
+ * An OAuth request's form fields, or what's wrong with the body. OAuth 2.0 sends forms, never JSON. `repeated` names
+ * a parameter sent twice, a problem with what was sent rather than how, which a different body format wouldn't fix.
+ */
+export async function readForm(c: Context): Promise<{ form: Record<string, string> } | { problem: string; repeated?: string }> {
   const formEncoded = "application/x-www-form-urlencoded";
   if (!/application\/x-www-form-urlencoded|multipart\/form-data/i.test(c.req.header("Content-Type") ?? "")) {
     return { problem: `Send the request body as ${formEncoded}, as OAuth 2.0 requires.` };
@@ -70,7 +73,7 @@ export async function readForm(c: Context): Promise<{ form: Record<string, strin
   }
   const names = [...new Set(body.keys())];
   const repeated = names.find((name) => body.getAll(name).length > 1);
-  if (repeated) return { problem: repeatedProblem(repeated) };
+  if (repeated) return { problem: repeatedProblem(repeated), repeated };
   const fields = names
     .map((name) => [name, body.get(name)] as const)
     .filter((entry): entry is [string, string] => typeof entry[1] === "string");

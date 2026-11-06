@@ -191,6 +191,19 @@ describe("Housecall Pro OAuth twin", () => {
     expect(await broken.json()).toMatchObject({ error: "invalid_request", error_description: expect.stringMatching(/isn't valid JSON/) });
   });
 
+  it("refuses a form token request that sends a parameter twice without saying to send JSON, which wouldn't help", async () => {
+    const response = await setup().app.request("/housecallpro/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "client_id=a&client_secret=s&grant_type=refresh_token&refresh_token=x&refresh_token=y",
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "invalid_request",
+      error_description: "refresh_token was sent more than once. Send each parameter once, as OAuth 2.0 requires.",
+    });
+  });
+
   it("lets an authorization code expire after 10 minutes of twin time, with the documented invalid_grant", async () => {
     const harness = setup();
     const code = codeFrom(await authorize(harness));

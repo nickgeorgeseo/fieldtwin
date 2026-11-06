@@ -95,5 +95,7 @@ async function readTokenRequest(c: Context): Promise<{ fields: Record<string, un
     return "problem" in read ? read : { fields: read.body };
   }
   const read = await readForm(c);
-  return "problem" in read ? { problem: `${read.problem} Housecall Pro's docs send JSON.` } : { fields: read.form };
+  if (!("problem" in read)) return { fields: read.form };
+  // Pointing to JSON helps a body the twin can't read as a form, not a parameter sent twice: JSON keeps the last one.
+  return read.repeated ? read : { problem: `${read.problem} Housecall Pro's docs send JSON.` };
 }
