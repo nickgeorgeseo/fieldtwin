@@ -51,14 +51,30 @@ const ORDER_TESTS: Record<Exclude<QueryOperator, "like">, (order: number) => boo
 /** Whether a record's value (as comparable() gives it) meets a condition. A record without the property never does. */
 export function holds({ property, operator, values }: QueryCondition, actual: unknown): boolean {
   if (actual === undefined) return false;
-  if (operator === "like") return likePattern(String(values[0])).test(String(actual));
+  if (operator === "like") return likeMatches(String(values[0]), String(actual));
   return values.some((wanted) => ORDER_TESTS[operator](compareValues(property, actual, wanted)));
 }
 
-/** "Wildcard character support for LIKE clauses is limited to '%'": every other character matches itself. */
-function likePattern(pattern: string): RegExp {
-  const literal = pattern.split("%").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return new RegExp(`^${literal.join(".*")}$`, "is");
+/**
+ * "Wildcard character support for LIKE clauses is limited to '%'": every other character matches itself.
+ * With % the only wildcard, finding each part at its leftmost place after the one before is exact, and never
+ * backtracks: a RegExp would, freezing the whole twin on a few %s, and refuses a pattern over 32,767 characters.
+ */
+function likeMatches(pattern: string, value: string): boolean {
+  // "Attribute values are also not case sensitive."
+  const parts = pattern.toLowerCase().split("%");
+  const text = value.toLowerCase();
+  const first = parts[0] ?? "";
+  const last = parts[parts.length - 1] ?? "";
+  if (parts.length === 1) return text === first;
+  if (!text.startsWith(first)) return false;
+  let from = first.length;
+  for (const part of parts.slice(1, -1)) {
+    const at = text.indexOf(part, from);
+    if (at === -1) return false;
+    from = at + part.length;
+  }
+  return text.length - last.length >= from && text.endsWith(last);
 }
 
 /** Records without a property sort as its lowest value: first ascending, last descending. Ties keep the default order. */

@@ -121,6 +121,24 @@ describe("QuickBooks query clause: LIKE", () => {
     const { body } = await query(harness, "select * from Customer where DisplayName like 'A.B.%(East)'");
     expect(body.QueryResponse.Customer.map((customer: { DisplayName: string }) => customer.DisplayName)).toEqual(["A.B. Cooling (East)"]);
   });
+
+  it("answers a pattern with many % wildcards at once, matching each part in order", async () => {
+    const harness = setup();
+    await harness.qboPost("/customer", { DisplayName: "a".repeat(60) });
+    await harness.qboPost("/customer", { DisplayName: `${"a".repeat(30)}b` });
+    const { body } = await query(harness, `select * from Customer where DisplayName like '${"%a".repeat(7)}%b'`);
+    expect(body.QueryResponse.Customer.map((customer: { DisplayName: string }) => customer.DisplayName)).toEqual([`${"a".repeat(30)}b`]);
+  });
+
+  it("answers a very long pattern as matching nothing, rather than failing", async () => {
+    const response = await setup().app.request("/v3/company/9341000000000001/query", {
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/text" },
+      body: `select count(*) from Customer where DisplayName like '${"ab".repeat(20_000)}%'`,
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).QueryResponse).toEqual({ totalCount: 0 });
+  });
 });
 
 describe("QuickBooks query clause: ORDERBY", () => {
