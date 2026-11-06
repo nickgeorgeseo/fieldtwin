@@ -157,6 +157,17 @@ describe("Housecall Pro twin: creating jobs", () => {
     expect((await lettered.json()).error.message).toMatch(/invoice_number/);
   });
 
+  it("numbers a job whose invoice_number is left blank after the highest, as the docs say a blank one is generated", async () => {
+    const harness = setup();
+    const { customerId, addressId } = await jobCast(harness);
+    const next = harness.twin.world.history.jobs.length + 1;
+    for (const [i, invoice_number] of ["", "   "].entries()) {
+      const response = await harness.hcpPost("/jobs", { customer_id: customerId, address_id: addressId, invoice_number });
+      expect(response.status, JSON.stringify(invoice_number)).toBe(201);
+      expect((await response.json()).invoice_number).toBe(String(next + i));
+    }
+  });
+
   it("takes a large quantity with two decimal places, and refuses a third", async () => {
     const harness = setup();
     const { customerId, addressId } = await jobCast(harness);

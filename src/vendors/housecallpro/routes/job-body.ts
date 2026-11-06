@@ -69,7 +69,8 @@ export function readJobRequest(body: Record<string, unknown>, state: HcpState): 
 
 /** "Invoice number must be unique across all of a company's jobs in Housecall Pro." A number, as JobCreate types it. */
 function readInvoiceNumber(sent: unknown, state: HcpState): { value: string | undefined } | Refusal {
-  if (sent === undefined || sent === null) return { value: undefined };
+  // "If left blank, one will be automatically generated": blank text is not sent, as Rails reads it too.
+  if (sent === undefined || sent === null || (typeof sent === "string" && !sent.trim())) return { value: undefined };
   // Digits in a string work too ("6001"), as answers write the number and Rails would read it (FIDELITY.md).
   const value = typeof sent === "string" && /^\d+$/.test(sent) ? Number(sent) : sent;
   // A safe integer, so it prints as digits ("5000", never "1e+21") and the number after it is one more.
