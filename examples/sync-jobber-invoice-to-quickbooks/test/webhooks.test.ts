@@ -109,6 +109,13 @@ describe("the webhook handler's edges", () => {
     expect(response.status).toBe(400);
   });
 
+  it("answers 400 to a signed body that is JSON but not an object, like null, instead of throwing", async () => {
+    for (const body of ["null", "[]", "42", '"text"']) {
+      const response = await handler()(new Request(HOOK_URL, { method: "POST", body, headers: { "X-Jobber-Hmac-SHA256": signed(body) } }));
+      expect(response.status, body).toBe(400);
+    }
+  });
+
   it("refuses a body far bigger than any webhook before hashing it", async () => {
     const body = "x".repeat(1_000_000);
     const response = await handler()(new Request(HOOK_URL, { method: "POST", body, headers: { "X-Jobber-Hmac-SHA256": signed(body) } }));

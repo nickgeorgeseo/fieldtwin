@@ -34,13 +34,13 @@ export function jobberWebhookHandler(options: { clientSecret: string; onEvent: (
     if (!verifyJobberSignature(body, request.headers.get("X-Jobber-Hmac-SHA256"), options.clientSecret)) {
       return new Response("signature doesn't verify", { status: 401 });
     }
-    let payload: { data?: { webHookEvent?: JobberWebhookEvent } };
+    let payload: { data?: { webHookEvent?: JobberWebhookEvent } } | null; // valid JSON can be null, which has no fields to read
     try {
       payload = JSON.parse(body.toString("utf8").replace(/^\uFEFF/, ""));
     } catch {
       return new Response("not JSON", { status: 400 });
     }
-    const event = payload.data?.webHookEvent;
+    const event = payload?.data?.webHookEvent;
     if (!event?.topic || !event.itemId) return new Response("not a webhook event", { status: 400 });
     options.onEvent(event);
     return new Response(null, { status: 200 });
